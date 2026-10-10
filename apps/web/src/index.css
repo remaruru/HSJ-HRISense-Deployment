@@ -1,0 +1,750 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ─── Design Token System ─────────────────────────────────────── */
+@theme {
+  /* Primary Palette — derived from #148281 */
+  --color-primary-50: #e6f5f4;
+  --color-primary-100: #c0e6e5;
+  --color-primary-200: #97d6d4;
+  --color-primary-300: #6cc5c3;
+  --color-primary-400: #4db8b6;
+  --color-primary-500: #148281;
+  --color-primary-600: #117472;
+  --color-primary-700: #0d6362;
+  --color-primary-800: #095251;
+  --color-primary-900: #053332;
+  --color-primary-950: #021e1e;
+
+  /* Not a stock Tailwind shade, but seven screens use `dark:bg-slate-850`;
+     without this the class generated nothing and their panels stayed light. */
+  --color-slate-850: #172033;
+
+  /* Semantic Colors */
+  --color-success: #16a34a;
+  /* The older *-light / *-dark pairs now point at the Hospicio colour code,
+     so every chip that already used them (leave, attendance, training…)
+     matches the palette and follows dark mode. They were fixed light-only hex
+     values that differed from the palette. */
+  --color-success-light: var(--status-success-surface);
+  --color-success-dark: var(--status-success-foreground);
+  --color-warning: #d97706;
+  --color-warning-light: var(--status-warning-surface);
+  --color-warning-dark: var(--status-warning-foreground);
+  --color-danger: #dc2626;
+  --color-danger-light: var(--status-danger-surface);
+  --color-danger-dark: var(--status-danger-foreground);
+  /* Was #2563eb. Informational is neutral now; nothing in HRISense is blue. */
+  --color-info: #475569;
+  --color-info-light: var(--status-info-surface);
+  --color-info-dark: var(--status-info-foreground);
+  /* The numbered scale these classes expect. Neutral, matching the tone above. */
+  --color-info-50: var(--color-slate-50);
+  --color-info-100: var(--color-slate-100);
+  --color-info-200: var(--color-slate-200);
+  --color-info-300: var(--color-slate-300);
+  --color-info-400: var(--color-slate-400);
+  --color-info-500: var(--color-slate-500);
+  --color-info-600: var(--color-slate-600);
+  --color-info-700: var(--color-slate-700);
+  --color-info-800: var(--color-slate-800);
+  --color-info-900: var(--color-slate-900);
+  --color-info-950: var(--color-slate-950);
+
+  /* AI / Accent */
+  --color-accent: #7c3aed;
+  --color-accent-light: #ede9fe;
+  --color-accent-dark: #6d28d9;
+
+  /* Secondary Pop Colors */
+  --color-pop-pink: #f472b6;
+  /* Removed: #fbbf24 was a secondary brand colour that is not in the approved
+     palette. Kept as an alias of the brand so any stray reference stays on-system. */
+  --color-pop-amber: var(--color-primary-300);
+  --color-pop-emerald: #34d399;
+  --color-pop-violet: #a78bfa;
+
+  
+      /* Semantic Colors - Mapped to CSS variables */
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-elevated: var(--surface-elevated);
+
+  --color-sidebar-background: var(--sidebar-background);
+  --color-topbar-background: var(--topbar-background);
+  --color-input-background: var(--input-background);
+  --color-table-background: var(--table-background);
+  --color-table-header-background: var(--table-header-background);
+
+  --color-foreground: var(--foreground);
+  --color-heading-foreground: var(--heading-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  /* Soft hairline border. `--border` is deliberately heavy (slate-700 in light
+     mode) for the system's bold surfaces; this is the quiet alternative for
+     dense management screens where a dark 1px outline on every card reads as
+     visual noise. */
+  --color-border-soft: var(--border-soft);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  
+  --color-input: var(--input-border);
+  --color-ring: var(--ring);
+
+  /* Semantic status surfaces. Declared here so Tailwind GENERATES the
+     `bg-status-*` / `text-status-*` / `border-status-*` utilities; the same
+     names are re-declared in the token bridge below so they RESOLVE against
+     whichever theme scope wins. Both halves are required. */
+  --color-status-total-surface: var(--status-total-surface);
+  --color-status-total-border: var(--status-total-border);
+  --color-status-total-foreground: var(--status-total-foreground);
+  --color-status-success-surface: var(--status-success-surface);
+  --color-status-success-border: var(--status-success-border);
+  --color-status-success-foreground: var(--status-success-foreground);
+  --color-status-warning-surface: var(--status-warning-surface);
+  --color-status-warning-border: var(--status-warning-border);
+  --color-status-warning-foreground: var(--status-warning-foreground);
+  --color-status-danger-surface: var(--status-danger-surface);
+  --color-status-danger-border: var(--status-danger-border);
+  --color-status-danger-foreground: var(--status-danger-foreground);
+  --color-status-info-surface: var(--status-info-surface);
+  --color-status-info-border: var(--status-info-border);
+  --color-status-info-foreground: var(--status-info-foreground);
+  --color-status-accent-surface: var(--status-accent-surface);
+  --color-status-accent-border: var(--status-accent-border);
+  --color-status-accent-foreground: var(--status-accent-foreground);
+  --color-status-neutral-surface: var(--status-neutral-surface);
+  --color-status-neutral-border: var(--status-neutral-border);
+  --color-status-neutral-foreground: var(--status-neutral-foreground);
+  --color-nav-selected-surface: var(--nav-selected-surface);
+  --color-nav-selected-foreground: var(--nav-selected-foreground);
+
+  /* Typography */
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-heading: 'Outfit', system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+  /* Border Radius */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  /* One container look for the whole system: a border you can actually see and
+     a shadow thrown down and to the RIGHT, so every panel reads as floating off
+     the page. Light mode keeps a faint teal in the far shadow for the brand. */
+  --container-border: #0f172a;
+  --container-border-width: 1px;
+  --shadow-container: 4px 4px 0 0 #1e293b;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.05), 0 4px 16px rgba(20,130,129,0.06);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.08), 0 8px 32px rgba(20,130,129,0.12);
+  --shadow-glow: 0 0 24px rgba(20,130,129,0.25);
+
+  /* Transitions */
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── CSS Custom Properties (for JS & DOM interop) ──────────────── */
+:root {
+  color-scheme: light;
+  --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
+  --topnav-height: 64px;
+  
+  /* Fallback Light Mode Variables for Public Pages */
+  /* The page is white in light mode. Containers are told apart by their border
+     and their shadow, not by a tinted sheet behind them. */
+  --background: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-elevated: #ffffff;
+  --foreground: #0f172a;
+  --heading-foreground: #0f172a;
+  --secondary-foreground: #334155;
+  --muted-foreground: #64748b;
+  --border: #334155;
+  --border-strong: #0f172a;
+  --border-soft: #e2e8f0;
+  --input-background: #ffffff;
+  --input-border: #334155;
+  --primary: #148281;
+  --primary-foreground: #ffffff;
+  --ring: #148281;
+  --accent: #7c3aed;
+  --radius: 12px;
+
+  /* ─── Hospicio Capstone colour code (the system-wide rule) ───────
+       #b9e0de  sidebar selected             → --nav-selected-surface
+       #def2e7  TOTAL / positive / create    → --status-total, --status-success
+       #fff1f2  missing, expired, urgent     → --status-danger
+       #f7ecd5  pending, awaiting, expiring  → --status-warning
+       #F2EDFD  needs review                 → --status-accent
+     The earlier, stronger fills (#b7e6c8, #f7c9c9, #f7dfae) now outline
+     these surfaces as their borders.
+     ─── Semantic status surfaces ──────────────────────────────────
+     Soft tinted containers for summary cards, status chips and alert
+     panels. One tone per MEANING, defined once per theme, so a "expired"
+     card looks the same in Medical, Compliance and the dashboard.
+     `-surface` fills, `-border` outlines, `-foreground` is the readable
+     text/icon colour on that fill. The older `*-light` hexes stay for the
+     existing chips; these are the theme-aware replacements. */
+  --status-total-surface: #def2e7;
+  --status-total-border: #b7e6c8;
+  --status-total-foreground: #14532d;
+
+  --status-success-surface: #def2e7;
+  --status-success-border: #b7e6c8;
+  --status-success-foreground: #14532d;
+
+  --status-warning-surface: #f7ecd5;
+  --status-warning-border: #ecd6a6;
+  --status-warning-foreground: #78350f;
+
+  --status-danger-surface: #fff1f2;
+  --status-danger-border: #f7c9c9;
+  --status-danger-foreground: #7f1d1d;
+
+  /* Informational — NOT a fifth semantic colour.
+     The approved palette has four meanings (positive, urgent, pending, review);
+     anything that is merely information takes the neutral system surface. These
+     tokens keep the `info` name so the call sites do not all have to change, but
+     they resolve to neutral. Blue is no longer a HRISense colour. */
+  --status-info-surface: #f1f5f9;
+  --status-info-border: #e2e8f0;
+  --status-info-foreground: #334155;
+
+  /* Module identity tone — Psychological records. */
+  --status-accent-surface: #f2edfd;
+  --status-accent-border: #d9caf8;
+  --status-accent-foreground: #5b21b6;
+
+  --status-neutral-surface: #f1f5f9;
+  --status-neutral-border: #e2e8f0;
+  --status-neutral-foreground: #334155;
+  /* Sidebar selected item — Hospicio Capstone colour code. */
+  --nav-selected-surface: #b9e0de;
+  --nav-selected-foreground: #095251;
+}
+
+/*
+ * Was `html.dark :root`, which can NEVER match: `:root` *is* `<html>`, and an
+ * element cannot be a descendant of itself. The public/unauthenticated pages
+ * therefore had no dark values at all.
+ *
+ * ─── Dark mode = "dimmed", not black ─────────────────────────────
+ * The first dark theme was near-black navy (#080f1d) with near-white text
+ * (#f8fafc), about 18:1 — glaring for long reading. This one keeps text at
+ * roughly 11–13:1 (still well past WCAG AA) on soft slate surfaces:
+ *   page #141a22 · card #1b232d · raised #222b36 / #28323e
+ *   text #d5dde6 · headings #e6ecf2 · secondary #b3bfcc · muted #8d9aa9
+ * Status colours flip roles: the Hospicio pastels become the TEXT, on a
+ * quietly tinted panel, so meaning survives without glowing blocks.
+ */
+html.dark {
+  --container-border: #6b7785;
+  --container-border-width: 1px;
+  --shadow-container: 4px 4px 0 0 #090d12;
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.5), 0 6px 18px rgba(0,0,0,0.38);
+  --shadow-card-hover: 0 4px 10px rgba(0,0,0,0.55), 0 12px 30px rgba(0,0,0,0.45);
+
+  color-scheme: dark; /* native scrollbars, date pickers and selects go dark too */
+
+  /* Fallback Dark Mode Variables for Public Pages */
+  --background: #141a22;
+  --surface: #1b232d;
+  --surface-2: #222b36;
+  --surface-elevated: #28323e;
+  --foreground: #d5dde6;
+  --heading-foreground: #e6ecf2;
+  --secondary-foreground: #b3bfcc;
+  --muted-foreground: #8d9aa9;
+  --border: #3a4654;
+  --border-strong: #52606f;
+  --border-soft: #2a3440;
+  --input-background: #202934;
+  --input-border: #52606f;
+
+  --status-total-surface: #1b2f28;
+  --status-total-border: #2f5243;
+  --status-total-foreground: #b7e6c8;
+
+  --status-success-surface: #1b2f28;
+  --status-success-border: #2f5243;
+  --status-success-foreground: #b7e6c8;
+
+  --status-warning-surface: #2f2a1d;
+  --status-warning-border: #56492c;
+  --status-warning-foreground: #f0d69e;
+
+  --status-danger-surface: #33232a;
+  --status-danger-border: #5c3a42;
+  --status-danger-foreground: #f7c9c9;
+
+  /* Informational = neutral here too (see the note in light mode). */
+  --status-info-surface: #222b36;
+  --status-info-border: #2f3a47;
+  --status-info-foreground: #c3cdd8;
+
+  --status-accent-surface: #2a2540;
+  --status-accent-border: #4a3f6e;
+  --status-accent-foreground: #d9caf8;
+
+  --status-neutral-surface: #222b36;
+  --status-neutral-border: #2f3a47;
+  --status-neutral-foreground: #c3cdd8;
+  --nav-selected-surface: #1f3f3e;
+  --nav-selected-foreground: #b9e0de;
+
+  /*
+   * Hundreds of screens name Tailwind greys directly for their dark look
+   * (`dark:bg-slate-900`, `dark:text-slate-100`, `dark:border-slate-700`…).
+   * Re-pointing the grey scales here moves every one of them onto the same
+   * dimmed palette as the tokens above, instead of the stock navy/white.
+   * The scale keeps its order (900 is still the darkest surface).
+   */
+  --color-slate-50: #eef2f6;  --color-gray-50: #eef2f6;
+  --color-slate-100: #dfe5ec; --color-gray-100: #dfe5ec;
+  --color-slate-200: #cbd4de; --color-gray-200: #cbd4de;
+  --color-slate-300: #b3bfcc; --color-gray-300: #b3bfcc;
+  --color-slate-400: #8d9aa9; --color-gray-400: #8d9aa9;
+  --color-slate-500: #6f7c8b; --color-gray-500: #6f7c8b;
+  --color-slate-600: #52606f; --color-gray-600: #52606f;
+  --color-slate-700: #3a4654; --color-gray-700: #3a4654;
+  --color-slate-800: #26303c; --color-gray-800: #26303c;
+  --color-slate-850: #212a35;
+  --color-slate-900: #1b232d; --color-gray-900: #1b232d;
+  --color-slate-950: #141a22; --color-gray-950: #141a22;
+
+  /* The deepest teals were near-black holes on the dimmed surfaces. */
+  --color-primary-900: #1c3f3e; --color-teal-900: #1c3f3e;
+  --color-primary-950: #16302f; --color-teal-950: #16302f;
+}
+
+.authenticated-app {
+  /* Page background: white (see the note on :root). */
+  --background: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-elevated: #ffffff;
+  
+  --sidebar-background: #ffffff;
+  --topbar-background: #ffffff;
+  --input-background: #ffffff;
+  /* The line around a control at rest. It has to read against the field's own
+     fill, so it is a border colour, never the background. */
+  --input-border: #334155;
+  --table-background: #ffffff;
+  --table-header-background: #f1f5f9;
+  
+  --foreground: #0f172a;
+  --heading-foreground: #0f172a;
+  --secondary-foreground: #334155;
+  --muted-foreground: #64748b;
+  
+  --border: #334155;
+  --border-strong: #0f172a;
+  --border-soft: #e2e8f0;
+  
+  --primary: #148281;
+  --primary-foreground: #ffffff;
+  
+  --ring: #148281;
+  --accent: #7c3aed;
+  --radius: 12px;
+}
+
+html.dark .authenticated-app {
+  /* Same dimmed palette as html.dark above — see the note there. */
+  --background: #141a22;
+  --surface: #1b232d;
+  --surface-2: #222b36;
+  --surface-elevated: #28323e;
+
+  --sidebar-background: #171e27;
+  --topbar-background: #1b232d;
+  --input-background: #202934;
+  --input-border: #52606f;
+  --table-background: #1b232d;
+  --table-header-background: #222b36;
+
+  --foreground: #d5dde6;
+  --heading-foreground: #e6ecf2;
+  --secondary-foreground: #b3bfcc;
+  --muted-foreground: #8d9aa9;
+
+  --border: #3a4654;
+  --border-strong: #52606f;
+  --border-soft: #2a3440;
+  
+  --primary: #148281;
+  --primary-foreground: #ffffff;
+  
+  --ring: #148281;
+  --accent: #7c3aed;
+  --radius: 12px;
+}
+
+/* ─── Dashboard welcome container ("teal tide") ─────────────────────── */
+/*
+ * A true left-to-right gradient in the brand family — deep teal → #148281 →
+ * bright aqua — never a status colour, so the pastel cards inside keep their
+ * meaning. Over the sweep: aqua light pooling behind the clock (top right), a
+ * seafoam (#b9e0de) glow from the lower left, and a deep ocean-blue pool at the
+ * lower right for depth. DashboardHeader draws flowing "silk" lines on top.
+ * The greeting sits on the deep end (white ≥7:1); the clock has its own dark
+ * glass chip so it stays readable on the bright end.
+ */
+.dashboard-hero {
+  background-color: #0d6362;
+  background-image:
+    radial-gradient(60% 95% at 100% -5%, rgb(125 211 205 / 0.55) 0%, transparent 60%),
+    radial-gradient(55% 80% at -5% 105%, rgb(185 224 222 / 0.26) 0%, transparent 60%),
+    radial-gradient(50% 70% at 88% 115%, rgb(18 88 124 / 0.5) 0%, transparent 65%),
+    linear-gradient(118deg, #0a4a49 0%, #0d6362 28%, #148281 56%, #2a9d95 80%, #4db8b6 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16),
+    0 14px 34px -14px rgb(13 99 98 / 0.55);
+}
+
+.dashboard-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgb(255 255 255 / 0.18) 1px, transparent 1.2px);
+  background-size: 18px 18px;
+  -webkit-mask-image: radial-gradient(60% 80% at 100% 0%, #000 0%, transparent 70%);
+  mask-image: radial-gradient(60% 80% at 100% 0%, #000 0%, transparent 70%);
+}
+
+html.dark .dashboard-hero {
+  background-color: #123837;
+  background-image:
+    radial-gradient(60% 95% at 100% -5%, rgb(125 211 205 / 0.22) 0%, transparent 60%),
+    radial-gradient(55% 80% at -5% 105%, rgb(185 224 222 / 0.10) 0%, transparent 60%),
+    radial-gradient(50% 70% at 88% 115%, rgb(18 88 124 / 0.35) 0%, transparent 65%),
+    linear-gradient(118deg, #0f2e2d 0%, #133a39 30%, #184b49 60%, #1d5b57 85%, #226863 100%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 14px 34px -16px rgb(0 0 0 / 0.55);
+}
+
+html.dark .dashboard-hero::before {
+  background-image: radial-gradient(rgb(255 255 255 / 0.10) 1px, transparent 1.2px);
+}
+
+/* ─── Scroll containers ─────────────────────────────────────────── */
+/*
+ * `no-scrollbar` was already used in five places (tab strips, modals, the
+ * announcement filter row) but had never been defined, so those strips showed a
+ * scrollbar across the middle of the UI. Hides the bar while keeping the area
+ * scrollable by wheel, touch and keyboard.
+ */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Semantic Token Bridge ─────────────────────────────────────── */
+/*
+ * Tailwind v4 resolves an `@theme` alias such as `--color-surface: var(--surface)`
+ * ONCE, on `:root`, and every element then inherits that already-resolved value.
+ * A CSS custom property substitutes at its point of DEFINITION, not at its point
+ * of use — so redefining `--surface` deeper (on `.authenticated-app`, or under
+ * `html.dark`) could never change what `bg-surface` / `text-foreground` /
+ * `border-border` actually painted. That is why every `--color-*` token kept its
+ * light value in dark mode and the KPI numbers rendered at 1.05:1 contrast.
+ *
+ * Re-declaring the aliases on each scope that overrides the raw variables makes
+ * every alias resolve against that scope's own value. `html.dark` and
+ * `html.dark .authenticated-app` target the SAME elements as `:root` and
+ * `.authenticated-app`, so the aliases below pick up whichever raw value won
+ * there. The colour values themselves stay defined exactly once, above.
+ */
+:root,
+.authenticated-app {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-elevated: var(--surface-elevated);
+
+  --color-sidebar-background: var(--sidebar-background);
+  --color-topbar-background: var(--topbar-background);
+  --color-input-background: var(--input-background);
+  --color-table-background: var(--table-background);
+  --color-table-header-background: var(--table-header-background);
+
+  --color-foreground: var(--foreground);
+  --color-heading-foreground: var(--heading-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-border-soft: var(--border-soft);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-input: var(--input-border);
+  --color-ring: var(--ring);
+
+  /* Semantic status surfaces — see the raw definitions above. */
+  --color-status-total-surface: var(--status-total-surface);
+  --color-status-total-border: var(--status-total-border);
+  --color-status-total-foreground: var(--status-total-foreground);
+  --color-status-success-surface: var(--status-success-surface);
+  --color-status-success-border: var(--status-success-border);
+  --color-status-success-foreground: var(--status-success-foreground);
+  --color-status-warning-surface: var(--status-warning-surface);
+  --color-status-warning-border: var(--status-warning-border);
+  --color-status-warning-foreground: var(--status-warning-foreground);
+  --color-status-danger-surface: var(--status-danger-surface);
+  --color-status-danger-border: var(--status-danger-border);
+  --color-status-danger-foreground: var(--status-danger-foreground);
+  --color-status-info-surface: var(--status-info-surface);
+  --color-status-info-border: var(--status-info-border);
+  --color-status-info-foreground: var(--status-info-foreground);
+  --color-status-accent-surface: var(--status-accent-surface);
+  --color-status-accent-border: var(--status-accent-border);
+  --color-status-accent-foreground: var(--status-accent-foreground);
+  --color-status-neutral-surface: var(--status-neutral-surface);
+  --color-status-neutral-border: var(--status-neutral-border);
+  --color-status-neutral-foreground: var(--status-neutral-foreground);
+  --color-nav-selected-surface: var(--nav-selected-surface);
+  --color-nav-selected-foreground: var(--nav-selected-foreground);
+  --color-success-light: var(--status-success-surface);
+  --color-success-dark: var(--status-success-foreground);
+  --color-warning-light: var(--status-warning-surface);
+  --color-warning-dark: var(--status-warning-foreground);
+  --color-danger-light: var(--status-danger-surface);
+  --color-danger-dark: var(--status-danger-foreground);
+  --color-info-light: var(--status-info-surface);
+  --color-info-dark: var(--status-info-foreground);
+  /* The numbered scale these classes expect. Neutral, matching the tone above. */
+  --color-info-50: var(--color-slate-50);
+  --color-info-100: var(--color-slate-100);
+  --color-info-200: var(--color-slate-200);
+  --color-info-300: var(--color-slate-300);
+  --color-info-400: var(--color-slate-400);
+  --color-info-500: var(--color-slate-500);
+  --color-info-600: var(--color-slate-600);
+  --color-info-700: var(--color-slate-700);
+  --color-info-800: var(--color-slate-800);
+  --color-info-900: var(--color-slate-900);
+  --color-info-950: var(--color-slate-950);
+}
+
+/* ─── Base Reset ────────────────────────────────────────────────── */
+/*
+ * These MUST live in `@layer base`.
+ *
+ * Tailwind v4 emits its utilities inside `@layer utilities`, and an UNLAYERED
+ * declaration beats a layered one no matter how low its specificity. When the
+ * `*` rule below was unlayered it silently defeated every `border-*` colour
+ * utility in the application — `border-red-500` computed to `#334155`, and the
+ * `border-border-soft` token had no effect anywhere. Keeping the reset in the
+ * base layer restores the intended cascade: the reset supplies the default
+ * border colour, and any explicit border utility overrides it.
+ */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    font-family: var(--font-body);
+    background-color: var(--background);
+    color: var(--foreground);
+    font-size: 1rem;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+}
+
+/* ─── The panel look (one rule for the whole system) ───────────────
+ * Solid dark hairline plus a hard block offset down-and-right — the same
+ * treatment as the primary button — on every PANEL, on every page and in all
+ * three account types, so the system reads as one thing.
+ *
+ * What counts as a panel, and what deliberately does not:
+ *   · it must be a rounded box that owns a real `border` / `border-2` class —
+ *     `border-b` table rows and `border-border` colour classes are not boxes;
+ *   · it must sit on a surface background (bg-surface / bg-white / bg-card).
+ *     The inner boxes in this codebase are tinted (bg-muted, bg-surface-2,
+ *     bg-slate-50), so detail strips inside a card stay quiet instead of
+ *     stacking a second dark frame inside the first;
+ *   · a panel nested inside another panel is skipped for the same reason, and
+ *     because a hard shadow inside a rounded `overflow-hidden` parent is what
+ *     was getting sliced off at the edges;
+ *   · input, button, span and label are never matched, so controls, chips and
+ *     badges keep their own look;
+ *   · the :not() list protects MEANING: a panel whose OWN border is a status or
+ *     brand colour, a dashed placeholder, or one that owns a ring (Tailwind
+ *     builds rings out of box-shadow) is left exactly as it was. Each name is
+ *     matched at the start of the class list or after a space, so a variant such
+ *     as `hover:border-primary-200` does not disqualify a neutral card.
+ *   · `border-0` / `shadow-none` anywhere in the class list opt the box out
+ *     entirely — a box that drops its own frame at a breakpoint (the dashboard
+ *     rail sections go flush inside the rail at xl) is not asking to have one
+ *     forced back on.
+ *   · deliberately NOT inside a layer, so it beats the ad-hoc `shadow-sm` and
+ *     `border-slate-200` utilities scattered through the pages. That is the
+ *     point: uniform, not per-screen.
+ */
+:where(div, section, article, aside, header, footer, main, nav, form, ul, ol, li, table, figure, details)[class*="rounded-"]:is([class~="border"], [class~="border-2"]):is([class*="bg-surface"], [class*="bg-white"], [class~="bg-card"], [class*="bg-input-background"]):not(
+  [class^="border-status-"], [class*=" border-status-"],
+  [class^="border-nav-"], [class*=" border-nav-"],
+  [class^="border-primary"], [class*=" border-primary"],
+  [class^="border-accent"], [class*=" border-accent"],
+  [class^="border-success"], [class*=" border-success"],
+  [class^="border-danger"], [class*=" border-danger"],
+  [class^="border-warning"], [class*=" border-warning"],
+  [class^="border-info"], [class*=" border-info"],
+  [class^="border-amber"], [class*=" border-amber"],
+  [class^="border-emerald"], [class*=" border-emerald"],
+  [class^="border-rose"], [class*=" border-rose"],
+  [class^="border-red"], [class*=" border-red"],
+  [class^="border-green"], [class*=" border-green"],
+  [class^="border-teal"], [class*=" border-teal"],
+  [class^="border-blue"], [class*=" border-blue"],
+  [class^="border-indigo"], [class*=" border-indigo"],
+  [class^="border-violet"], [class*=" border-violet"],
+  [class^="border-purple"], [class*=" border-purple"],
+  [class^="border-cyan"], [class*=" border-cyan"],
+  [class^="border-orange"], [class*=" border-orange"],
+  [class^="border-yellow"], [class*=" border-yellow"],
+  [class^="border-pink"], [class*=" border-pink"],
+  [class^="border-dashed"], [class*=" border-dashed"],
+  [class^="border-transparent"], [class*=" border-transparent"],
+  [class^="ring-"], [class*=" ring-"],
+  [class*="border-0"], [class*="shadow-none"]
+):not(:where(:where(div, section, article, aside, header, footer, main, nav, form, ul, ol, li, table, figure, details)[class*="rounded-"]:is([class~="border"], [class~="border-2"]):is([class*="bg-surface"], [class*="bg-white"], [class~="bg-card"], [class*="bg-input-background"])) *) {
+  border-width: var(--container-border-width);
+  border-style: solid;
+  border-color: var(--container-border);
+  box-shadow: var(--shadow-container);
+}
+
+/* A child that fills a card edge to edge — an accordion header with its own
+ * fill, a coloured strip — paints AFTER the parent's border and knows nothing
+ * about the radius, so it squared off the corners and covered the border along
+ * the top. Clipping the card to its own shape puts both back.
+ *
+ * In the base layer on purpose: a card that sets its own overflow utility
+ * (`overflow-y-auto` on the tall draft modals) still wins. Table cards are in
+ * too — a sticky header's fill squared off their top corners — and every table
+ * inside one now sits in its own `overflow-x-auto` wrapper, so wide tables
+ * still scroll sideways instead of being cut.
+ */
+@layer base {
+  .authenticated-app .hrisense-surface,
+  .authenticated-app .hrisense-table-container {
+    overflow: hidden;
+  }
+}
+
+/* ─── HRISense Authenticated Container Classes ──────────────────── */
+.authenticated-app .hrisense-surface,
+.authenticated-app .hrisense-table-container {
+  background-color: var(--surface);
+  border: var(--container-border-width) solid var(--container-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-container);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/*
+ * The solid semantic colours (#7c3aed, #16a34a…) are tuned for white pages; as
+ * TEXT on the dimmed surfaces they drop to 2.7–4.3:1. In dark mode their text
+ * form uses the softer same-hue tone instead. Fills (`bg-danger` badges and the
+ * like) keep the strong colour so white text on them stays readable.
+ */
+html.dark .text-accent { color: #c4b5fd; }
+html.dark .text-success { color: #9ad8b2; }
+html.dark .text-warning { color: #f0cf8a; }
+html.dark .text-danger { color: #f4a9a9; }
+html.dark .text-info { color: #a9c7f3; }
+html.dark .text-primary-500,
+html.dark .text-primary-600 { color: var(--color-primary-300); }
+
+.authenticated-app .hrisense-overlay {
+  background-color: var(--surface);
+  border: var(--container-border-width) solid var(--container-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-container);
+}
+
+.authenticated-app .hrisense-control {
+  background-color: var(--input-background);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.authenticated-app .hrisense-control:focus-within,
+.authenticated-app .hrisense-control:focus {
+  border-color: var(--ring);
+  box-shadow: 4px 4px 0 var(--ring);
+}
+
+/* ─── Help Center Print Styling ──────────────────────────────────── */
+@media print {
+  aside,
+  header,
+  nav,
+  button {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  main {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  article {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+}

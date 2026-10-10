@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="HSJ HRISense: An AI-Assisted Workforce Administration System with Compliance Decision for Hospicio de San Jose" />
+    <meta name="theme-color" content="#148281" />
+    <title>HSJ HRISense: An AI-Assisted Workforce Administration System with Compliance Decision</title>
+    <!-- Preconnect for Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <script>
+      // Pre-paint the right theme so a reload does not flash white (see
+      // ThemeProvider). Public pages use the visitor's choice from the landing
+      // page switch; the signed-in app uses the current account's, mirrored in
+      // `hrisense_theme` and cleared on sign-out. Keep the public list in step
+      // with PUBLIC_* in src/lib/tokenStorage.ts.
+      (function() {
+        try {
+          var p = location.pathname;
+          var isPublic = p === '/' || p === '/login' || p === '/forgot-password' ||
+            p === '/reset-password' || p.indexOf('/careers') === 0;
+          var key = isPublic ? 'hrisense_theme:guest' : 'hrisense_theme';
+          if (localStorage.getItem(key) === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

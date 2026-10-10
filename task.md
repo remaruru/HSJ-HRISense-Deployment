@@ -1,0 +1,16 @@
+- `[x]` Fix Sticky public navigation
+- `[x]` Redesign Hero section
+- `[x]` Build Project overview section
+- `[x]` Update Core system capabilities
+- `[x]` Update Personalized user roles
+- `[x]` Build How HRISense Works section
+- `[x]` Update AI-assisted decision-support explanation
+- `[x]` Build About the Capstone section
+- `[x]` Build Three equal student team cards
+- `[x]` Build Separate Capstone Adviser acknowledgment
+- `[x]` Build Careers call to action
+- `[x]` Build Login call to action
+- `[x]` Build Complete footer
+- `[x]` Working-button and link audit
+- `[x]` Web build
+- `[x]` Documentation & Checkpoint commit

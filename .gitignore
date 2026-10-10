@@ -1,0 +1,67 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Production / Build output
+dist
+dist-ssr
+build
+.next
+out
+
+# TypeScript incremental artifacts
+*.tsbuildinfo
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ─── Environment & Secrets ───────────────────────────────────────────────────
+# Never commit real environment files; only the *.env.example templates.
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Private local runtime artifacts (dev credential reports, setup summaries)
+.local/
+**/.local/
+*credentials*.json
+*credentials*.txt
+dev_credentials_report.*
+simple_local_accounts.*
+
+# Database dumps / SQL backups — but keep the Prisma migrations (schema history the deployment needs)
+*.sql
+*.sqlite
+*.sqlite3
+!apps/api/prisma/migrations/**/migration.sql
+backups/
+workspace_snapshot/
+
+# Uploads — employee and applicant documents never go into the repository
+apps/api/uploads/
+uploads/
+
+# Archives and local QA output
+*.zip
+.qa/
+
+# Local / IDE files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db

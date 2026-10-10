@@ -1,0 +1,958 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model activity_attendances {
+  id           String    @id
+  employeeId   String
+  activityName String
+  activityDate DateTime  @db.Date
+  isPresent    Boolean   @default(false)
+  notes        String?
+  recordedById String?
+  createdAt    DateTime  @default(now())
+  employees    employees @relation(fields: [employeeId], references: [id])
+
+  @@index([activityDate])
+  @@index([employeeId])
+}
+
+model activity_logs {
+  id        String   @id
+  userId    String?
+  action    String
+  metadata  String?  @db.LongText
+  ipAddress String?
+  createdAt DateTime @default(now())
+  users     users?   @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model ai_conversations {
+  id         String   @id
+  userId     String
+  title      String?
+  messages   String   @db.LongText
+  model      String
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime
+
+  @@index([userId])
+}
+
+model ai_insights {
+  id               String           @id
+  type             ai_insights_type
+  title            String
+  content          String
+  confidenceScore  Float
+  module           String
+  targetEmployeeId String?
+  isActionable     Boolean          @default(false)
+  suggestedActions String?          @db.LongText
+  isRead           Boolean          @default(false)
+  expiresAt        DateTime?
+  generatedAt      DateTime         @default(now())
+  employees        employees?       @relation(fields: [targetEmployeeId], references: [id])
+
+  @@index([generatedAt])
+  @@index([isRead])
+  @@index([targetEmployeeId], map: "ai_insights_targetEmployeeId_fkey")
+  @@index([type])
+}
+
+model ai_request_logs {
+  id               String                 @id
+  requestedById    String?
+  prompt           String
+  response         String?
+  model            String
+  tokensUsed       Int?
+  promptTokens     Int?
+  completionTokens Int?
+  status           ai_request_logs_status @default(PENDING)
+  durationMs       Int?
+  error            String?
+  createdAt        DateTime               @default(now())
+
+  @@index([createdAt])
+  @@index([requestedById])
+  @@index([status])
+}
+
+model announcement_attachments {
+  id             String        @id
+  announcementId String
+  fileName       String
+  fileUrl        String
+  uploadedAt     DateTime      @default(now())
+  announcements  announcements @relation(fields: [announcementId], references: [id])
+
+  @@index([announcementId])
+}
+
+model announcements {
+  id                       String                     @id
+  title                    String
+  content                  String
+  priority                 announcements_priority     @default(NORMAL)
+  audience                 announcements_audience     @default(ALL)
+  targetUnitId             String?
+  targetJobRoleId          String?
+  targetEmployeeId         String?
+  isPinned                 Boolean                    @default(false)
+  authorId                 String
+  publishedAt              DateTime?
+  expiresAt                DateTime?
+  deletedAt                DateTime?
+  createdAt                DateTime                   @default(now())
+  updatedAt                DateTime
+  announcement_attachments announcement_attachments[]
+  employees                employees                  @relation(fields: [authorId], references: [id])
+  units                    units?                     @relation(fields: [targetUnitId], references: [id])
+
+  @@index([audience])
+  @@index([authorId])
+  @@index([isPinned])
+  @@index([publishedAt])
+  @@index([targetUnitId], map: "announcements_targetUnitId_fkey")
+}
+
+model attendance_logs {
+  id                 String              @id
+  employeeId         String
+  attendanceId       String?
+  logType            String
+  logDate            DateTime            @db.Date
+  minutesLate        Int?
+  excuseSlipUrl      String?
+  notes              String?
+  acknowledgedBy     String?
+  acknowledgedAt     DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime
+  attendance_records attendance_records? @relation(fields: [attendanceId], references: [id])
+  employees          employees           @relation(fields: [employeeId], references: [id])
+
+  @@index([attendanceId], map: "attendance_logs_attendanceId_fkey")
+  @@index([employeeId])
+  @@index([logDate])
+}
+
+model attendance_records {
+  id              String                    @id
+  employeeId      String
+  date            DateTime                  @db.Date
+  timeIn          DateTime?
+  timeOut         DateTime?
+  status          attendance_records_status
+  hoursWorked     Float?
+  overtimeHours   Float?
+  remarks         String?
+  verifiedById    String?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime
+  attendance_logs attendance_logs[]
+  employees       employees                 @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, date])
+  @@index([date])
+  @@index([employeeId])
+  @@index([status])
+}
+
+model audit_logs {
+  id               String   @id
+  action           String
+  oldValue         String?  @db.LongText
+  newValue         String?  @db.LongText
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime @default(now())
+  actorUserId      String?
+  entityId         String?
+  entityType       String?
+  metadata         String?  @db.LongText
+  targetEmployeeId String?
+  users            users?   @relation(fields: [actorUserId], references: [id])
+
+  @@index([actorUserId])
+  @@index([createdAt])
+  @@index([entityType])
+  @@index([targetEmployeeId])
+}
+
+model compliance_documents {
+  id                      String                  @id
+  requirementId           String
+  fileName                String
+  fileUrl                 String
+  uploadedById            String?
+  uploadedAt              DateTime                @default(now())
+  compliance_requirements compliance_requirements @relation(fields: [requirementId], references: [id])
+
+  @@index([requirementId])
+}
+
+model compliance_requirements {
+  id                   String                           @id
+  title                String
+  description          String
+  category             compliance_requirements_category
+  dueDate              DateTime
+  status               compliance_requirements_status   @default(PENDING)
+  responsibleUnitId    String?
+  aiRiskScore          Float?
+  reminderSentAt       DateTime?
+  completedAt          DateTime?
+  completionNotes      String?
+  deletedAt            DateTime?
+  createdAt            DateTime                         @default(now())
+  updatedAt            DateTime
+  compliance_documents compliance_documents[]
+  units                units?                           @relation(fields: [responsibleUnitId], references: [id])
+
+  @@index([category])
+  @@index([dueDate])
+  @@index([responsibleUnitId], map: "compliance_requirements_responsibleUnitId_fkey")
+  @@index([status])
+}
+
+model departments {
+  id                                             String        @id
+  name                                           String        @unique
+  code                                           String        @unique
+  description                                    String?
+  isActive                                       Boolean       @default(true)
+  createdAt                                      DateTime      @default(now())
+  updatedAt                                      DateTime
+  headJobRoleId                                  String?
+  parentDepartmentId                             String?
+  job_roles_departments_headJobRoleIdTojob_roles job_roles?    @relation("departments_headJobRoleIdTojob_roles", fields: [headJobRoleId], references: [id])
+  departments                                    departments?  @relation("departmentsTodepartments", fields: [parentDepartmentId], references: [id])
+  other_departments                              departments[] @relation("departmentsTodepartments")
+  employees                                      employees[]
+  job_roles_job_roles_departmentIdTodepartments  job_roles[]   @relation("job_roles_departmentIdTodepartments")
+  units                                          units[]
+
+  @@index([code])
+  @@index([headJobRoleId])
+  @@index([parentDepartmentId])
+}
+
+model email_verification_tokens {
+  id        String    @id
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  users     users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId], map: "email_verification_tokens_userId_fkey")
+}
+
+model employee_documents {
+  id                    String                      @id
+  employeeId            String
+  expiresAt             DateTime?
+  uploadedById          String?
+  uploadedAt            DateTime                    @default(now())
+  category              employee_documents_category
+  deletedAt             DateTime?
+  isVisibleToEmployee   Boolean                     @default(true)
+  isVisibleToSupervisor Boolean                     @default(false)
+  mimeType              String
+  notes                 String?                     @db.Text
+  originalFilename      String
+  replacedAt            DateTime?
+  sizeBytes             Int
+  storedFilename        String                      @unique
+  employees             employees                   @relation(fields: [employeeId], references: [id])
+
+  @@index([category])
+  @@index([employeeId])
+}
+
+model employees {
+  id                                                                     String                                @id
+  employeeNumber                                                         String                                @unique
+  firstName                                                              String
+  middleName                                                             String?
+  lastName                                                               String
+  suffix                                                                 String?
+  gender                                                                 employees_gender
+  dateOfBirth                                                            DateTime                              @db.Date
+  placeOfBirth                                                           String?
+  civilStatus                                                            employees_civilStatus
+  nationality                                                            String                                @default("Filipino")
+  religion                                                               String?
+  personalEmail                                                          String?
+  workEmail                                                              String?                               @unique
+  mobilePhone                                                            String
+  telephoneNumber                                                        String?
+  homePhone                                                              String?
+  presentAddress                                                         String
+  permanentAddress                                                       String?
+  emergencyContactName                                                   String
+  emergencyContactRel                                                    String
+  emergencyContactPhone                                                  String
+  departmentId                                                           String?
+  unitId                                                                 String
+  jobRoleId                                                              String
+  employmentStatus                                                       employees_employmentStatus            @default(REGULAR)
+  employmentState                                                        employees_employmentState             @default(ACTIVE)
+  workSchedule                                                           employees_workSchedule                @default(REGULAR_DAY_SHIFT)
+  hireDate                                                               DateTime                              @db.Date
+  probationDate                                                          DateTime?                             @db.Date
+  regularizationDate                                                     DateTime?                             @db.Date
+  separationDate                                                         DateTime?                             @db.Date
+  separationReason                                                       String?
+  sssNumber                                                              String?
+  philhealthNumber                                                       String?
+  pagibigNumber                                                          String?
+  tinNumber                                                              String?
+  photoUrl                                                               String?
+  deletedAt                                                              DateTime?
+  createdAt                                                              DateTime                              @default(now())
+  updatedAt                                                              DateTime
+  immediateSupervisorId                                                  String?
+  supervisorAssignmentSource                                             employees_supervisorAssignmentSource?
+  supervisorAssignmentStatus                                             employees_supervisorAssignmentStatus?
+  supervisorOverrideAt                                                   DateTime?
+  supervisorOverrideById                                                 String?
+  supervisorOverrideReason                                               String?
+  supervisorPendingReason                                                employees_supervisorPendingReason?
+  activity_attendances                                                   activity_attendances[]
+  ai_insights                                                            ai_insights[]
+  announcements                                                          announcements[]
+  attendance_logs                                                        attendance_logs[]
+  attendance_records                                                     attendance_records[]
+  employee_documents                                                     employee_documents[]
+  departments                                                            departments?                          @relation(fields: [departmentId], references: [id])
+  employees                                                              employees?                            @relation("employeesToemployees", fields: [immediateSupervisorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_employees                                                        employees[]                           @relation("employeesToemployees")
+  job_roles                                                              job_roles                             @relation(fields: [jobRoleId], references: [id])
+  users_employees_supervisorOverrideByIdTousers                          users?                                @relation("employees_supervisorOverrideByIdTousers", fields: [supervisorOverrideById], references: [id])
+  units                                                                  units                                 @relation(fields: [unitId], references: [id])
+  leave_balances                                                         leave_balances[]
+  leave_requests_leave_requests_approvedByIdToemployees                  leave_requests[]                      @relation("leave_requests_approvedByIdToemployees")
+  leave_requests_leave_requests_employeeIdToemployees                    leave_requests[]                      @relation("leave_requests_employeeIdToemployees")
+  medical_records                                                        medical_records[]
+  payslips                                                               payslips[]
+  performance_evaluations_performance_evaluations_employeeIdToemployees  performance_evaluations[]             @relation("performance_evaluations_employeeIdToemployees")
+  performance_evaluations_performance_evaluations_evaluatorIdToemployees performance_evaluations[]             @relation("performance_evaluations_evaluatorIdToemployees")
+  psychological_records                                                  psychological_records[]
+  supervision_links_supervision_links_subordinateIdToemployees           supervision_links[]                   @relation("supervision_links_subordinateIdToemployees")
+  supervision_links_supervision_links_supervisorIdToemployees            supervision_links[]                   @relation("supervision_links_supervisorIdToemployees")
+  training_attendees                                                     training_attendees[]
+  users_users_employeeIdToemployees                                      users?                                @relation("users_employeeIdToemployees")
+
+  @@index([departmentId])
+  @@index([employeeNumber])
+  @@index([employmentStatus])
+  @@index([immediateSupervisorId])
+  @@index([jobRoleId])
+  @@index([supervisorAssignmentSource])
+  @@index([supervisorAssignmentStatus])
+  @@index([supervisorOverrideById], map: "employees_supervisorOverrideById_fkey")
+  @@index([unitId])
+  @@index([workEmail])
+}
+
+model job_roles {
+  id                                               String                    @id
+  title                                            String
+  code                                             String                    @unique
+  unitId                                           String
+  permissionTier                                   job_roles_permissionTier
+  isActive                                         Boolean                   @default(true)
+  createdAt                                        DateTime                  @default(now())
+  updatedAt                                        DateTime
+  departmentId                                     String?
+  hierarchyStatus                                  job_roles_hierarchyStatus @default(PENDING_CONFIRMATION)
+  isHead                                           Boolean                   @default(false)
+  isSupervisor                                     Boolean                   @default(false)
+  parentJobRoleId                                  String?
+  departments_departments_headJobRoleIdTojob_roles departments[]             @relation("departments_headJobRoleIdTojob_roles")
+  employees                                        employees[]
+  departments_job_roles_departmentIdTodepartments  departments?              @relation("job_roles_departmentIdTodepartments", fields: [departmentId], references: [id])
+  job_roles                                        job_roles?                @relation("job_rolesTojob_roles", fields: [parentJobRoleId], references: [id])
+  other_job_roles                                  job_roles[]               @relation("job_rolesTojob_roles")
+  units_job_roles_unitIdTounits                    units                     @relation("job_roles_unitIdTounits", fields: [unitId], references: [id])
+  role_permissions                                 role_permissions[]
+  units_units_headJobRoleIdTojob_roles             units[]                   @relation("units_headJobRoleIdTojob_roles")
+
+  @@index([departmentId])
+  @@index([hierarchyStatus])
+  @@index([parentJobRoleId])
+  @@index([permissionTier])
+  @@index([unitId])
+}
+
+model leave_balances {
+  id            String                   @id
+  employeeId    String
+  year          Int
+  leaveType     leave_balances_leaveType
+  totalAllotted Float
+  used          Float                    @default(0)
+  pending       Float                    @default(0)
+  forfeited     Float                    @default(0)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime
+  employees     employees                @relation(fields: [employeeId], references: [id])
+
+  @@unique([employeeId, year, leaveType])
+  @@index([employeeId])
+}
+
+model leave_requests {
+  id                                               String                   @id
+  employeeId                                       String
+  leaveType                                        leave_requests_leaveType
+  startDate                                        DateTime                 @db.Date
+  endDate                                          DateTime                 @db.Date
+  totalDays                                        Float
+  reason                                           String
+  supportingDocUrl                                 String?
+  status                                           leave_requests_status    @default(PENDING)
+  approvedById                                     String?
+  approvedAt                                       DateTime?
+  rejectionReason                                  String?
+  hrNotes                                          String?
+  deletedAt                                        DateTime?
+  createdAt                                        DateTime                 @default(now())
+  updatedAt                                        DateTime
+  employees_leave_requests_approvedByIdToemployees employees?               @relation("leave_requests_approvedByIdToemployees", fields: [approvedById], references: [id])
+  employees_leave_requests_employeeIdToemployees   employees                @relation("leave_requests_employeeIdToemployees", fields: [employeeId], references: [id])
+
+  @@index([approvedById], map: "leave_requests_approvedById_fkey")
+  @@index([employeeId])
+  @@index([startDate, endDate])
+  @@index([status])
+}
+
+model medical_records {
+  id              String    @id
+  employeeId      String
+  date            DateTime  @db.Date
+  type            String
+  findings        String
+  recommendations String?
+  attachments     String?   @db.LongText
+  recordedById    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime
+  employees       employees @relation(fields: [employeeId], references: [id])
+
+  @@index([date])
+  @@index([employeeId])
+}
+
+model notifications {
+  id        String             @id
+  userId    String
+  type      notifications_type
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean            @default(false)
+  readAt    DateTime?
+  createdAt DateTime           @default(now())
+  users     users              @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([isRead])
+  @@index([userId])
+}
+
+model onboarding_drafts {
+  id                String                   @id
+  data              String                   @db.LongText
+  status            onboarding_drafts_status @default(DRAFT)
+  createdById       String
+  lastUpdatedById   String
+  assignedToId      String?
+  createdEmployeeId String?                  @unique
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime
+  completedAt       DateTime?
+
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([status])
+}
+
+model password_reset_tokens {
+  id        String    @id
+  userId    String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  users     users     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId], map: "password_reset_tokens_userId_fkey")
+}
+
+model payslips {
+  id          String    @id
+  employeeId  String
+  period      String
+  periodStart DateTime  @db.Date
+  periodEnd   DateTime  @db.Date
+  grossPay    Float
+  deductions  String    @db.LongText
+  netPay      Float
+  isReleased  Boolean   @default(false)
+  releasedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  employees   employees @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+  @@index([isReleased])
+  @@index([period])
+}
+
+model performance_evaluations {
+  id                                                       String                         @id
+  employeeId                                               String
+  evaluatorId                                              String
+  period                                                   String
+  year                                                     Int
+  quarter                                                  Int?
+  dimensionScores                                          String                         @db.LongText
+  overallScore                                             Float
+  overallRating                                            String
+  comments                                                 String?
+  status                                                   performance_evaluations_status @default(DRAFT)
+  finalizedAt                                              DateTime?
+  createdAt                                                DateTime                       @default(now())
+  updatedAt                                                DateTime
+  employees_performance_evaluations_employeeIdToemployees  employees                      @relation("performance_evaluations_employeeIdToemployees", fields: [employeeId], references: [id])
+  employees_performance_evaluations_evaluatorIdToemployees employees                      @relation("performance_evaluations_evaluatorIdToemployees", fields: [evaluatorId], references: [id])
+
+  @@index([employeeId])
+  @@index([evaluatorId], map: "performance_evaluations_evaluatorId_fkey")
+  @@index([status])
+  @@index([year, quarter])
+}
+
+model permissions {
+  id               String             @id
+  module           String
+  action           String
+  scope            String
+  description      String
+  role_permissions role_permissions[]
+
+  @@unique([module, action, scope])
+  @@index([module])
+}
+
+model psychological_records {
+  id              String    @id
+  employeeId      String
+  date            DateTime  @db.Date
+  sessionType     String
+  summary         String
+  recommendations String?
+  attachments     String?   @db.LongText
+  conductedById   String?
+  isConfidential  Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime
+  employees       employees @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId])
+}
+
+model role_permissions {
+  id           String      @id
+  jobRoleId    String
+  permissionId String
+  createdAt    DateTime    @default(now())
+  job_roles    job_roles   @relation(fields: [jobRoleId], references: [id], onDelete: Cascade)
+  permissions  permissions @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([jobRoleId, permissionId])
+  @@index([jobRoleId])
+  @@index([permissionId])
+}
+
+model supervision_links {
+  id                                                   String    @id
+  supervisorId                                         String
+  subordinateId                                        String
+  isActive                                             Boolean   @default(true)
+  assignedAt                                           DateTime  @default(now())
+  employees_supervision_links_subordinateIdToemployees employees @relation("supervision_links_subordinateIdToemployees", fields: [subordinateId], references: [id])
+  employees_supervision_links_supervisorIdToemployees  employees @relation("supervision_links_supervisorIdToemployees", fields: [supervisorId], references: [id])
+
+  @@unique([supervisorId, subordinateId])
+  @@index([subordinateId])
+  @@index([supervisorId])
+}
+
+model system_settings {
+  id          String   @id
+  key         String   @unique
+  value       String
+  description String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+
+  @@index([key])
+}
+
+model training_attendees {
+  id             String    @id
+  trainingId     String
+  employeeId     String
+  registeredAt   DateTime  @default(now())
+  attended       Boolean   @default(false)
+  completedAt    DateTime?
+  certificateUrl String?
+  score          Float?
+  notes          String?
+  employees      employees @relation(fields: [employeeId], references: [id])
+  trainings      trainings @relation(fields: [trainingId], references: [id])
+
+  @@unique([trainingId, employeeId])
+  @@index([employeeId])
+  @@index([trainingId])
+}
+
+model trainings {
+  id                 String               @id
+  title              String
+  description        String?
+  type               String
+  facilitator        String
+  venue              String
+  startDate          DateTime
+  endDate            DateTime
+  hoursCredit        Float
+  maxParticipants    Int?
+  status             trainings_status     @default(UPCOMING)
+  materialsUrl       String?
+  createdById        String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  training_attendees training_attendees[]
+
+  @@index([startDate])
+  @@index([status])
+}
+
+model units {
+  id                                       String                    @id
+  name                                     String                    @unique
+  code                                     String                    @unique
+  departmentId                             String?
+  description                              String?
+  isActive                                 Boolean                   @default(true)
+  createdAt                                DateTime                  @default(now())
+  updatedAt                                DateTime
+  headJobRoleId                            String?
+  parentUnitId                             String?
+  announcements                            announcements[]
+  compliance_requirements                  compliance_requirements[]
+  employees                                employees[]
+  job_roles_job_roles_unitIdTounits        job_roles[]               @relation("job_roles_unitIdTounits")
+  departments                              departments?              @relation(fields: [departmentId], references: [id])
+  job_roles_units_headJobRoleIdTojob_roles job_roles?                @relation("units_headJobRoleIdTojob_roles", fields: [headJobRoleId], references: [id])
+  units                                    units?                    @relation("unitsTounits", fields: [parentUnitId], references: [id])
+  other_units                              units[]                   @relation("unitsTounits")
+
+  @@index([code])
+  @@index([departmentId], map: "units_departmentId_fkey")
+  @@index([headJobRoleId])
+  @@index([parentUnitId])
+}
+
+model uploaded_files {
+  id           String   @id
+  fileName     String
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  fileUrl      String
+  uploadedById String?
+  purpose      String?
+  createdAt    DateTime @default(now())
+
+  @@index([uploadedById])
+}
+
+model user_sessions {
+  id           String   @id
+  userId       String
+  refreshToken String   @unique
+  deviceInfo   String?
+  ipAddress    String?
+  expiresAt    DateTime
+  isRevoked    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime @default(now())
+  users        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([refreshToken])
+  @@index([userId])
+}
+
+model users {
+  id                                                String                      @id
+  email                                             String                      @unique
+  passwordHash                                      String
+  employeeId                                        String?                     @unique
+  isActive                                          Boolean                     @default(true)
+  isEmailVerified                                   Boolean                     @default(false)
+  failedLoginAttempts                               Int                         @default(0)
+  lockedUntil                                       DateTime?
+  lastLoginAt                                       DateTime?
+  lastLoginIp                                       String?
+  mustChangePassword                                Boolean                     @default(false)
+  deletedAt                                         DateTime?
+  createdAt                                         DateTime                    @default(now())
+  updatedAt                                         DateTime
+  activity_logs                                     activity_logs[]
+  audit_logs                                        audit_logs[]
+  email_verification_tokens                         email_verification_tokens[]
+  employees_employees_supervisorOverrideByIdTousers employees[]                 @relation("employees_supervisorOverrideByIdTousers")
+  notifications                                     notifications[]
+  password_reset_tokens                             password_reset_tokens[]
+  user_sessions                                     user_sessions[]
+  employees_users_employeeIdToemployees             employees?                  @relation("users_employeeIdToemployees", fields: [employeeId], references: [id])
+
+  @@index([email])
+}
+
+enum ai_insights_type {
+  WORKFORCE_TREND
+  ATTRITION_RISK
+  COMPLIANCE_RISK
+  ATTENDANCE_ANOMALY
+  PERFORMANCE_INSIGHT
+  RECOMMENDATION
+  STAFFING_GAP
+  SUMMARY
+}
+
+enum leave_requests_leaveType {
+  SICK
+  VACATION
+  EMERGENCY
+  MATERNITY
+  PATERNITY
+  SOLO_PARENT
+  STUDY
+  REHABILITATION
+  SPECIAL_PRIVILEGE
+  BEREAVEMENT
+  FORCED
+}
+
+enum notifications_type {
+  LEAVE_FILED
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  EVALUATION_ASSIGNED
+  EVALUATION_SUBMITTED
+  ANNOUNCEMENT
+  COMPLIANCE_ALERT
+  AI_INSIGHT
+  ATTENDANCE_ALERT
+  TRAINING_REMINDER
+  SYSTEM
+  PAYSLIP_RELEASED
+}
+
+enum onboarding_drafts_status {
+  DRAFT
+  IN_PROGRESS
+  READY_FOR_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum announcements_priority {
+  NORMAL
+  IMPORTANT
+  URGENT
+}
+
+enum compliance_requirements_category {
+  REGULATORY
+  LICENSING
+  TRAINING
+  HEALTH
+  SAFETY
+  DOCUMENTATION
+  BIR
+  SSS
+  PHILHEALTH
+  PAGIBIG
+}
+
+enum leave_balances_leaveType {
+  SICK
+  VACATION
+  EMERGENCY
+  MATERNITY
+  PATERNITY
+  SOLO_PARENT
+  STUDY
+  REHABILITATION
+  SPECIAL_PRIVILEGE
+  BEREAVEMENT
+  FORCED
+}
+
+enum announcements_audience {
+  ALL
+  UNIT
+  ROLE
+  INDIVIDUAL
+}
+
+enum job_roles_permissionTier {
+  FULL
+  SUPERVISOR
+  STANDARD
+}
+
+enum attendance_records_status {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  ON_LEAVE
+  HOLIDAY
+  REST_DAY
+  SUSPENDED
+}
+
+enum compliance_requirements_status {
+  COMPLIANT
+  NON_COMPLIANT
+  AT_RISK
+  PENDING
+  EXEMPTED
+}
+
+enum employee_documents_category {
+  RESUME
+  EMPLOYMENT_CONTRACT
+  GOVERNMENT_ID
+  MEDICAL_CLEARANCE
+  CERTIFICATE
+  OTHER
+}
+
+enum employees_gender {
+  MALE
+  FEMALE
+  PREFER_NOT_TO_SAY
+}
+
+enum ai_request_logs_status {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum leave_requests_status {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  FOR_REVIEW
+}
+
+enum employees_civilStatus {
+  SINGLE
+  MARRIED
+  WIDOWED
+  SEPARATED
+  LEGALLY_SEPARATED
+}
+
+enum job_roles_hierarchyStatus {
+  CONFIRMED
+  PENDING_CONFIRMATION
+}
+
+enum performance_evaluations_status {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  FINALIZED
+}
+
+enum trainings_status {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+  POSTPONED
+}
+
+enum employees_employmentStatus {
+  REGULAR
+  PROBATIONARY
+  CONTRACTUAL
+  CASUAL
+  PART_TIME
+}
+
+enum employees_employmentState {
+  ACTIVE
+  ON_LEAVE
+  RESIGNED
+  TERMINATED
+  RETIRED
+}
+
+enum employees_workSchedule {
+  REGULAR_DAY_SHIFT
+  FLEXIBLE_SHIFT
+  NIGHT_SHIFT
+  ROTATING_SHIFT
+  PART_TIME_MORNING
+  PART_TIME_AFTERNOON
+}
+
+enum employees_supervisorAssignmentSource {
+  AUTO_JOB_ROLE
+  AUTO_DEPARTMENT_HEAD
+  AUTO_UNIT_HEAD
+  MANUAL_OVERRIDE
+}
+
+enum employees_supervisorAssignmentStatus {
+  ASSIGNED
+  PENDING
+  OVERRIDDEN
+}
+
+enum employees_supervisorPendingReason {
+  MISSING_PARENT_ROLE
+  NO_ACTIVE_SUPERVISOR
+  UNCLEAR_HIERARCHY
+  MISSING_HEAD_CONFIGURATION
+}

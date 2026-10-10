@@ -1,0 +1,88 @@
+/*
+ * HRISense AI mascot animation — used only by components/ai/AiMascot.tsx.
+ * The state class on the <svg> (ai-mascot--idle | --thinking | --done) picks
+ * the face and pose. Rotations and scales use fill-box so each part turns
+ * about its own joint. Every animation is off under prefers-reduced-motion.
+ */
+.ai-mascot {
+  display: inline-block;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.ai-mascot .m-float { animation: ai-mascot-float 3s ease-in-out infinite; }
+.ai-mascot .m-shadow { transform-box: fill-box; transform-origin: center; animation: ai-mascot-shadow 3s ease-in-out infinite; }
+
+.ai-mascot .m-arm { transform-box: fill-box; transform-origin: 100% 100%; transition: transform 0.3s ease; }
+.ai-mascot--idle .m-arm { animation: ai-mascot-wave 3.2s ease-in-out infinite; }
+.ai-mascot--thinking .m-arm { transform: rotate(30deg); }
+.ai-mascot--done .m-arm { animation: ai-mascot-pump 0.8s ease-in-out infinite; }
+.ai-mascot .m-wave-line { opacity: 0; }
+.ai-mascot--idle .m-wave-line { animation: ai-mascot-wave-line 3.2s ease-in-out infinite; }
+
+.ai-mascot .m-blink { transform-box: fill-box; transform-origin: center; animation: ai-mascot-blink 4s infinite; }
+
+.ai-mascot .m-sparkle { transform-box: fill-box; transform-origin: center; animation: ai-mascot-twinkle 2.4s ease-in-out infinite; }
+.ai-mascot .m-sparkle-2 { animation-delay: 0.6s; }
+.ai-mascot .m-sparkle-3 { animation-delay: 1.2s; }
+.ai-mascot--thinking .m-sparkle { animation-duration: 0.9s; }
+
+.ai-mascot .m-bar { transform-box: fill-box; transform-origin: 50% 100%; animation: ai-mascot-grow 3.2s ease-out infinite; }
+.ai-mascot .m-bar-2 { animation-delay: 0.15s; }
+.ai-mascot .m-bar-3 { animation-delay: 0.3s; }
+
+.ai-mascot .m-face,
+.ai-mascot .m-dots,
+.ai-mascot .m-check { transition: opacity 0.25s; }
+.ai-mascot .m-face-thinking,
+.ai-mascot .m-face-done,
+.ai-mascot .m-dots,
+.ai-mascot .m-check { opacity: 0; }
+.ai-mascot--thinking .m-face-idle,
+.ai-mascot--done .m-face-idle { opacity: 0; }
+.ai-mascot--thinking .m-face-thinking,
+.ai-mascot--thinking .m-dots,
+.ai-mascot--done .m-face-done,
+.ai-mascot--done .m-check { opacity: 1; }
+
+.ai-mascot .m-dot { animation: ai-mascot-dot 1.2s ease-in-out infinite; }
+.ai-mascot .m-dot-2 { animation-delay: 0.2s; }
+.ai-mascot .m-dot-3 { animation-delay: 0.4s; }
+
+.ai-mascot--done .m-float { animation: ai-mascot-hop 0.8s ease-in-out infinite; }
+.ai-mascot--done .m-shadow { animation: ai-mascot-shadow-hop 0.8s ease-in-out infinite; }
+
+.ai-mascot--still * { animation: none !important; }
+
+/* hello = continuous wave; talking = the mouth opens and closes. */
+.ai-mascot--hello .m-arm { animation: ai-mascot-wave-fast 1.2s ease-in-out infinite; }
+.ai-mascot--hello .m-wave-line { opacity: 1; }
+.ai-mascot .m-mouth-open { opacity: 0; }
+.ai-mascot--talking .m-mouth-open { animation: ai-mascot-talk-open 0.36s linear infinite; }
+.ai-mascot--talking .m-smile { animation: ai-mascot-talk-closed 0.36s linear infinite; }
+
+/* Peeking pose (the buddy): leans in from a screen edge, pivoting on its
+   lower corner, and sways as if looking over the page. A right-edge peek is
+   the same pose inside a mirrored wrapper. */
+.ai-mascot-peek { transform-origin: 0% 100%; animation: ai-mascot-peek-sway 4.5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-mascot * { animation: none !important; transition: none !important; }
+  .ai-mascot-peek { animation: none; transform: rotate(12deg); }
+}
+
+@keyframes ai-mascot-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes ai-mascot-shadow { 0%, 100% { transform: scale(1); opacity: 0.18; } 50% { transform: scale(0.82); opacity: 0.1; } }
+@keyframes ai-mascot-wave { 0%, 50%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(-18deg); } 20%, 40% { transform: rotate(10deg); } }
+@keyframes ai-mascot-wave-line { 0%, 48%, 100% { opacity: 0; } 10%, 38% { opacity: 1; } }
+@keyframes ai-mascot-pump { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(-26deg); } }
+@keyframes ai-mascot-blink { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(0.1); } }
+@keyframes ai-mascot-twinkle { 0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(0.7) rotate(45deg); } }
+@keyframes ai-mascot-grow { 0% { transform: scaleY(0.25); } 25%, 100% { transform: scaleY(1); } }
+@keyframes ai-mascot-dot { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+@keyframes ai-mascot-hop { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-16px); } }
+@keyframes ai-mascot-shadow-hop { 0%, 100% { transform: scale(1); opacity: 0.18; } 40% { transform: scale(0.7); opacity: 0.08; } }
+@keyframes ai-mascot-wave-fast { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-22deg); } 75% { transform: rotate(12deg); } }
+@keyframes ai-mascot-talk-open { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes ai-mascot-talk-closed { 0%, 49% { opacity: 0; } 50%, 100% { opacity: 1; } }
+@keyframes ai-mascot-peek-sway { 0%, 100% { transform: rotate(9deg); } 50% { transform: rotate(17deg); } }

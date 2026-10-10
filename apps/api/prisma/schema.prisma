@@ -1,0 +1,3265 @@
+// HRISense — Prisma Schema v2
+// Aligned to Job Roles spreadsheet (Hospicio de San Jose)
+// Generated: 2026-07-17
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum SupervisorAssignmentSource {
+  AUTO_JOB_ROLE
+  AUTO_DEPARTMENT_HEAD
+  AUTO_UNIT_HEAD
+  MANUAL_OVERRIDE
+}
+
+enum SupervisorAssignmentStatus {
+  ASSIGNED
+  PENDING
+  OVERRIDDEN
+}
+
+enum SupervisorPendingReason {
+  MISSING_PARENT_ROLE
+  NO_ACTIVE_SUPERVISOR
+  UNCLEAR_HIERARCHY
+  MISSING_HEAD_CONFIGURATION
+}
+
+enum HierarchyConfigurationStatus {
+  CONFIRMED
+  PENDING_CONFIRMATION
+}
+
+enum OnboardingDraftStatus {
+  DRAFT
+  IN_PROGRESS
+  READY_FOR_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum PermissionTier {
+  FULL // HR Officers — access ALL data for ALL employees
+  SUPERVISOR // Section heads/coordinators — own data + subordinate attendance logs
+  STANDARD // All other staff — own data only
+}
+
+enum EmploymentState {
+  ACTIVE
+  ON_LEAVE
+  RESIGNED
+  TERMINATED
+  RETIRED
+  /// Absent without official leave.
+  AWOL
+  /// Employment ended for a reason outside the list; the detail goes in separationReason.
+  OTHERS
+}
+
+enum EmploymentStatus {
+  REGULAR
+  PROBATIONARY
+  CONTRACTUAL
+  CASUAL
+  PART_TIME
+}
+
+enum WorkSchedule {
+  REGULAR_DAY_SHIFT // 8:00 AM - 5:00 PM
+  FLEXIBLE_SHIFT
+  NIGHT_SHIFT // 10:00 PM - 6:00 AM
+  ROTATING_SHIFT
+  PART_TIME_MORNING
+  PART_TIME_AFTERNOON
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  PREFER_NOT_TO_SAY
+}
+
+enum CivilStatus {
+  SINGLE
+  MARRIED
+  WIDOWED
+  SEPARATED
+  LEGALLY_SEPARATED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  ON_LEAVE
+  HOLIDAY
+  REST_DAY
+  SUSPENDED
+}
+
+enum LeaveAllotmentSource {
+  MANUAL
+  AUTOMATIC
+}
+
+enum LeaveType {
+  SICK
+  VACATION
+  EMERGENCY
+  MATERNITY
+  PATERNITY
+  SOLO_PARENT
+  STUDY
+  REHABILITATION
+  SPECIAL_PRIVILEGE
+  BEREAVEMENT
+  FORCED
+  /// Hospicio form "Leave Without Pay" — uses no leave credits.
+  LEAVE_WITHOUT_PAY
+  /// Hospicio form "Others / Offset" — time off in place of extra time worked.
+  OFFSET
+  /// Hospicio form "Others" — the reason says what the leave is for.
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  FOR_REVIEW
+}
+
+enum EvaluationStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWED
+  FINALIZED
+}
+
+enum EvaluationRatingMethod {
+  NUMERIC
+  LABELED
+}
+
+/// How an evaluation's overall score is reached.
+///   CRITERIA       — flat criteria: weighted sum, or plain average (useWeighting)
+///   AREA_WEIGHTED  — review areas: each area's average × the area's weight ÷ 100
+///   AREA_AVERAGE   — review areas: each area's average, then the average of those
+///                    (the Simplified form's own rule: total ÷ 3, then sum ÷ 10)
+enum EvaluationScoringMethod {
+  CRITERIA
+  AREA_WEIGHTED
+  AREA_AVERAGE
+}
+
+enum EvaluationCycleStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+/// How a cycle's employees are evaluated. STANDARD: the assigned head /
+/// supervisor / coordinator evaluates the employee (no self or peer rating).
+/// WEIGHTED_MULTI_RATER: self 20% + peer 20% + head 60% (Hospicio's weighting).
+enum EvaluationMode {
+  STANDARD
+  WEIGHTED_MULTI_RATER
+}
+
+enum EvaluationRaterType {
+  SELF
+  PEER
+  HEAD
+}
+
+enum EvaluationAssignmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+  FINALIZED
+}
+
+enum TrainingStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+  POSTPONED
+}
+
+enum TrainingActivityType {
+  TRAINING
+  SEMINAR
+  WORKSHOP
+  ORIENTATION
+  CONFERENCE
+  OTHER
+}
+
+enum TrainingActivityStatus {
+  DRAFT
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum TrainingParticipationStatus {
+  ASSIGNED
+  COMPLETED
+  DID_NOT_ATTEND
+  EXCUSED
+  CANCELLED
+}
+
+// ── LEGACY enums (kept for legacy model compatibility) ──────────────────────
+enum ComplianceStatus {
+  COMPLIANT
+  NON_COMPLIANT
+  AT_RISK
+  PENDING
+  EXEMPTED
+}
+
+enum ComplianceCategory {
+  REGULATORY
+  LICENSING
+  TRAINING
+  HEALTH
+  SAFETY
+  DOCUMENTATION
+  BIR
+  SSS
+  PHILHEALTH
+  PAGIBIG
+}
+
+// ── NEW enums for Compliance + Medical + Psychological modules ───────────────
+
+/// Category of a compliance requirement
+enum RequirementCategory {
+  MEDICAL
+  PSYCHOLOGICAL
+  CERTIFICATION
+  PROFESSIONAL_LICENSE
+  TRAINING
+  DOCUMENT
+  OTHER
+}
+
+/// Lifecycle of a compliance requirement definition
+enum RequirementLifecycle {
+  ACTIVE
+  INACTIVE
+}
+
+/// How applicability scope is defined for a requirement
+enum RequirementScopeType {
+  ALL
+  UNIT
+  DEPARTMENT
+  JOB_ROLE
+  EMPLOYEE
+}
+
+/// Administrative review result for any compliance/medical/psychological record
+enum RecordReviewStatus {
+  PENDING_REVIEW
+  ACCEPTED
+  NEEDS_CORRECTION
+}
+
+/// Derived compliance status for a given employee × requirement pair
+enum EmployeeComplianceStatus {
+  MISSING
+  NEEDS_REVIEW
+  VALID
+  EXPIRING_SOON
+  EXPIRED
+}
+
+/// Document visibility for psychological record attachments
+enum PsychologicalDocumentVisibility {
+  EMPLOYEE_VISIBLE
+  HR_ONLY
+}
+
+/// Document visibility for generic compliance record attachments
+enum ComplianceDocumentVisibility {
+  VISIBLE
+  HR_ONLY
+}
+
+enum AnnouncementPriority {
+  NORMAL
+  IMPORTANT
+  URGENT
+}
+
+/// @deprecated Legacy audience enum — kept to avoid destructive enum migration.
+/// New audience targeting is handled by AnnouncementAudienceScope model.
+enum AnnouncementAudience {
+  ALL
+  UNIT
+  ROLE
+  INDIVIDUAL
+}
+
+/// Lifecycle state for the full Announcement workflow.
+enum AnnouncementState {
+  DRAFT // Not visible to recipients
+  ACTIVE // Scheduled (publishAt > now) or Published (publishAt <= now)
+  ARCHIVED // HR-archived; removed from recipient feed; data preserved
+}
+
+/// Scope targeting type for AnnouncementAudienceScope.
+/// Separate from RequirementScopeType — Announcements and Compliance are independent domains.
+enum AnnouncementScopeType {
+  ALL // All active employees
+  UNIT // Employees in a specific Unit
+  DEPARTMENT // Employees in a specific Department
+  JOB_ROLE // Employees with a specific Job Role
+  EMPLOYEE // A specific individual employee
+}
+
+enum NotificationType {
+  LEAVE_FILED
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  EVALUATION_ASSIGNED
+  EVALUATION_SUBMITTED
+  ANNOUNCEMENT
+  COMPLIANCE_ALERT
+  AI_INSIGHT
+  ATTENDANCE_ALERT
+  TRAINING_REMINDER
+  /// An employee's birthday is coming up — raised for HR and the person's supervisor.
+  BIRTHDAY_REMINDER
+  SYSTEM
+  PAYSLIP_RELEASED
+}
+
+enum AIInsightType {
+  WORKFORCE_TREND
+  ATTRITION_RISK
+  COMPLIANCE_RISK
+  ATTENDANCE_ANOMALY
+  PERFORMANCE_INSIGHT
+  RECOMMENDATION
+  STAFFING_GAP
+  SUMMARY
+}
+
+enum AIRequestStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum JobOpeningStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  FILLED
+  ARCHIVED
+}
+
+enum JobApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  SHORTLISTED
+  FOR_INTERVIEW
+  INTERVIEWED
+  FOR_REQUIREMENTS
+  HIRED
+  REJECTED
+  WITHDRAWN
+}
+
+enum InterviewType {
+  INITIAL
+  TECHNICAL
+  PANEL
+  FINAL
+  OTHER
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+  NO_SHOW
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ORGANIZATION STRUCTURE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Represents the 7 service units under Hospicio de San Jose
+/// (Administrative Services, Finance, General Support Services, Auxiliary Services,
+///  Social Services, Pastoral Care/Homelife Services, Health Services)
+model Department {
+  id                 String   @id @default(uuid())
+  name               String   @unique
+  code               String   @unique
+  description        String?
+  isActive           Boolean  @default(true)
+  headJobRoleId      String?
+  parentDepartmentId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  headJobRole      JobRole?     @relation("DepartmentHeadRole", fields: [headJobRoleId], references: [id])
+  parentDepartment Department?  @relation("DepartmentToParent", fields: [parentDepartmentId], references: [id])
+  childDepartments Department[] @relation("DepartmentToParent")
+
+  units                 Unit[]
+  employees             Employee[]
+  jobRoles              JobRole[]
+  jobOpenings           JobOpening[]
+  complianceScopes      ComplianceRequirementScope[]
+  evaluationCycleScopes EvaluationCycleScope[]
+  announcementScopes    AnnouncementAudienceScope[]
+
+  @@index([code])
+  @@index([parentDepartmentId])
+  @@index([headJobRoleId])
+  @@map("departments")
+}
+
+model Unit {
+  id            String      @id @default(uuid())
+  name          String      @unique
+  code          String      @unique // ADM | FIN | GSS | AUX | SOC | PCH | HLT
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+  description   String?
+  isActive      Boolean     @default(true)
+  headJobRoleId String?
+  parentUnitId  String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  headJobRole JobRole? @relation("UnitHeadRole", fields: [headJobRoleId], references: [id])
+  parentUnit  Unit?    @relation("UnitToParent", fields: [parentUnitId], references: [id])
+  childUnits  Unit[]   @relation("UnitToParent")
+
+  jobRoles              JobRole[]
+  employees             Employee[]
+  jobOpenings           JobOpening[]
+  complianceScopes      ComplianceRequirementScope[]
+  evaluationCycleScopes EvaluationCycleScope[]
+  announcementScopes    AnnouncementAudienceScope[]
+  calendarWorkingDays   OrganizationCalendarWorkingUnit[]
+
+  @@index([code])
+  @@index([parentUnitId])
+  @@index([headJobRoleId])
+  @@map("units")
+}
+
+/// All 48 distinct job roles from the Job Roles spreadsheet
+/// Each role belongs to one unit and has a permission tier
+model JobRole {
+  id              String                       @id @default(uuid())
+  title           String // Exact title as written in spreadsheet
+  code            String                       @unique // Slug: e.g. HR_OFFICER, KITCHEN_SUPERVISOR
+  /// The unit the role belongs to. Null for an organisation-wide role that is
+  /// not part of one unit (e.g. SISTER); its holders still have their own unit.
+  unitId          String?
+  unit            Unit?                        @relation(fields: [unitId], references: [id], onDelete: Restrict)
+  departmentId    String?
+  parentJobRoleId String?
+  isHead          Boolean                      @default(false)
+  isSupervisor    Boolean                      @default(false)
+  hierarchyStatus HierarchyConfigurationStatus @default(PENDING_CONFIRMATION)
+  permissionTier  PermissionTier // FULL | SUPERVISOR | STANDARD
+  isActive        Boolean                      @default(true)
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  department        Department?  @relation(fields: [departmentId], references: [id])
+  parentJobRole     JobRole?     @relation("JobRoleToParent", fields: [parentJobRoleId], references: [id])
+  childJobRoles     JobRole[]    @relation("JobRoleToParent")
+  departmentHeadFor Department[] @relation("DepartmentHeadRole")
+  unitHeadFor       Unit[]       @relation("UnitHeadRole")
+
+  employees             Employee[]
+  rolePermissions       RolePermission[]
+  jobOpenings           JobOpening[]
+  complianceScopes      ComplianceRequirementScope[]
+  evaluationCycleScopes EvaluationCycleScope[]
+  announcementScopes    AnnouncementAudienceScope[]
+  evaluationTemplate    EvaluationTemplateJobRole?
+  additionalOversights  AdditionalOversight[]
+
+  @@index([unitId])
+  @@index([permissionTier])
+  @@index([parentJobRoleId])
+  @@index([departmentId])
+  @@index([hierarchyStatus])
+  @@map("job_roles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RBAC — Normalized Permission System
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Granular permission registry
+/// Each record represents one specific action on one module with one scope
+model Permission {
+  id          String @id @default(uuid())
+  module      String // employees | leave | attendance | payslip | training | psychological | ai | reports | announcements | compliance | users | audit | settings | profile | activity
+  action      String // read | create | update | delete | approve | reject | export | import | manage
+  scope       String // OWN | SUBORDINATES | ALL
+  description String
+
+  rolePermissions RolePermission[]
+
+  @@unique([module, action, scope])
+  @@index([module])
+  @@map("permissions")
+}
+
+/// Join table linking JobRoles to Permissions
+model RolePermission {
+  id           String     @id @default(uuid())
+  jobRoleId    String
+  jobRole      JobRole    @relation(fields: [jobRoleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@unique([jobRoleId, permissionId])
+  @@index([jobRoleId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTHENTICATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id                  String    @id @default(uuid())
+  email               String    @unique
+  passwordHash        String
+  employeeId          String?   @unique
+  employee            Employee? @relation(fields: [employeeId], references: [id])
+  isActive            Boolean   @default(true)
+  isEmailVerified     Boolean   @default(false)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  mustChangePassword  Boolean   @default(false)
+  deletedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  sessions                        UserSession[]
+  passwordResets                  PasswordResetToken[]
+  emailVerifications              EmailVerificationToken[]
+  auditLogs                       AuditLog[]               @relation("AuditLogsActor")
+  activityLogs                    ActivityLog[]
+  supervisorOverrides             Employee[]               @relation("SupervisorOverrideUser")
+  notifications                   Notification[]
+  sentApplicantCommunications     ApplicantCommunication[]
+  scheduleHistoryActions          ScheduleHistoryLog[]     @relation("ScheduleHistoryActor")
+  createdAnnouncements            Announcement[]           @relation("AnnouncementCreator")
+  uploadedAnnouncementAttachments AnnouncementAttachment[] @relation("AttachmentUploader")
+
+  // Attendance provenance and import back-relations
+  attendanceManualEdits      AttendanceRecord[]          @relation("AttendanceManualEditor")
+  attendanceImportsUploaded  AttendanceImportBatch[]     @relation("AttendanceImportUploader")
+  attendanceImportsConfirmed AttendanceImportBatch[]     @relation("AttendanceImportConfirmer")
+  attendanceImportDecisions  AttendanceImportCandidate[] @relation("AttendanceImportDecider")
+
+  // Personal dashboard calendar
+  calendarNotes CalendarNote[]
+
+  @@index([email])
+  @@map("users")
+}
+
+/// Who can see a dashboard calendar note.
+enum CalendarNoteAudience {
+  PERSONAL // only the author
+  ALL // every employee — an HR note for the whole organisation
+  SELECTED // only the employees listed in calendar_note_recipients
+}
+
+/// A plan, task or notice on the dashboard calendar.
+/// PERSONAL notes are private to their author. HR can also post a note to ALL
+/// employees or to SELECTED ones; recipients see it read-only. Only the author
+/// can change or delete a note. Deleted with the author's account.
+model CalendarNote {
+  id         String                  @id @default(uuid())
+  userId     String
+  user       User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date       DateTime                @db.Date
+  title      String                  @db.VarChar(120)
+  details    String?                 @db.Text
+  isDone     Boolean                 @default(false)
+  audience   CalendarNoteAudience    @default(PERSONAL)
+  recipients CalendarNoteRecipient[]
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  @@index([userId, date])
+  @@index([audience, date])
+  @@map("calendar_notes")
+}
+
+/// One employee a SELECTED calendar note is addressed to.
+model CalendarNoteRecipient {
+  id         String       @id @default(uuid())
+  noteId     String
+  note       CalendarNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  employeeId String
+  employee   Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime     @default(now())
+
+  @@unique([noteId, employeeId])
+  @@index([employeeId])
+  @@map("calendar_note_recipients")
+}
+
+model UserSession {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  //
+  // A signed refresh JWT is currently 192 characters and grows with the payload.
+  // Prisma's default for an indexed MySQL String is varchar(191), and because
+  // this MySQL runs without STRICT_TRANS_TABLES the insert silently TRUNCATED
+  // every token to 191 chars — so the lookup by full token never matched and
+  // `POST /auth/refresh` always returned 401. 512 leaves generous headroom and
+  // still fits InnoDB's 3072-byte DYNAMIC index limit (512 x 4 bytes = 2048).
+  refreshToken String   @unique @db.VarChar(512)
+  deviceInfo   String?
+  ipAddress    String?
+  expiresAt    DateTime
+  isRevoked    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  lastUsedAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([refreshToken])
+  @@map("user_sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@map("email_verification_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EMPLOYEE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Employee {
+  id             String      @id @default(uuid())
+  employeeNumber String      @unique
+  firstName      String
+  middleName     String?
+  lastName       String
+  suffix         String?
+  gender         Gender
+  dateOfBirth    DateTime    @db.Date
+  placeOfBirth   String?
+  civilStatus    CivilStatus
+  nationality    String      @default("Filipino")
+  religion       String?
+
+  // Personal details from the HSJ employee record — all optional. Blank means
+  // "not provided" (never a placeholder such as N/A or 0). Age is computed from
+  // dateOfBirth and is never stored.
+  /// ABO and Rh, e.g. "O+" (one of the eight standard groups).
+  bloodType        String? @db.VarChar(3)
+  /// Only when civil status is not Single.
+  spouseName       String? @db.VarChar(150)
+  /// Null = not provided; 0 is a real answer.
+  numberOfChildren Int?
+
+  // Contact Information
+  /// The employee's email AND their HRISense login address (users.email). One
+  /// source: onboarding creates the account with it and HR edits keep the two
+  /// in step.
+  personalEmail   String?
+  /// Legacy — no longer collected or shown. Kept so old values are not lost;
+  /// existing accounts that signed in with it still do (see users.email).
+  workEmail       String? @unique
+  mobilePhone     String
+  telephoneNumber String?
+  homePhone       String?
+
+  // Address
+  presentAddress   String
+  /// The home / provincial address ("Provincial Address" on the HSJ record).
+  permanentAddress String?
+
+  // Residence within Hospicio — only for employees who live on the premises.
+  hsjResidence  String? @db.VarChar(150)
+  /// "Unit / Dorm" where they stay. Not the organisational unit (unitId).
+  residenceDorm String? @db.VarChar(100)
+
+  // Emergency Contact — mirror of emergency contact #1 (EmployeeEmergencyContact
+  // position 1), kept for the screens, exports and tools that read one contact.
+  emergencyContactName  String
+  emergencyContactRel   String
+  emergencyContactPhone String
+
+  // Employment
+  departmentId       String?
+  department         Department?      @relation(fields: [departmentId], references: [id])
+  unitId             String
+  unit               Unit             @relation(fields: [unitId], references: [id])
+  jobRoleId          String
+  jobRole            JobRole          @relation(fields: [jobRoleId], references: [id])
+  employmentStatus   EmploymentStatus @default(REGULAR)
+  employmentState    EmploymentState  @default(ACTIVE)
+  workSchedule       WorkSchedule     @default(REGULAR_DAY_SHIFT)
+  hireDate           DateTime         @db.Date
+  probationDate      DateTime?        @db.Date
+  regularizationDate DateTime?        @db.Date
+  separationDate     DateTime?        @db.Date
+  separationReason   String?
+
+  // Professional credentials — optional; only licensed professionals have them.
+  // An employee counts as "Professional" in the UI when prcLicenseNumber is set.
+  prcLicenseNumber String?   @db.VarChar(30)
+  professionalRole String?   @db.VarChar(120)
+  /// PRC licence dates — only with a licence number. Valid / expiring / expired
+  /// is derived from prcValidUntil, never stored.
+  prcIssuedDate    DateTime? @db.Date
+  prcValidUntil    DateTime? @db.Date
+
+  // TESDA National Certificate (e.g. NC II) — optional; not every role needs one.
+  ncCertificateNumber String?   @db.VarChar(50)
+  /// The qualification certified, e.g. "Caregiving NC II".
+  ncQualification     String?   @db.VarChar(150)
+  /// Only when the certificate states a validity.
+  ncValidUntil        DateTime? @db.Date
+
+  // Education — as recorded on the HSJ employee record; every part optional.
+  primarySchool           String?  @db.VarChar(150)
+  secondarySchool         String?  @db.VarChar(150)
+  tertiarySchool          String?  @db.VarChar(150)
+  tertiaryCourse          String?  @db.VarChar(150)
+  /// Graduated from the tertiary course: true / false, or null when not recorded.
+  tertiaryGraduated       Boolean?
+  diploma                 String?  @db.VarChar(150)
+  vocationalQualification String?  @db.VarChar(150)
+
+  // Government IDs
+  sssNumber          String?
+  philhealthNumber   String?
+  pagibigNumber      String?
+  tinNumber          String?
+  /// Legacy free text ("Label: number" per line), from before other government
+  /// IDs became rows (EmployeeGovernmentId). Kept and shown read-only; no longer
+  /// written by the app.
+  otherGovernmentIds String? @db.Text
+
+  /// HR-managed eligibility for automatic leave entitlement. Never inferred from
+  /// sex, civil status, children or any other profile field.
+  paternityLeaveEligible  Boolean @default(false)
+  soloParentLeaveEligible Boolean @default(false)
+
+  /// The employee's number in the biometric/timekeeping system, as it appears in
+  /// the Mustard Seedtime export (the value in parentheses on an employee line).
+  /// Unrelated to `employeeNumber`, which is HRISense's own HSJ-XXXX identity.
+  /// Unique and nullable: attendance rows are matched on this and NEVER on name.
+  biometricCode String? @unique @db.VarChar(40)
+
+  immediateSupervisorId      String?
+  supervisorAssignmentSource SupervisorAssignmentSource?
+  supervisorAssignmentStatus SupervisorAssignmentStatus?
+  supervisorPendingReason    SupervisorPendingReason?
+  supervisorOverrideReason   String?
+  supervisorOverrideById     String?
+  supervisorOverrideAt       DateTime?
+
+  photoUrl  String?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  user                     User?
+  immediateSupervisor      Employee?               @relation("EmployeeSupervisor", fields: [immediateSupervisorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  directReports            Employee[]              @relation("EmployeeSupervisor")
+  supervisorOverrideBy     User?                   @relation("SupervisorOverrideUser", fields: [supervisorOverrideById], references: [id])
+  supervisorLinks          SupervisionLink[]       @relation("Supervisor")
+  subordinateLinks         SupervisionLink[]       @relation("Subordinate")
+  additionalOversights     AdditionalOversight[]   @relation("OversightOverseer")
+  additionallyOverseenBy   AdditionalOversight[]   @relation("OversightOverseenEmployee")
+  awardNominationsReceived AwardNomination[]       @relation("AwardNominee")
+  awardNominationsMade     AwardNomination[]       @relation("AwardNominator")
+  awardBallots             AwardBallot[]
+  awardVotesReceived       AwardVote[]
+  awardResults             AwardResult[]
+  hallOfFameRecords        HallOfFameRecord[]
+  attendanceRecords        AttendanceRecord[]
+  attendanceLogs           AttendanceLog[]
+  leaveRequests            LeaveRequest[]          @relation("EmployeeLeaves")
+  leaveApprovals           LeaveRequest[]          @relation("ApproverLeaves")
+  leaveEndorsements        LeaveRequest[]          @relation("LeaveEndorser")
+  leaveRevisionProposals   LeaveRequest[]          @relation("LeaveRevisionProposer")
+  leaveBalances            LeaveBalance[]
+  evaluationsAsSubject     PerformanceEvaluation[] @relation("EvaluationSubject")
+  evaluationsAsEvaluator   PerformanceEvaluation[] @relation("EvaluationEvaluator")
+  trainingAttendances      TrainingAttendee[]
+  activityAttendances      ActivityAttendance[]
+
+  // Evaluation relations
+  evaluationAssignmentsAsSubject   EvaluationAssignment[] @relation("EvaluationAssignmentSubject")
+  evaluationAssignmentsAsEvaluator EvaluationAssignment[] @relation("EvaluationAssignmentEvaluator")
+  evaluationCyclesDefaultEvaluator EvaluationCycle[]      @relation("CycleDefaultEvaluator")
+  evaluationCycleScopes            EvaluationCycleScope[] @relation("EvaluationCycleScopeEmployee")
+
+  // Training relations
+  trainingParticipations TrainingParticipant[] @relation("TrainingParticipantEmployee")
+
+  // Legacy health record relations (preserved for schema safety)
+  legacyMedicalRecords       LegacyMedicalRecord[]
+  legacyPsychologicalRecords LegacyPsychologicalRecord[]
+
+  // New health + compliance record relations
+  medicalRecords              MedicalRecord[]
+  psychologicalRecords        PsychologicalRecord[]
+  complianceRecords           EmployeeComplianceRecord[]
+  complianceRequirementScopes ComplianceRequirementScope[]
+
+  payslips                   Payslip[]
+  documents                  EmployeeDocument[]
+  aiInsightsAbout            AIInsight[]
+  announcementAudienceScopes AnnouncementAudienceScope[]
+  announcementRecipients     AnnouncementRecipient[]
+
+  scheduleAssignments         EmployeeScheduleAssignment[]
+  weeklySchedules             EmployeeWeeklySchedule[]
+  attendanceImportCandidates  AttendanceImportCandidate[]  @relation("AttendanceImportCandidateEmployee")
+  attendanceImportSuggestions AttendanceImportCandidate[]  @relation("AttendanceImportCandidateSuggested")
+  scheduleHistoryTarget       ScheduleHistoryLog[]         @relation("ScheduleHistoryTarget")
+
+  emergencyContacts EmployeeEmergencyContact[]
+  governmentIds     EmployeeGovernmentId[]
+
+  // Dashboard calendar notes addressed to this employee
+  calendarNoteRecipients CalendarNoteRecipient[]
+
+  @@index([employeeNumber])
+  @@index([departmentId])
+  @@index([unitId])
+  @@index([jobRoleId])
+  @@index([employmentStatus])
+  @@index([workEmail])
+  @@index([immediateSupervisorId])
+  @@index([supervisorAssignmentStatus])
+  @@index([supervisorAssignmentSource])
+  @@map("employees")
+}
+
+/// Up to three emergency contacts per employee (position 1-3). Position 1 is
+/// required and is mirrored into employees.emergencyContact*.
+model EmployeeEmergencyContact {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  position     Int
+  contactName  String
+  relationship String
+  mobilePhone  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([employeeId, position])
+  @@index([employeeId])
+  @@map("employee_emergency_contacts")
+}
+
+/// Government IDs beyond SSS, PhilHealth, Pag-IBIG and TIN. The type is free
+/// text (Passport, UMID, PhilSys ...) — no fixed list.
+model EmployeeGovernmentId {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  position   Int      @default(1)
+  idType     String   @db.VarChar(120)
+  idNumber   String   @db.VarChar(120)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([employeeId])
+  @@map("employee_government_ids")
+}
+
+/// Tracks supervisor → subordinate relationships
+/// Required for the "UNDER HER SUPERVISION" permission scope in the spreadsheet
+// ─── Yearly Achievements ──────────────────────────────────────────────────────
+// Hospicio's institutional achievements, one page per year. HR (FULL) creates
+// and publishes; every signed-in employee reads the published pages. Not
+// related to performance evaluations.
+
+enum YearlyAchievementStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model YearlyAchievementPage {
+  id          String                  @id @default(uuid())
+  year        Int
+  title       String
+  summary     String?                 @db.Text
+  status      YearlyAchievementStatus @default(DRAFT)
+  /// Example content created to show the feature — marked on the page, for HR to edit or delete.
+  isSample    Boolean                 @default(false)
+  createdById String?
+  updatedById String?
+  publishedAt DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  entries YearlyAchievementEntry[]
+
+  @@index([year])
+  @@map("yearly_achievement_pages")
+}
+
+model YearlyAchievementEntry {
+  id                String                @id @default(uuid())
+  pageId            String
+  page              YearlyAchievementPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  title             String
+  description       String                @db.Text
+  displayOrder      Int                   @default(1)
+  /// Optional image or PDF, stored under uploads/achievements and streamed by an authenticated route.
+  attachmentPath    String?
+  attachmentName    String?
+  attachmentMime    String?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([pageId])
+  @@map("yearly_achievement_entries")
+}
+
+// ─── Awards & Recognition ─────────────────────────────────────────────────────
+// Hospicio's confirmed process: the system identifies who is eligible and tallies
+// the votes; people review, verify and declare the final results. Nothing here is
+// decided by AI, and evaluation scores play no part.
+
+enum AwardType {
+  EMPLOYEE_OF_THE_QUARTER
+  VINCENTIAN
+  LOUISIAN
+  SPECIAL
+  LONGEVITY
+  CUSTOM
+}
+
+/// Not every award uses every stage (Longevity has no nomination or voting).
+enum AwardStatus {
+  DRAFT
+  NOMINATION_OPEN
+  NOMINATION_CLOSED
+  VOTING_OPEN
+  VOTING_CLOSED
+  DELIBERATION
+  VERIFIED
+  FINALIZED
+}
+
+/// PER_CATEGORY: each category ranked on its own (Special Awards: Top 5 each).
+/// COMBINED: one ranking across the award's categories (Vincentian: Top 15).
+enum AwardResultMode {
+  PER_CATEGORY
+  COMBINED
+}
+
+enum AwardResultDecision {
+  PENDING
+  CONFIRMED
+  NOT_AWARDED
+}
+
+/// An organisational group for awards: Hospicio's grouping terms ("Admin
+/// Services", "Health Services") mapped by HR to CURRENT units, departments,
+/// job roles and employees. Never a job role of its own.
+model AwardGroup {
+  id            String   @id @default(uuid())
+  name          String   @unique
+  description   String?  @db.Text
+  /// One of Hospicio's four Employee of the Quarter / Vincentian groups.
+  isOfficial    Boolean  @default(false)
+  unitIds       Json
+  departmentIds Json
+  jobRoleIds    Json
+  employeeIds   Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  nomineeCategories AwardCategory[] @relation("AwardCategoryNomineeGroup")
+  voterCategories   AwardCategory[] @relation("AwardCategoryVoterGroup")
+
+  @@map("award_groups")
+}
+
+/// One award in one period (Employee of the Quarter Q1 2027, Special Awards
+/// CY 2027). A new period is a new row, so earlier periods, their titles and
+/// their results stay exactly as they were.
+model Award {
+  id                   String          @id @default(uuid())
+  type                 AwardType
+  /// Hospicio's official awards; HR-created ones are custom.
+  isOfficial           Boolean         @default(false)
+  title                String
+  description          String?         @db.Text
+  year                 Int
+  quarter              Int?
+  periodLabel          String
+  status               AwardStatus     @default(DRAFT)
+  usesNomination       Boolean
+  usesVoting           Boolean
+  requiresConfirmation Boolean         @default(true)
+  resultMode           AwardResultMode @default(PER_CATEGORY)
+  /// Top N (per category, or overall when COMBINED); null = every nominee with a vote.
+  shortlistCount       Int?
+  /// Completed years of service are counted as of this date.
+  eligibilityDate      DateTime        @db.Date
+  /// Nominee rule in completed years (Vincentian: at least 3; Louisian: at most 3).
+  minYears             Int?
+  maxYears             Int?
+  excludeHallOfFame    Boolean         @default(false)
+  /// Job roles that cannot be nominees (Employee of the Quarter: leadership).
+  excludedJobRoleIds   Json?
+  nominationOpenedAt   DateTime?
+  nominationClosedAt   DateTime?
+  votingOpenedAt       DateTime?
+  votingClosedAt       DateTime?
+  reviewStartedAt      DateTime?
+  verifiedAt           DateTime?
+  verifiedById         String?
+  finalizedAt          DateTime?
+  finalizedById        String?
+  createdById          String?
+  deletedAt            DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  categories AwardCategory[]
+  ballots    AwardBallot[]
+  results    AwardResult[]
+
+  @@index([type, year])
+  @@index([status])
+  @@map("awards")
+}
+
+/// A category of an award: an Employee of the Quarter group, a Vincentian group,
+/// a Special Award title (editable per period) or a Longevity milestone.
+model AwardCategory {
+  id             String      @id @default(uuid())
+  awardId        String
+  award          Award       @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?     @db.Text
+  displayOrder   Int         @default(1)
+  /// Votes each voter may give here, always to DIFFERENT nominees.
+  votesPerVoter  Int         @default(1)
+  /// Null = organisation-wide.
+  nomineeGroupId String?
+  nomineeGroup   AwardGroup? @relation("AwardCategoryNomineeGroup", fields: [nomineeGroupId], references: [id], onDelete: Restrict)
+  /// Null = every active employee may vote.
+  voterGroupId   String?
+  voterGroup     AwardGroup? @relation("AwardCategoryVoterGroup", fields: [voterGroupId], references: [id], onDelete: Restrict)
+  /// Longevity milestone (5, 10, 15, 20 years).
+  milestoneYears Int?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  nominations AwardNomination[]
+  votes       AwardVote[]
+  results     AwardResult[]
+
+  @@index([awardId])
+  @@map("award_categories")
+}
+
+model AwardNomination {
+  id            String        @id @default(uuid())
+  categoryId    String
+  category      AwardCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  nomineeId     String
+  nominee       Employee      @relation("AwardNominee", fields: [nomineeId], references: [id])
+  nominatedById String
+  nominatedBy   Employee      @relation("AwardNominator", fields: [nominatedById], references: [id])
+  reason        String?       @db.Text
+  createdAt     DateTime      @default(now())
+
+  @@unique([categoryId, nomineeId, nominatedById])
+  @@index([nomineeId])
+  @@map("award_nominations")
+}
+
+/// One per voter per award, created first in the same transaction as the votes,
+/// so a second submission (refresh, another tab, double click) adds no votes.
+model AwardBallot {
+  id          String      @id @default(uuid())
+  awardId     String
+  award       Award       @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  voterId     String
+  voter       Employee    @relation(fields: [voterId], references: [id])
+  submittedAt DateTime    @default(now())
+  votes       AwardVote[]
+
+  @@unique([awardId, voterId])
+  @@map("award_ballots")
+}
+
+/// A single vote. Who voted for whom is never returned by the API.
+model AwardVote {
+  id         String        @id @default(uuid())
+  ballotId   String
+  ballot     AwardBallot   @relation(fields: [ballotId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   AwardCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  nomineeId  String
+  nominee    Employee      @relation(fields: [nomineeId], references: [id])
+  slot       Int
+
+  @@unique([ballotId, categoryId, slot])
+  @@unique([ballotId, categoryId, nomineeId])
+  @@index([categoryId, nomineeId])
+  @@map("award_votes")
+}
+
+/// The tally frozen when HR starts the review, and the committee's decisions on it.
+model AwardResult {
+  id             String              @id @default(uuid())
+  awardId        String
+  award          Award               @relation(fields: [awardId], references: [id], onDelete: Cascade)
+  categoryId     String?
+  category       AwardCategory?      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee            @relation(fields: [employeeId], references: [id])
+  voteCount      Int                 @default(0)
+  rank           Int?
+  shortlisted    Boolean             @default(false)
+  /// Tied with the last shortlisted place: the committee decides.
+  tiedAtCutoff   Boolean             @default(false)
+  /// Longevity: completed years when recommended.
+  completedYears Int?
+  decision       AwardResultDecision @default(PENDING)
+  placement      Int?
+  note           String?             @db.Text
+  decidedById    String?
+  decidedAt      DateTime?
+  createdAt      DateTime            @default(now())
+
+  @@index([awardId])
+  @@index([employeeId])
+  @@map("award_results")
+}
+
+/// Hall of Fame awardees, recorded by HR as conferred (no formula decides it).
+/// They cannot be nominees for the Vincentian, Louisian or Special Awards, but
+/// they still vote.
+model HallOfFameRecord {
+  id           String    @id @default(uuid())
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+  awardYear    Int
+  title        String    @default("Hall of Fame Award")
+  conferredOn  DateTime? @db.Date
+  notes        String?   @db.Text
+  recordedById String?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([employeeId])
+  @@map("hall_of_fame_records")
+}
+
+/// Additional (secondary, cross-branch) oversight shown on the Org Chart: an
+/// actual employee who also oversees another employee — or everyone currently
+/// holding a job role — outside their normal branch. It never changes who the
+/// employee reports to (`Employee.immediateSupervisorId` stays the primary
+/// hierarchy) and grants NO access by itself: leave, evaluations, attendance,
+/// schedules, My Team and every other module keep their own rules.
+model AdditionalOversight {
+  id                 String    @id @default(uuid())
+  overseerId         String
+  overseer           Employee  @relation("OversightOverseer", fields: [overseerId], references: [id], onDelete: Cascade)
+  /// Exactly one target: one employee, or everyone holding a job role.
+  overseenEmployeeId String?
+  overseenEmployee   Employee? @relation("OversightOverseenEmployee", fields: [overseenEmployeeId], references: [id], onDelete: Cascade)
+  overseenJobRoleId  String?
+  overseenJobRole    JobRole?  @relation(fields: [overseenJobRoleId], references: [id], onDelete: Cascade)
+  createdById        String?
+  createdAt          DateTime  @default(now())
+
+  @@unique([overseerId, overseenEmployeeId])
+  @@unique([overseerId, overseenJobRoleId])
+  @@index([overseenEmployeeId])
+  @@index([overseenJobRoleId])
+  @@map("additional_oversights")
+}
+
+model SupervisionLink {
+  id            String   @id @default(uuid())
+  supervisorId  String
+  supervisor    Employee @relation("Supervisor", fields: [supervisorId], references: [id])
+  subordinateId String
+  subordinate   Employee @relation("Subordinate", fields: [subordinateId], references: [id])
+  isActive      Boolean  @default(true)
+  assignedAt    DateTime @default(now())
+
+  @@unique([supervisorId, subordinateId])
+  @@index([supervisorId])
+  @@index([subordinateId])
+  @@map("supervision_links")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATTENDANCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Daily attendance summary record per employee
+model AttendanceRecord {
+  id            String           @id @default(uuid())
+  employeeId    String
+  employee      Employee         @relation(fields: [employeeId], references: [id])
+  date          DateTime         @db.Date
+  timeIn        DateTime?
+  timeOut       DateTime?
+  status        AttendanceStatus
+  hoursWorked   Float?
+  overtimeHours Float?
+  remarks       String?
+  /// PRE-EXISTING and currently unused by any code path. Its meaning is
+  /// "verified", which is NOT the same as "source" — deliberately not repurposed
+  /// for provenance. Flagged for a later cleanup decision.
+  verifiedById  String?
+
+  // ── Provenance ────────────────────────────────────────────────────────────
+  /// Where this record's current values came from. Existing rows default to
+  /// LEGACY: their true origin is unknown and claiming IMPORT would be a lie.
+  sourceType           AttendanceRecordSource @default(LEGACY)
+  /// The import batch that last wrote this record, when one did.
+  lastImportBatchId    String?
+  lastImportBatch      AttendanceImportBatch? @relation(fields: [lastImportBatchId], references: [id])
+  /// Set when HR corrects the record by hand. Non-null means a future import
+  /// MUST ask before replacing it — this is the manual-correction guard.
+  manuallyModifiedAt   DateTime?
+  manuallyModifiedById String?
+  manuallyModifiedBy   User?                  @relation("AttendanceManualEditor", fields: [manuallyModifiedById], references: [id])
+  /// Incremented on every write. Used for optimistic drift detection between an
+  /// import preview and its apply.
+  recordVersion        Int                    @default(0)
+
+  // ── Source facts ──────────────────────────────────────────────────────────
+  // `timeIn`/`timeOut` stay the first and last punch of the day so every existing
+  // reader keeps working. These hold what the export actually said, so nothing is
+  // lost when a day has more than one session or the source disagrees with itself.
+  /// Every punch pair the source reported: [{ "in": "06:02", "out": "14:27" }, …].
+  /// A pair with a missing side keeps the side that exists and nulls the other —
+  /// a missing punch is never invented.
+  sessions    Json?
+  /// The source's own hour columns, verbatim and uncalculated:
+  /// { "required": 9, "break": 0, "worked": 6.45, "overtime": 1.97, "undertime": 2.55 }.
+  sourceHours Json?
+  /// Conditions HR may need to look at for this day — attendance on a scheduled
+  /// day off, punches during approved leave, an unclosed punch pair, and so on.
+  /// Facts, not verdicts: nothing here changes the status.
+  reviewFlags Json?
+
+  logs       AttendanceLog[]
+  candidates AttendanceImportCandidate[]
+  createdAt  DateTime                    @default(now())
+  updatedAt  DateTime                    @updatedAt
+
+  @@unique([employeeId, date])
+  @@index([employeeId])
+  @@index([date])
+  @@index([status])
+  @@index([sourceType])
+  @@index([lastImportBatchId])
+  @@map("attendance_records")
+}
+
+/// Granular tardiness/undertime/excuse slip logs
+/// Supervisors can view these for their subordinates (per spreadsheet permission)
+model AttendanceLog {
+  id             String            @id @default(uuid())
+  employeeId     String
+  employee       Employee          @relation(fields: [employeeId], references: [id])
+  attendanceId   String?
+  attendance     AttendanceRecord? @relation(fields: [attendanceId], references: [id])
+  logType        String // LATE | UNDERTIME | EXCUSE_SLIP | OVERTIME | ABSENT_UNEXCUSED
+  logDate        DateTime          @db.Date
+  minutesLate    Int?
+  excuseSlipUrl  String?
+  notes          String?
+  acknowledgedBy String?
+  acknowledgedAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([employeeId])
+  @@index([logDate])
+  @@map("attendance_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEAVE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model LeaveBalance {
+  id                        String               @id @default(uuid())
+  employeeId                String
+  employee                  Employee             @relation(fields: [employeeId], references: [id])
+  year                      Int
+  leaveType                 LeaveType
+  totalAllotted             Float
+  used                      Float                @default(0)
+  pending                   Float                @default(0)
+  forfeited                 Float                @default(0)
+  /// AUTOMATIC: totalAllotted follows the completed-years entitlement
+  /// (lib/leave-entitlement). MANUAL: HR entered it and HRISense never changes it.
+  allotmentSource           LeaveAllotmentSource @default(MANUAL)
+  /// Completed years of service the automatic allotment was based on.
+  entitlementCompletedYears Int?
+  entitlementAppliedAt      DateTime?
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
+
+  @@unique([employeeId, year, leaveType])
+  @@index([employeeId])
+  @@map("leave_balances")
+}
+
+model LeaveRequest {
+  id               String      @id @default(uuid())
+  employeeId       String
+  employee         Employee    @relation("EmployeeLeaves", fields: [employeeId], references: [id])
+  leaveType        LeaveType
+  startDate        DateTime    @db.Date
+  endDate          DateTime    @db.Date
+  totalDays        Float
+  reason           String
+  supportingDocUrl String?
+  status           LeaveStatus @default(PENDING)
+  approvedById     String?
+  approvedBy       Employee?   @relation("ApproverLeaves", fields: [approvedById], references: [id])
+  approvedAt       DateTime?
+  rejectionReason  String?
+  hrNotes          String?
+
+  /// Where the employee can be reached during the leave (Hospicio form).
+  addressDuringLeave String? @db.VarChar(255)
+  /// Contact number during the leave; prefilled from the employee's mobile.
+  contactNumber      String? @db.VarChar(40)
+
+  // Head / supervisor recommendation (PENDING → FOR_REVIEW).
+  endorsedById    String?
+  endorsedBy      Employee? @relation("LeaveEndorser", fields: [endorsedById], references: [id])
+  endorsedAt      DateTime?
+  endorsementNote String?   @db.Text
+
+  // A change the head proposed while endorsing, for HR's decision. The request
+  // itself (startDate / endDate / totalDays) is not touched by a proposal.
+  proposedStartDate DateTime? @db.Date
+  proposedEndDate   DateTime? @db.Date
+  proposedTotalDays Float?
+  proposalReason    String?   @db.Text
+  proposedById      String?
+  proposedBy        Employee? @relation("LeaveRevisionProposer", fields: [proposedById], references: [id])
+  proposedAt        DateTime?
+
+  /// Set only when HR approved different dates or days: the employee's ORIGINAL
+  /// request. startDate / endDate / totalDays then hold the final approved leave,
+  /// which every calendar, attendance and balance figure uses.
+  originalStartDate DateTime? @db.Date
+  originalEndDate   DateTime? @db.Date
+  originalTotalDays Float?
+  /// Why the approved leave differs from the request.
+  adjustmentReason  String?   @db.Text
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("leave_requests")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PERFORMANCE
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PerformanceEvaluation {
+  id              String           @id @default(uuid())
+  employeeId      String
+  employee        Employee         @relation("EvaluationSubject", fields: [employeeId], references: [id])
+  evaluatorId     String
+  evaluator       Employee         @relation("EvaluationEvaluator", fields: [evaluatorId], references: [id])
+  period          String // e.g. "Q1 2026", "Annual 2025"
+  year            Int
+  quarter         Int? // 1-4, null for annual evaluations
+  dimensionScores Json // [{dimension: "Attendance", score: 4.5, weight: 0.20}, ...]
+  overallScore    Float
+  overallRating   String // Outstanding | Very Satisfactory | Satisfactory | Unsatisfactory | Poor
+  comments        String?
+  status          EvaluationStatus @default(DRAFT)
+  finalizedAt     DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([employeeId])
+  @@index([year, quarter])
+  @@index([status])
+  @@map("performance_evaluations")
+}
+
+model EvaluationTemplate {
+  id             String                  @id @default(uuid())
+  name           String
+  description    String?                 @db.Text
+  ratingMethod   EvaluationRatingMethod  @default(NUMERIC)
+  minScore       Float?                  @default(1)
+  maxScore       Float?                  @default(5)
+  scoreLabels    Json?
+  useWeighting   Boolean                 @default(false)
+  /// How the overall score is reached (see EvaluationScoringMethod).
+  scoringMethod  EvaluationScoringMethod @default(CRITERIA)
+  /// Hospicio de San Jose's official forms (seeded from the Word documents HR
+  /// supplied). Their content is read-only: HR duplicates one to customise it.
+  isOfficial     Boolean                 @default(false)
+  officialCode   String?                 @unique
+  sourceDocument String?
+  /// The form's written sections and wording: instructions, appraisal type
+  /// options, comments / goals labels, the employee acknowledgment, and where
+  /// the weights came from. Null for templates that predate it.
+  formLayout     Json?
+  isActive       Boolean                 @default(true)
+  createdById    String?
+  deletedAt      DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  criteria    EvaluationCriterion[]
+  groups      EvaluationCriterionGroup[]
+  cycles      EvaluationCycle[]
+  assignments EvaluationAssignment[]
+  jobRoles    EvaluationTemplateJobRole[]
+
+  @@map("evaluation_templates")
+}
+
+/// A review area / performance factor. On an area template the area carries the
+/// weight; its statements (EvaluationCriterion rows) are the items rated.
+model EvaluationCriterionGroup {
+  id           String             @id @default(uuid())
+  templateId   String
+  template     EvaluationTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?            @db.Text
+  displayOrder Int                @default(1)
+  weight       Float?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  criteria EvaluationCriterion[]
+
+  @@index([templateId])
+  @@map("evaluation_criterion_groups")
+}
+
+/// Which template a job role is evaluated with. A role has at most one; a cycle
+/// uses it for that role's employees and its own template for everyone else.
+model EvaluationTemplateJobRole {
+  id         String             @id @default(uuid())
+  templateId String
+  template   EvaluationTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  jobRoleId  String             @unique
+  jobRole    JobRole            @relation(fields: [jobRoleId], references: [id], onDelete: Cascade)
+  createdAt  DateTime           @default(now())
+
+  @@index([templateId])
+  @@map("evaluation_template_job_roles")
+}
+
+model EvaluationCriterion {
+  id                String                    @id @default(uuid())
+  templateId        String
+  template          EvaluationTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  /// The review area this statement belongs to (area templates only).
+  groupId           String?
+  group             EvaluationCriterionGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?                   @db.Text
+  displayOrder      Int                       @default(1)
+  isRatingRequired  Boolean                   @default(true)
+  isCommentRequired Boolean                   @default(false)
+  weight            Float?
+  isActive          Boolean                   @default(true)
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@index([templateId])
+  @@index([groupId])
+  @@map("evaluation_criteria")
+}
+
+model EvaluationCycle {
+  id                        String                @id @default(uuid())
+  name                      String
+  description               String?               @db.Text
+  templateId                String
+  template                  EvaluationTemplate    @relation(fields: [templateId], references: [id])
+  startDate                 DateTime              @db.Date
+  dueDate                   DateTime              @db.Date
+  status                    EvaluationCycleStatus @default(ACTIVE)
+  evaluatorAssignmentMethod String                @default("MANUAL")
+  /// The paper form's "Nature of Appraisal" / "Type of Evaluation" for this cycle.
+  appraisalType             String?
+  /// Chosen when the cycle is created and never changed: its assignments differ.
+  evaluationMode            EvaluationMode        @default(STANDARD)
+  /// Weighted multi-rater cycles: the self / peer / head percentages the cycle
+  /// runs with — Hospicio's 20 / 20 / 60 for every new cycle (older cycles keep
+  /// the percentages they were created with). Null for standard cycles.
+  selfWeight                Float?
+  peerWeight                Float?
+  headWeight                Float?
+  defaultEvaluatorId        String?
+  defaultEvaluator          Employee?             @relation("CycleDefaultEvaluator", fields: [defaultEvaluatorId], references: [id])
+  createdById               String?
+  deletedAt                 DateTime?
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+
+  scopes      EvaluationCycleScope[]
+  assignments EvaluationAssignment[]
+
+  @@index([templateId])
+  @@index([status])
+  @@index([defaultEvaluatorId])
+  @@map("evaluation_cycles")
+}
+
+model EvaluationCycleScope {
+  id                 String               @id @default(uuid())
+  cycleId            String
+  cycle              EvaluationCycle      @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  scopeType          RequirementScopeType
+  targetUnitId       String?
+  targetUnit         Unit?                @relation(fields: [targetUnitId], references: [id])
+  targetDepartmentId String?
+  targetDepartment   Department?          @relation(fields: [targetDepartmentId], references: [id])
+  targetJobRoleId    String?
+  targetJobRole      JobRole?             @relation(fields: [targetJobRoleId], references: [id])
+  targetEmployeeId   String?
+  targetEmployee     Employee?            @relation("EvaluationCycleScopeEmployee", fields: [targetEmployeeId], references: [id])
+  createdAt          DateTime             @default(now())
+
+  @@index([cycleId])
+  @@index([scopeType])
+  @@map("evaluation_cycle_scopes")
+}
+
+model EvaluationAssignment {
+  id                         String                     @id @default(uuid())
+  cycleId                    String
+  cycle                      EvaluationCycle            @relation(fields: [cycleId], references: [id])
+  employeeId                 String
+  employee                   Employee                   @relation("EvaluationAssignmentSubject", fields: [employeeId], references: [id])
+  evaluatorId                String
+  evaluator                  Employee                   @relation("EvaluationAssignmentEvaluator", fields: [evaluatorId], references: [id])
+  templateId                 String
+  template                   EvaluationTemplate         @relation(fields: [templateId], references: [id])
+  templateSnapshot           Json?
+  /// Whose rating this is: the employee's SELF rating, a PEER's, or the assigned
+  /// HEAD / supervisor / coordinator's. The HEAD assignment carries the
+  /// discussion and HR finalisation for the employee's evaluation in the cycle.
+  raterType                  EvaluationRaterType        @default(HEAD)
+  dueDate                    DateTime                   @db.Date
+  status                     EvaluationAssignmentStatus @default(NOT_STARTED)
+  startedAt                  DateTime?
+  submittedAt                DateTime?
+  finalizedAt                DateTime?
+  finalizedById              String?
+  overallScore               Float?
+  overallRating              String?
+  evaluatorSummary           String?                    @db.Text
+  developmentRecommendations String?                    @db.Text
+  isEmployeeVisible          Boolean                    @default(false)
+  /// Discussion with the evaluated employee (HEAD assignment only), recorded by
+  /// the assigned evaluator after submitting and required before finalisation.
+  discussionCompletedAt      DateTime?
+  discussionDate             DateTime?                  @db.Date
+  discussionNotes            String?                    @db.Text
+  discussionRecordedById     String?
+  /// Final weighted rating (HEAD row, weighted multi-rater cycles) frozen at HR
+  /// finalisation, with the breakdown that produced it.
+  combinedScore              Float?
+  combinedBreakdown          Json?
+  deletedAt                  DateTime?
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
+
+  responses EvaluationResponse[]
+
+  @@unique([cycleId, employeeId, raterType, evaluatorId])
+  @@index([cycleId])
+  @@index([employeeId])
+  @@index([evaluatorId])
+  @@index([status])
+  @@index([templateId])
+  @@map("evaluation_assignments")
+}
+
+model EvaluationResponse {
+  id                   String               @id @default(uuid())
+  assignmentId         String
+  assignment           EvaluationAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  criterionId          String
+  criterionName        String
+  criterionDescription String?              @db.Text
+  criterionWeight      Float?
+  ratingNumeric        Float?
+  ratingLabel          String?
+  comment              String?              @db.Text
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@unique([assignmentId, criterionId])
+  @@index([assignmentId])
+  @@map("evaluation_responses")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEGACY STUBS (original tables preserved — do NOT drop)
+// Models renamed with Legacy prefix; @@map retains the original table name.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// @deprecated Legacy stub — table preserved for safety. Use ComplianceRequirement instead.
+model LegacyComplianceRequirement {
+  id                String             @id @default(uuid())
+  title             String
+  description       String
+  category          ComplianceCategory
+  dueDate           DateTime
+  status            ComplianceStatus   @default(PENDING)
+  responsibleUnitId String?
+  aiRiskScore       Float?
+  reminderSentAt    DateTime?
+  completedAt       DateTime?
+  completionNotes   String?
+  deletedAt         DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  documents LegacyComplianceDocument[]
+
+  @@map("compliance_requirements")
+}
+
+/// @deprecated Legacy stub — table preserved for safety.
+model LegacyComplianceDocument {
+  id            String                      @id @default(uuid())
+  requirementId String
+  requirement   LegacyComplianceRequirement @relation(fields: [requirementId], references: [id])
+  fileName      String
+  fileUrl       String
+  uploadedById  String?
+  uploadedAt    DateTime                    @default(now())
+
+  @@index([requirementId])
+  @@map("compliance_documents")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LEGACY HEALTH STUBS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// @deprecated Legacy stub — table preserved for safety. Use MedicalRecord instead.
+model LegacyMedicalRecord {
+  id              String   @id @default(uuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  date            DateTime @db.Date
+  type            String
+  findings        String
+  recommendations String?
+  attachments     Json?
+  recordedById    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([employeeId])
+  @@map("medical_records")
+}
+
+/// @deprecated Legacy stub — table preserved for safety. Use PsychologicalRecord instead.
+model LegacyPsychologicalRecord {
+  id              String   @id @default(uuid())
+  employeeId      String
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  date            DateTime @db.Date
+  sessionType     String
+  summary         String
+  recommendations String?
+  attachments     Json?
+  conductedById   String?
+  isConfidential  Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([employeeId])
+  @@map("psychological_records")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPLIANCE — REQUIREMENTS (Full Implementation)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// HR-defined compliance requirement template.
+/// Applicability determined dynamically via ComplianceRequirementScope entries.
+model ComplianceRequirement {
+  id           String               @id @default(uuid())
+  title        String
+  description  String?              @db.Text
+  category     RequirementCategory
+  /// Whether expiry tracking applies for this requirement
+  tracksExpiry Boolean              @default(false)
+  /// Days before expiry to trigger EXPIRING_SOON status (null = disabled)
+  reminderDays Int?
+  lifecycle    RequirementLifecycle @default(ACTIVE)
+  deletedAt    DateTime?
+  createdById  String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  scopes             ComplianceRequirementScope[]
+  medicalRecords     MedicalRecord[]
+  psychRecords       PsychologicalRecord[]
+  complianceRecords  EmployeeComplianceRecord[]
+  trainingActivities TrainingActivity[]
+
+  @@index([lifecycle])
+  @@index([category])
+  @@map("compliance_requirements_new")
+}
+
+/// Defines which employees a ComplianceRequirement applies to.
+/// Resolved dynamically at query time using current employee organizational data.
+model ComplianceRequirementScope {
+  id                 String                @id @default(uuid())
+  requirementId      String
+  requirement        ComplianceRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  scopeType          RequirementScopeType
+  /// Populated when scopeType = UNIT
+  targetUnitId       String?
+  targetUnit         Unit?                 @relation(fields: [targetUnitId], references: [id])
+  /// Populated when scopeType = DEPARTMENT
+  targetDepartmentId String?
+  targetDepartment   Department?           @relation(fields: [targetDepartmentId], references: [id])
+  /// Populated when scopeType = JOB_ROLE
+  targetJobRoleId    String?
+  targetJobRole      JobRole?              @relation(fields: [targetJobRoleId], references: [id])
+  /// Populated when scopeType = EMPLOYEE
+  targetEmployeeId   String?
+  targetEmployee     Employee?             @relation(fields: [targetEmployeeId], references: [id])
+  createdAt          DateTime              @default(now())
+
+  @@index([requirementId])
+  @@index([scopeType])
+  @@map("compliance_requirement_scopes")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MEDICAL RECORDS (Full Implementation)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Full lifecycle medical examination record. HR-only access.
+/// Sensitive fields (hrNotes) never exposed through compliance or employee-facing endpoints.
+model MedicalRecord {
+  id            String                 @id @default(uuid())
+  employeeId    String
+  employee      Employee               @relation(fields: [employeeId], references: [id])
+  /// Optional link to the compliance requirement this record fulfills
+  requirementId String?
+  requirement   ComplianceRequirement? @relation(fields: [requirementId], references: [id])
+  /// Type of medical examination
+  examType      String // PRE_EMPLOYMENT | ANNUAL | OCCUPATIONAL | SPECIAL
+  examDate      DateTime               @db.Date
+  examinedBy    String? // Name of physician/clinic
+  /// HR-internal administrative notes — NEVER returned to employee view
+  hrNotes       String?                @db.Text
+  /// Optional expiry date as entered by HR from source document
+  expiresAt     DateTime?              @db.Date
+  reviewStatus  RecordReviewStatus     @default(PENDING_REVIEW)
+  reviewedById  String?
+  reviewedAt    DateTime?
+  reviewReason  String?                @db.Text
+  createdById   String?
+  deletedAt     DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  documents MedicalRecordDocument[]
+
+  @@index([employeeId])
+  @@index([requirementId])
+  @@index([reviewStatus])
+  @@index([examDate])
+  @@index([expiresAt])
+  @@map("medical_records_new")
+}
+
+/// Protected document attachment for a MedicalRecord.
+model MedicalRecordDocument {
+  id               String        @id @default(uuid())
+  medicalRecordId  String
+  medicalRecord    MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+  originalFilename String
+  storedFilename   String        @unique
+  mimeType         String
+  sizeBytes        Int
+  notes            String?
+  uploadedById     String?
+  uploadedAt       DateTime      @default(now())
+
+  @@index([medicalRecordId])
+  @@map("medical_record_documents")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PSYCHOLOGICAL RECORDS (Full Implementation)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Full lifecycle psychological assessment record.
+/// Two structural zones: employee-visible and HR-confidential.
+/// Employee self-view ONLY returns employeeVisibleSummary and EMPLOYEE_VISIBLE documents.
+model PsychologicalRecord {
+  id                     String                 @id @default(uuid())
+  employeeId             String
+  employee               Employee               @relation(fields: [employeeId], references: [id])
+  /// Optional link to the compliance requirement this record fulfills
+  requirementId          String?
+  requirement            ComplianceRequirement? @relation(fields: [requirementId], references: [id])
+  assessmentType         String // PRE_EMPLOYMENT | ANNUAL | COUNSELING | FOLLOW_UP | SPECIAL
+  assessmentDate         DateTime               @db.Date
+  conductedBy            String? // Name of psychologist/assessor
+  /// EMPLOYEE-VISIBLE zone: summary HR chooses to share with the employee
+  employeeVisibleSummary String?                @db.Text
+  /// HR-CONFIDENTIAL zone: NEVER returned to employee or supervisor views
+  hrConfidentialNotes    String?                @db.Text
+  /// Optional expiry date as entered by HR from source document
+  expiresAt              DateTime?              @db.Date
+  reviewStatus           RecordReviewStatus     @default(PENDING_REVIEW)
+  reviewedById           String?
+  reviewedAt             DateTime?
+  reviewReason           String?                @db.Text
+  createdById            String?
+  deletedAt              DateTime?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  documents PsychologicalRecordDocument[]
+
+  @@index([employeeId])
+  @@index([requirementId])
+  @@index([reviewStatus])
+  @@index([assessmentDate])
+  @@index([expiresAt])
+  @@map("psychological_records_new")
+}
+
+/// Protected document for a PsychologicalRecord.
+/// visibility field enforced at service layer — HR_ONLY docs never streamed to employee.
+model PsychologicalRecordDocument {
+  id                    String                          @id @default(uuid())
+  psychologicalRecordId String
+  psychologicalRecord   PsychologicalRecord             @relation(fields: [psychologicalRecordId], references: [id], onDelete: Cascade)
+  originalFilename      String
+  storedFilename        String                          @unique
+  mimeType              String
+  sizeBytes             Int
+  /// HR_ONLY documents are never streamed to employee self-view
+  visibility            PsychologicalDocumentVisibility @default(HR_ONLY)
+  notes                 String?
+  uploadedById          String?
+  uploadedAt            DateTime                        @default(now())
+
+  @@index([psychologicalRecordId])
+  @@index([visibility])
+  @@map("psychological_record_documents")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GENERIC COMPLIANCE RECORDS (Certification / Document / Training / Other)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Fulfillment record for CERTIFICATION, TRAINING, DOCUMENT, OTHER requirements.
+/// Medical and Psychological requirements use their own dedicated record models.
+model EmployeeComplianceRecord {
+  id              String                @id @default(uuid())
+  employeeId      String
+  employee        Employee              @relation(fields: [employeeId], references: [id])
+  requirementId   String
+  requirement     ComplianceRequirement @relation(fields: [requirementId], references: [id])
+  /// Human-readable title for this record (e.g. "BLS Certificate 2026")
+  recordTitle     String
+  /// Optional reference/certificate number
+  referenceNumber String?
+  /// Date the certificate/document was issued or training was completed
+  completedAt     DateTime              @db.Date
+  /// Optional validity expiry date as entered by HR from source document
+  expiresAt       DateTime?             @db.Date
+  notes           String?               @db.Text
+  reviewStatus    RecordReviewStatus    @default(PENDING_REVIEW)
+  reviewedById    String?
+  reviewedAt      DateTime?
+  reviewReason    String?               @db.Text
+  createdById     String?
+  deletedAt       DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  /// SOURCE-EVENT IDEMPOTENCY KEY.
+  /// Set when this record was generated automatically by a training completion.
+  /// Unique, so retrying the same completion cannot create a second compliance
+  /// record. Deliberately NOT a uniqueness rule over (employee, requirement) —
+  /// recurring requirements legitimately produce several records over time.
+  generatedFromTrainingParticipantId String?              @unique
+  generatedFromTrainingParticipant   TrainingParticipant? @relation("ComplianceGeneratedFromTraining", fields: [generatedFromTrainingParticipantId], references: [id])
+
+  documents            EmployeeComplianceDocument[]
+  trainingParticipants TrainingParticipant[]        @relation("TrainingParticipantComplianceLink")
+
+  @@index([employeeId])
+  @@index([requirementId])
+  @@index([reviewStatus])
+  @@index([expiresAt])
+  @@map("employee_compliance_records")
+}
+
+/// Protected document attachment for a generic EmployeeComplianceRecord.
+model EmployeeComplianceDocument {
+  id                 String                       @id @default(uuid())
+  complianceRecordId String
+  complianceRecord   EmployeeComplianceRecord     @relation(fields: [complianceRecordId], references: [id], onDelete: Cascade)
+  originalFilename   String
+  storedFilename     String                       @unique
+  mimeType           String
+  sizeBytes          Int
+  visibility         ComplianceDocumentVisibility @default(VISIBLE)
+  notes              String?
+  uploadedById       String?
+  uploadedAt         DateTime                     @default(now())
+
+  @@index([complianceRecordId])
+  @@map("employee_compliance_documents")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TRAINING & ACTIVITIES
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Training {
+  id              String         @id @default(uuid())
+  title           String
+  description     String?
+  type            String // SEMINAR | WORKSHOP | CERTIFICATION | ORIENTATION | DRILL | RECERTIFICATION
+  facilitator     String
+  venue           String
+  startDate       DateTime
+  endDate         DateTime
+  hoursCredit     Float
+  maxParticipants Int?
+  status          TrainingStatus @default(UPCOMING)
+  materialsUrl    String?
+  createdById     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  attendees TrainingAttendee[]
+
+  @@index([status])
+  @@index([startDate])
+  @@map("trainings")
+}
+
+model TrainingActivity {
+  id                      String                 @id @default(uuid())
+  title                   String
+  type                    TrainingActivityType   @default(TRAINING)
+  description             String?                @db.Text
+  provider                String
+  venue                   String
+  startDate               DateTime               @db.Date
+  startTime               String?
+  endDate                 DateTime               @db.Date
+  endTime                 String?
+  hoursCredit             Float?
+  maxParticipants         Int?
+  status                  TrainingActivityStatus @default(SCHEDULED)
+  complianceRequirementId String?
+  complianceRequirement   ComplianceRequirement? @relation(fields: [complianceRequirementId], references: [id])
+  materialsUrl            String?
+  createdById             String?
+  deletedAt               DateTime?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  participants TrainingParticipant[]
+  documents    TrainingActivityDocument[]
+
+  @@index([status])
+  @@index([startDate])
+  @@index([complianceRequirementId])
+  @@map("training_activities")
+}
+
+model TrainingParticipant {
+  id                          String                      @id @default(uuid())
+  trainingActivityId          String
+  trainingActivity            TrainingActivity            @relation(fields: [trainingActivityId], references: [id], onDelete: Cascade)
+  employeeId                  String
+  employee                    Employee                    @relation("TrainingParticipantEmployee", fields: [employeeId], references: [id])
+  participationStatus         TrainingParticipationStatus @default(ASSIGNED)
+  assignedAt                  DateTime                    @default(now())
+  completedAt                 DateTime?
+  validUntil                  DateTime?                   @db.Date
+  notes                       String?                     @db.Text
+  certificateOriginalFilename String?
+  certificateStoredFilename   String?                     @unique
+  certificateMimeType         String?
+  certificateSizeBytes        Int?
+  complianceRecordId          String?
+  complianceRecord            EmployeeComplianceRecord?   @relation("TrainingParticipantComplianceLink", fields: [complianceRecordId], references: [id])
+  /// Back-reference for the compliance record auto-generated by THIS completion.
+  /// Distinct from `complianceRecord`, which may point at a record HR created by
+  /// hand. Enforces one generated record per completion event.
+  generatedComplianceRecord   EmployeeComplianceRecord?   @relation("ComplianceGeneratedFromTraining")
+  createdAt                   DateTime                    @default(now())
+  updatedAt                   DateTime                    @updatedAt
+
+  @@unique([trainingActivityId, employeeId])
+  @@index([trainingActivityId])
+  @@index([employeeId])
+  @@index([participationStatus])
+  @@index([complianceRecordId])
+  @@map("training_participants")
+}
+
+model TrainingActivityDocument {
+  id                 String           @id @default(uuid())
+  trainingActivityId String
+  trainingActivity   TrainingActivity @relation(fields: [trainingActivityId], references: [id], onDelete: Cascade)
+  originalFilename   String
+  storedFilename     String           @unique
+  mimeType           String
+  sizeBytes          Int
+  notes              String?
+  uploadedById       String?
+  uploadedAt         DateTime         @default(now())
+
+  @@index([trainingActivityId])
+  @@map("training_activity_documents")
+}
+
+model TrainingAttendee {
+  id             String    @id @default(uuid())
+  trainingId     String
+  training       Training  @relation(fields: [trainingId], references: [id])
+  employeeId     String
+  employee       Employee  @relation(fields: [employeeId], references: [id])
+  registeredAt   DateTime  @default(now())
+  attended       Boolean   @default(false)
+  completedAt    DateTime?
+  certificateUrl String?
+  score          Float?
+  notes          String?
+
+  @@unique([trainingId, employeeId])
+  @@index([trainingId])
+  @@index([employeeId])
+  @@map("training_attendees")
+}
+
+/// Tracks employee attendance at events/activities (separate from formal training)
+/// Supervisors can view this for their subordinates per spreadsheet: "ACTIVITIES ATTENDANCES"
+model ActivityAttendance {
+  id           String   @id @default(uuid())
+  employeeId   String
+  employee     Employee @relation(fields: [employeeId], references: [id])
+  activityName String
+  activityDate DateTime @db.Date
+  isPresent    Boolean  @default(false)
+  notes        String?
+  recordedById String?
+  createdAt    DateTime @default(now())
+
+  @@index([employeeId])
+  @@index([activityDate])
+  @@map("activity_attendances")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PAYROLL
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Payslip {
+  id          String    @id @default(uuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  period      String // e.g. "June 2026 - 1st Half"
+  periodStart DateTime  @db.Date
+  periodEnd   DateTime  @db.Date
+  grossPay    Float
+  deductions  Json // {sss: 0, philhealth: 0, pagibig: 0, tax: 0, absences: 0, loans: 0, others: 0}
+  netPay      Float
+  isReleased  Boolean   @default(false)
+  releasedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([employeeId])
+  @@index([period])
+  @@index([isReleased])
+  @@map("payslips")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DOCUMENTS & FILES
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum DocumentCategory {
+  RESUME
+  EMPLOYMENT_CONTRACT
+  GOVERNMENT_ID
+  MEDICAL_CLEARANCE
+  CERTIFICATE
+  OTHER
+}
+
+model EmployeeDocument {
+  id                    String           @id @default(uuid())
+  employeeId            String
+  employee              Employee         @relation(fields: [employeeId], references: [id])
+  category              DocumentCategory
+  originalFilename      String
+  storedFilename        String           @unique
+  mimeType              String
+  sizeBytes             Int
+  isVisibleToEmployee   Boolean          @default(true)
+  isVisibleToSupervisor Boolean          @default(false)
+  expiresAt             DateTime?
+  replacedAt            DateTime?
+  deletedAt             DateTime?
+  notes                 String?          @db.Text
+  uploadedById          String?
+  uploadedAt            DateTime         @default(now())
+
+  @@index([employeeId])
+  @@index([category])
+  @@map("employee_documents")
+}
+
+model UploadedFile {
+  id           String   @id @default(uuid())
+  fileName     String
+  originalName String
+  mimeType     String
+  sizeBytes    Int
+  fileUrl      String
+  uploadedById String?
+  purpose      String? // PROFILE_PHOTO | DOCUMENT | COMPLIANCE | EXCUSE_SLIP | ANNOUNCEMENT | OTHER
+  createdAt    DateTime @default(now())
+
+  @@index([uploadedById])
+  @@map("uploaded_files")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMMUNICATION
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Full-lifecycle Announcement model.
+/// state + publishAt + expiresAt drive derived user-facing statuses at query time.
+/// No cron job required to transition between Draft / Scheduled / Published / Expired.
+model Announcement {
+  id    String @id @default(uuid())
+  title String @db.VarChar(255)
+
+  // ── Legacy field — preserved from original schema. NOT used by new service logic.
+  // body TEXT is the authoritative message field, but AnnouncementService still
+  // writes the full body into `content` to keep the two in sync — so this is TEXT
+  // as well (it was VARCHAR(191), which truncated or rejected longer announcements).
+  /// @deprecated Use body instead. Preserved for migration safety.
+  content String @db.Text
+
+  /// Authoritative full message body. Populated via: UPDATE announcements SET body = content.
+  body String? @db.Text
+
+  priority AnnouncementPriority @default(NORMAL)
+  state    AnnouncementState    @default(DRAFT)
+  isPinned Boolean              @default(false)
+
+  /// When the announcement becomes visible to recipients.
+  /// For DRAFT: null. For SCHEDULED/PUBLISHED: set at activation time.
+  publishAt DateTime?
+
+  /// When the announcement is no longer CURRENT (but history is preserved).
+  expiresAt DateTime?
+
+  /// Set when HR archives this announcement.
+  archivedAt DateTime?
+
+  // ── Legacy fields — preserved from original schema. NOT used by new service logic.
+  /// @deprecated Legacy audience enum column. New targeting uses AnnouncementAudienceScope.
+  audience         AnnouncementAudience @default(ALL)
+  /// @deprecated Legacy unit target. Use AnnouncementAudienceScope instead.
+  targetUnitId     String?
+  /// @deprecated Legacy job role target. Use AnnouncementAudienceScope instead.
+  targetJobRoleId  String?
+  /// @deprecated Legacy employee target. Use AnnouncementAudienceScope instead.
+  targetEmployeeId String?
+  /// @deprecated Legacy author employee FK. Use createdByUserId instead.
+  authorId         String?
+
+  /// FK to users.id — the authenticated HR user who created this announcement.
+  /// Nullable to allow existing seed rows without a valid User FK.
+  createdByUserId String?
+  createdBy       User?   @relation("AnnouncementCreator", fields: [createdByUserId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  audienceScopes AnnouncementAudienceScope[]
+  recipients     AnnouncementRecipient[]
+  attachments    AnnouncementAttachment[]
+
+  @@index([state])
+  @@index([isPinned])
+  @@index([publishAt])
+  @@index([expiresAt])
+  @@index([createdByUserId])
+  @@map("announcements")
+}
+
+/// Defines one audience-targeting scope for an Announcement.
+/// Multiple scopes are additive — backend resolves and deduplicates.
+/// Mirrors the pattern used by ComplianceRequirementScope and EvaluationCycleScope
+/// but intentionally separate (Announcements ≠ Compliance domain).
+model AnnouncementAudienceScope {
+  id             String                @id @default(uuid())
+  announcementId String
+  announcement   Announcement          @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  scopeType      AnnouncementScopeType
+
+  /// Populated when scopeType = UNIT
+  targetUnitId String?
+  targetUnit   Unit?   @relation(fields: [targetUnitId], references: [id])
+
+  /// Populated when scopeType = DEPARTMENT
+  targetDepartmentId String?
+  targetDepartment   Department? @relation(fields: [targetDepartmentId], references: [id])
+
+  /// Populated when scopeType = JOB_ROLE
+  targetJobRoleId String?
+  targetJobRole   JobRole? @relation(fields: [targetJobRoleId], references: [id])
+
+  /// Populated when scopeType = EMPLOYEE
+  targetEmployeeId String?
+  targetEmployee   Employee? @relation(fields: [targetEmployeeId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([announcementId])
+  @@index([scopeType])
+  @@map("announcement_audience_scopes")
+}
+
+/// Recipient snapshot — one row per resolved employee per announcement.
+/// Created atomically when an announcement is published or scheduled.
+/// NEVER created by employee read actions (read marks only UPDATE existing rows).
+model AnnouncementRecipient {
+  id             String       @id @default(uuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id])
+
+  /// Set when the recipient opens the announcement detail view. Never reset by HR edits.
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([announcementId, employeeId])
+  @@index([announcementId])
+  @@index([employeeId])
+  @@index([readAt])
+  @@map("announcement_recipients")
+}
+
+/// Protected announcement attachment with secure stored-filename metadata.
+/// Mirrors the pattern of MedicalRecordDocument / TrainingActivityDocument.
+model AnnouncementAttachment {
+  id             String       @id @default(uuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  // ── Legacy fields — preserved from original schema (0 rows, no data at risk).
+  /// @deprecated Use originalFilename instead.
+  fileName String @db.VarChar(191)
+  /// @deprecated Use storedFilename instead. Public URL pattern is insecure.
+  fileUrl  String @db.VarChar(191)
+
+  /// Original filename as provided by uploader (display only).
+  originalFilename String?
+
+  /// Random server-side filename (crypto.randomBytes). UNIQUE across all attachments.
+  storedFilename String? @unique
+
+  /// MIME type validated at upload time.
+  mimeType String?
+
+  /// File size in bytes.
+  sizeBytes Int?
+
+  /// FK to users.id — HR user who uploaded this attachment.
+  uploadedByUserId String?
+  uploadedBy       User?   @relation("AttachmentUploader", fields: [uploadedByUserId], references: [id])
+
+  uploadedAt DateTime @default(now())
+
+  @@index([announcementId])
+  @@map("announcement_attachments")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id])
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean          @default(false)
+  readAt    DateTime?
+  /// Idempotency key for the business event that produced this notification,
+  /// e.g. `leave-approved:<leaveRequestId>:<userId>`. Nullable, because plenty of
+  /// notifications are one-off and have no natural event key. When present it is
+  /// unique, so a retried request cannot create a second copy.
+  /// Mirrors the pattern already proven by ApplicantCommunication.eventId.
+  eventId   String?          @unique
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AUDIT & ACTIVITY LOGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id               String   @id @default(uuid())
+  actorUserId      String?
+  actorUser        User?    @relation("AuditLogsActor", fields: [actorUserId], references: [id])
+  targetEmployeeId String?
+  action           String // LOGIN | CREATE | UPDATE | etc.
+  entityType       String? // EMPLOYEE | DRAFT | LEAVE_REQUEST | etc.
+  entityId         String?
+  metadata         Json?
+  oldValue         Json?
+  newValue         Json?
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime @default(now())
+
+  @@index([actorUserId])
+  @@index([targetEmployeeId])
+  @@index([entityType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model OnboardingDraft {
+  id                String                @id @default(uuid())
+  data              Json
+  status            OnboardingDraftStatus @default(DRAFT)
+  createdById       String
+  lastUpdatedById   String
+  assignedToId      String?
+  createdEmployeeId String?               @unique
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  completedAt       DateTime?
+
+  @@index([createdById])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("onboarding_drafts")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AI MODELS
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AIInsight {
+  id               String        @id @default(uuid())
+  type             AIInsightType
+  title            String
+  content          String
+  confidenceScore  Float
+  module           String
+  targetEmployeeId String?
+  targetEmployee   Employee?     @relation(fields: [targetEmployeeId], references: [id])
+  isActionable     Boolean       @default(false)
+  suggestedActions Json? // [{label: "View Analytics", action: "/reports/attendance"}, ...]
+  isRead           Boolean       @default(false)
+  expiresAt        DateTime?
+  generatedAt      DateTime      @default(now())
+
+  @@index([type])
+  @@index([generatedAt])
+  @@index([isRead])
+  @@map("ai_insights")
+}
+
+/// One row per AI request, for auditing. Holds the question, a truncated answer
+/// and WHICH tools ran — never tool output, keys, tokens or other secrets.
+model AIRequestLog {
+  id               String          @id @default(uuid())
+  requestedById    String?
+  /// The user's question (secret-like strings redacted), or the analysis label.
+  prompt           String          @db.Text
+  /// The final answer shown to the user, truncated.
+  response         String?         @db.Text
+  model            String // configurable from env — never hardcoded
+  tokensUsed       Int?
+  promptTokens     Int?
+  completionTokens Int?
+  status           AIRequestStatus @default(PENDING)
+  durationMs       Int?
+  /// Error message only — never request headers or bodies.
+  error            String?         @db.Text
+  /// ASSISTANT (the role-aware chat) | ANALYSIS (HR's workforce fact-sheet analysis).
+  channel          String?         @db.VarChar(20)
+  conversationId   String?
+  /// Tier resolved on the server for this request. Never taken from the browser.
+  actorTier        PermissionTier?
+  provider         String?         @db.VarChar(40)
+  /// ANSWERED | NO_DATA | NOT_AUTHORIZED | OUT_OF_SCOPE | REFUSED | AI_UNAVAILABLE | ERROR
+  outcome          String?         @db.VarChar(30)
+  /// Tools the assistant used: [{ name, ok, code?, targetEmployeeId?, rows?, ms }].
+  /// Records WHAT was accessed, never the data returned.
+  toolCalls        Json?
+  toolRounds       Int?
+  createdAt        DateTime        @default(now())
+
+  @@index([requestedById])
+  @@index([status])
+  @@index([createdAt])
+  @@index([conversationId])
+  @@map("ai_request_logs")
+}
+
+/// A user's conversation with the AI assistant. Only the owner can read it.
+/// Messages hold the user's text and the assistant's final answer (with any
+/// chart it drew) — never raw tool results.
+model AIConversation {
+  id         String   @id @default(uuid())
+  userId     String
+  title      String?
+  messages   Json // [{ id, role: "user"|"assistant", content, status?, charts?, links?, createdAt }]
+  model      String
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isArchived, updatedAt])
+  @@map("ai_conversations")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SYSTEM
+// ─────────────────────────────────────────────────────────────────────────────
+
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
+  @@map("system_settings")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RECRUITMENT
+// ─────────────────────────────────────────────────────────────────────────────
+
+model JobOpening {
+  id                String           @id @default(uuid())
+  referenceNumber   String           @unique
+  slug              String           @unique
+  title             String
+  unitId            String
+  unit              Unit             @relation(fields: [unitId], references: [id])
+  departmentId      String?
+  department        Department?      @relation(fields: [departmentId], references: [id])
+  jobRoleId         String
+  jobRole           JobRole          @relation(fields: [jobRoleId], references: [id])
+  employmentType    EmploymentStatus
+  vacancies         Int?
+  description       String           @db.Text
+  responsibilities  String           @db.Text
+  qualifications    String           @db.Text
+  requiredDocuments String?          @db.Text
+  openingDate       DateTime         @db.Date
+  closingDate       DateTime         @db.Date
+  status            JobOpeningStatus @default(DRAFT)
+
+  createdById String
+  updatedById String
+  publishedAt DateTime?
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  applications JobApplication[]
+
+  @@index([status])
+  @@index([closingDate])
+  @@map("job_openings")
+}
+
+model Applicant {
+  id         String  @id @default(uuid())
+  firstName  String
+  middleName String?
+  lastName   String
+  suffix     String?
+  email      String
+  mobile     String
+  address    String?
+  /// Free text: the applicant picks from a list or types their own under "Others".
+  religion   String? @db.VarChar(120)
+  /// Optional on the public form: an applicant is not obliged to state it, and
+  /// PREFER_NOT_TO_SAY is a real answer rather than a missing one.
+  gender     Gender?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  applications JobApplication[]
+
+  @@index([email])
+  @@index([mobile])
+  @@map("applicants")
+}
+
+model JobApplication {
+  id               String               @id @default(uuid())
+  referenceNumber  String               @unique
+  applicantId      String
+  applicant        Applicant            @relation(fields: [applicantId], references: [id])
+  jobOpeningId     String
+  jobOpening       JobOpening           @relation(fields: [jobOpeningId], references: [id])
+  applicationDate  DateTime             @default(now())
+  status           JobApplicationStatus @default(SUBMITTED)
+  source           String?
+  applicantMessage String?              @db.Text
+
+  privacyConsent   Boolean
+  consentTimestamp DateTime
+
+  onboardingDraftId String? @unique
+  employeeId        String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  documents      ApplicantDocument[]
+  interviews     ApplicantInterview[]
+  statusHistory  ApplicationStatusHistory[]
+  notes          ApplicantNote[]
+  communications ApplicantCommunication[]
+
+  @@index([status])
+  @@index([jobOpeningId])
+  @@index([applicantId])
+  @@map("job_applications")
+}
+
+model ApplicantDocument {
+  id               String         @id @default(uuid())
+  applicationId    String
+  application      JobApplication @relation(fields: [applicationId], references: [id])
+  documentType     String // RESUME | COVER_LETTER | OTHER
+  originalFilename String
+  storedFilename   String         @unique
+  mimeType         String
+  sizeBytes        Int
+  storagePath      String
+  uploadedBy       String? // nullable for public
+  uploadedAt       DateTime       @default(now())
+
+  @@index([applicationId])
+  @@map("applicant_documents")
+}
+
+model ApplicantInterview {
+  id              String          @id @default(uuid())
+  applicationId   String
+  application     JobApplication  @relation(fields: [applicationId], references: [id])
+  scheduledAt     DateTime
+  interviewType   InterviewType
+  locationDetails String?         @db.Text
+  interviewer     String?
+  notes           String?         @db.Text
+  recommendation  String?
+  status          InterviewStatus @default(SCHEDULED)
+
+  createdById String
+  updatedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([applicationId])
+  @@index([scheduledAt])
+  @@map("applicant_interviews")
+}
+
+model ApplicationStatusHistory {
+  id             String                @id @default(uuid())
+  applicationId  String
+  application    JobApplication        @relation(fields: [applicationId], references: [id])
+  previousStatus JobApplicationStatus?
+  newStatus      JobApplicationStatus
+  reason         String?               @db.Text
+  changedById    String
+  changedAt      DateTime              @default(now())
+
+  @@index([applicationId])
+  @@map("application_status_history")
+}
+
+model ApplicantNote {
+  id            String         @id @default(uuid())
+  applicationId String
+  application   JobApplication @relation(fields: [applicationId], references: [id])
+  note          String         @db.Text
+  createdById   String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([applicationId])
+  @@map("applicant_notes")
+}
+
+enum RecruitmentCommunicationType {
+  APPLICATION_RECEIVED
+  APPLICATION_UNDER_REVIEW
+  SHORTLISTED
+  INTERVIEW_PROCESS_UPDATE
+  INTERVIEW_INVITATION
+  INTERVIEW_RESCHEDULED
+  INTERVIEW_CANCELLED
+  ADDITIONAL_REQUIREMENTS
+  APPLICATION_ACCEPTED
+  APPLICATION_NOT_SELECTED
+  APPLICATION_WITHDRAWN_CONFIRMATION
+  CUSTOM_MESSAGE
+}
+
+enum RecruitmentCommunicationSource {
+  AUTOMATIC_SYSTEM
+  MANUAL_HR
+}
+
+enum CommunicationChannel {
+  EMAIL
+}
+
+enum CommunicationSendStatus {
+  DRAFT
+  SENDING
+  SENT
+  FAILED
+  SIMULATED
+}
+
+enum CommunicationInitiator {
+  SYSTEM
+  USER
+}
+
+model ApplicantCommunication {
+  id                     String                         @id @default(uuid())
+  jobApplicationId       String
+  application            JobApplication                 @relation(fields: [jobApplicationId], references: [id])
+  communicationType      RecruitmentCommunicationType
+  source                 RecruitmentCommunicationSource @default(MANUAL_HR)
+  eventId                String?                        @unique
+  triggerType            String?
+  relatedEntityId        String?
+  channel                CommunicationChannel
+  recipientEmail         String
+  recipientName          String
+  subjectSnapshot        String
+  bodySnapshot           String                         @db.Text
+  provider               String
+  providerMessageId      String?
+  sendStatus             CommunicationSendStatus
+  initiatedBy            CommunicationInitiator         @default(USER)
+  sentByUserId           String?
+  sentByUser             User?                          @relation(fields: [sentByUserId], references: [id])
+  sentAt                 DateTime?
+  failedAt               DateTime?
+  failureCode            String?
+  failureReason          String?                        @db.Text
+  retryOfCommunicationId String?
+  retryOf                ApplicantCommunication?        @relation("RetryRelation", fields: [retryOfCommunicationId], references: [id])
+  retries                ApplicantCommunication[]       @relation("RetryRelation")
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+
+  @@index([jobApplicationId])
+  @@index([communicationType])
+  @@index([sendStatus])
+  @@index([sentAt])
+  @@index([sentByUserId])
+  @@map("applicant_communications")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCHEDULING & CALENDAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum OrganizationCalendarType {
+  HOLIDAY
+  SPECIAL_NON_WORKING
+  ORGANIZATION_NON_WORKING
+  SUSPENSION
+}
+
+enum OrganizationCalendarSource {
+  HOLIDAY_API
+  MANUAL
+}
+
+enum OrganizationCalendarStatus {
+  PENDING
+  APPROVED
+  IGNORED
+}
+
+model OrganizationCalendarEntry {
+  id          String                     @id @default(uuid())
+  date        DateTime                   @db.Date
+  name        String
+  type        OrganizationCalendarType
+  source      OrganizationCalendarSource @default(MANUAL)
+  status      OrganizationCalendarStatus @default(APPROVED)
+  notes       String?                    @db.Text
+  createdById String?
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  /// Units expected to work on this date. Every other unit observes the entry.
+  workingUnits OrganizationCalendarWorkingUnit[]
+
+  @@unique([date, name])
+  @@index([date])
+  @@index([status])
+  @@map("organization_calendar_entries")
+}
+
+model ScheduleTemplate {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  version     Int      @default(1)
+  isArchived  Boolean  @default(false)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  days        ScheduleTemplateDay[]
+  assignments EmployeeScheduleAssignment[]
+
+  @@unique([name, version])
+  @@map("schedule_templates")
+}
+
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model ScheduleTemplateDay {
+  id         String           @id @default(uuid())
+  templateId String
+  template   ScheduleTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  dayOfWeek  Weekday
+  isWorking  Boolean          @default(true)
+  startTime  String? // Format "08:00:00"
+  endTime    String? // Format "17:00:00"
+
+  @@unique([templateId, dayOfWeek])
+  @@map("schedule_template_days")
+}
+
+model EmployeeScheduleAssignment {
+  id                 String           @id @default(uuid())
+  employeeId         String
+  employee           Employee         @relation(fields: [employeeId], references: [id])
+  scheduleTemplateId String
+  scheduleTemplate   ScheduleTemplate @relation(fields: [scheduleTemplateId], references: [id])
+  effectiveFrom      DateTime         @db.Date
+  effectiveTo        DateTime?        @db.Date
+  assignedByUserId   String?
+  bulkBatchId        String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([employeeId])
+  @@index([effectiveFrom, effectiveTo])
+  @@map("employee_schedule_assignments")
+}
+
+model ScheduleHistoryLog {
+  id               String    @id @default(uuid())
+  targetEmployeeId String?
+  employee         Employee? @relation("ScheduleHistoryTarget", fields: [targetEmployeeId], references: [id])
+  actorUserId      String
+  user             User      @relation("ScheduleHistoryActor", fields: [actorUserId], references: [id])
+  action           String // TEMPLATE_ASSIGNED, OVERRIDE_CREATED, HOLIDAY_APPROVED, etc.
+  previousValue    Json?
+  newValue         Json?
+  remarks          String?   @db.Text
+  bulkBatchId      String?
+  createdAt        DateTime  @default(now())
+
+  @@index([targetEmployeeId])
+  @@index([actorUserId])
+  @@index([bulkBatchId])
+  @@map("schedule_history_logs")
+}
+
+// ──────────────────────────────────────────────────────────────────────────────────
+// EMPLOYEE WEEKLY SCHEDULE (HOSPICIO OFFICIAL SCHEDULE ARCHITECTURE)
+// ──────────────────────────────────────────────────────────────────────────────────
+
+enum ShiftCategory {
+  OFFICE
+  SHIFT
+}
+
+model ShiftDefinition {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  category    ShiftCategory @default(SHIFT)
+  startTime   String // Format "08:00:00"
+  endTime     String // Format "17:00:00"
+  isActive    Boolean       @default(true)
+  version     Int           @default(1)
+  isArchived  Boolean       @default(false)
+  createdById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  weeklyShifts EmployeeWeeklyScheduleShift[]
+
+  @@unique([name, version])
+  @@map("shift_definitions")
+}
+
+model EmployeeWeeklySchedule {
+  id              String    @id @default(uuid())
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  effectiveFrom   DateTime  @db.Date
+  effectiveTo     DateTime? @db.Date
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  days EmployeeWeeklyScheduleDay[]
+
+  /// One schedule per employee per effective date. Previously nothing at the
+  /// database enforced this — uniqueness relied on a find-then-delete-then-create
+  /// sequence in the service, which is not atomic against a concurrent save.
+  /// Preflight on 2026-09-07 confirmed 0 violating rows before adding this.
+  @@unique([employeeId, effectiveFrom])
+  @@index([employeeId, effectiveFrom, effectiveTo])
+  @@map("employee_weekly_schedules")
+}
+
+enum DayConfigurationStatus {
+  UNCONFIGURED
+  DAY_OFF
+  WORKING
+}
+
+model EmployeeWeeklyScheduleDay {
+  id               String                 @id @default(uuid())
+  weeklyScheduleId String
+  weeklySchedule   EmployeeWeeklySchedule @relation(fields: [weeklyScheduleId], references: [id], onDelete: Cascade)
+  dayOfWeek        Weekday
+  status           DayConfigurationStatus @default(UNCONFIGURED)
+
+  shifts EmployeeWeeklyScheduleShift[]
+
+  @@unique([weeklyScheduleId, dayOfWeek])
+  @@map("employee_weekly_schedule_days")
+}
+
+model EmployeeWeeklyScheduleShift {
+  id            String                    @id @default(uuid())
+  scheduleDayId String
+  scheduleDay   EmployeeWeeklyScheduleDay @relation(fields: [scheduleDayId], references: [id], onDelete: Cascade)
+  shiftId       String
+  shift         ShiftDefinition           @relation(fields: [shiftId], references: [id])
+  sequence      Int                       @default(1)
+
+  @@map("employee_weekly_schedule_shifts")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATTENDANCE IMPORT FOUNDATION
+//
+// Format-independent. Nothing here encodes any assumption about the Mustard
+// Seedtime workbook — its columns, sheets, identifiers and punch semantics are
+// still unknown, and the raw layer exists precisely so they do not have to be
+// guessed at now.
+//
+// The pipeline is deliberately three-layered:
+//
+//   AttendanceImportBatch          one uploaded file / review session
+//     └── AttendanceImportRawRow   one VERBATIM source row (evidence)
+//           └── AttendanceImportCandidate   one normalized employee-day
+//                 └── AttendanceRecord      the real record, written only on
+//                                           explicit HR confirmation
+//
+// Raw rows and candidates are separate models on purpose. If the export turns
+// out to carry several biometric punches per employee-day, MANY raw rows must be
+// able to normalize into ONE candidate. Collapsing the two layers would make that
+// impossible to represent without destroying the original evidence.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model AttendanceImportBatch {
+  id               String  @id @default(uuid())
+  /// SHA-256 of the uploaded file. INDEXED, NOT UNIQUE — the same file may
+  /// legitimately be uploaded again after a cancelled or failed import, so a
+  /// hash match warns rather than blocks.
+  fileHash         String
+  originalFilename String
+  /// Randomised name under protected storage. Null when file retention is off.
+  storedFilename   String? @unique
+  fileSizeBytes    Int
+
+  uploadedByUserId String
+  uploadedByUser   User     @relation("AttendanceImportUploader", fields: [uploadedByUserId], references: [id])
+  uploadedAt       DateTime @default(now())
+
+  status AttendanceImportStatus @default(UPLOADED)
+
+  /// Derived from the parsed rows, never from the filename.
+  detectedPeriodStart DateTime? @db.Date
+  detectedPeriodEnd   DateTime? @db.Date
+
+  totalSourceRows Int @default(0)
+
+  countNew             Int @default(0)
+  countExactDuplicate  Int @default(0)
+  countEnrichment      Int @default(0)
+  countConflict        Int @default(0)
+  countConflictManual  Int @default(0)
+  countDuplicateInFile Int @default(0)
+  countUnknownEmployee Int @default(0)
+  countInvalid         Int @default(0)
+  /// Rows whose device code no longer matches the name beside it in the file.
+  countIdentityFlagged Int @default(0)
+
+  countApplied Int @default(0)
+  countSkipped Int @default(0)
+  countFailed  Int @default(0)
+
+  confirmedByUserId String?
+  confirmedByUser   User?     @relation("AttendanceImportConfirmer", fields: [confirmedByUserId], references: [id])
+  confirmedAt       DateTime?
+
+  completedAt   DateTime?
+  failureReason String?   @db.Text
+
+  /// Which normalizer produced the candidates. Lets a later rule correction find
+  /// the batches that need re-parsing.
+  normalizerVersion String?
+
+  rawRows           AttendanceImportRawRow[]
+  candidates        AttendanceImportCandidate[]
+  attendanceRecords AttendanceRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([uploadedAt])
+  @@index([fileHash])
+  @@index([detectedPeriodStart, detectedPeriodEnd])
+  @@map("attendance_import_batches")
+}
+
+model AttendanceImportRawRow {
+  id      String                @id @default(uuid())
+  batchId String
+  batch   AttendanceImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  /// 1-based position in the source sheet, so a problem can be reported as
+  /// "row 47" in terms the person holding the spreadsheet recognises.
+  sourceRowNumber Int
+  sourceSheetName String?
+
+  /// The source row exactly as read. NOT interpreted — no column meaning is
+  /// assumed anywhere in this model.
+  rawPayload Json
+  /// Hash of rawPayload, for detecting identical rows within one file.
+  rawRowHash String
+
+  /// The normalized employee-day this row contributed to, once a normalizer has
+  /// run. Many raw rows may share one candidate (multi-punch formats).
+  candidateId String?
+  candidate   AttendanceImportCandidate? @relation(fields: [candidateId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([batchId, sourceRowNumber])
+  @@index([batchId])
+  @@index([batchId, rawRowHash])
+  @@index([candidateId])
+  @@map("attendance_import_raw_rows")
+}
+
+model AttendanceImportCandidate {
+  id      String                @id @default(uuid())
+  batchId String
+  batch   AttendanceImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  /// Null when the source identifier matched no employee (UNKNOWN_EMPLOYEE).
+  employeeId String?
+  employee   Employee? @relation("AttendanceImportCandidateEmployee", fields: [employeeId], references: [id])
+  /// The business date this candidate describes. Null only for INVALID rows.
+  date       DateTime? @db.Date
+
+  timeIn        DateTime?
+  timeOut       DateTime?
+  status        AttendanceStatus?
+  hoursWorked   Float?
+  overtimeHours Float?
+
+  /// The identifier exactly as the file carried it, kept even when it matched
+  /// nobody — that is the whole point of the UNKNOWN_EMPLOYEE report.
+  sourceEmployeeCode String? @db.VarChar(40)
+  /// See AttendanceRecord.sessions / .sourceHours / .reviewFlags.
+  sessions           Json?
+  sourceHours        Json?
+  reviewFlags        Json?
+
+  classification       AttendanceImportClassification @default(INVALID)
+  classificationReason String?                        @db.Text
+
+  /// Whether the name printed beside this device code in the file still matches
+  /// the employee the code is mapped to.
+  ///
+  /// The name ITSELF is never stored - only the verdict and how close it was.
+  /// Matching remains by `biometricCode` alone; this exists so a device number
+  /// quietly reassigned to a different person is caught instead of silently
+  /// filing one person's attendance under another's.
+  identityVerdict AttendanceImportIdentityVerdict?
+  /// 0-100 similarity against the mapped employee. Null when there was nothing
+  /// to compare (no name in the file, or the code matched nobody).
+  identityScore   Int?
+
+  /// The employee the source name most resembles, offered to HR for one-click
+  /// confirmation. An HRISense id, never text copied out of the file. NEVER
+  /// applied automatically - a suggestion may raise a question, never settle one.
+  suggestedEmployeeId String?
+  suggestedEmployee   Employee? @relation("AttendanceImportCandidateSuggested", fields: [suggestedEmployeeId], references: [id])
+  suggestedScore      Int?
+
+  /// The record this candidate collides with, when one exists.
+  existingRecordId      String?
+  existingRecord        AttendanceRecord? @relation(fields: [existingRecordId], references: [id])
+  /// The existing values AT CLASSIFICATION TIME. Compared again at apply so a
+  /// decision made against a stale preview is never executed.
+  existingSnapshot      Json?
+  /// `recordVersion` observed at classification time — cheap drift check.
+  existingRecordVersion Int?
+
+  hrDecision         AttendanceImportDecision @default(PENDING)
+  hrDecisionByUserId String?
+  hrDecisionByUser   User?                    @relation("AttendanceImportDecider", fields: [hrDecisionByUserId], references: [id])
+  hrDecisionAt       DateTime?
+  hrDecisionReason   String?                  @db.Text
+
+  /// Stamped ONLY after the AttendanceRecord write committed. Makes resume after
+  /// a partial failure exact rather than a guess.
+  appliedAt  DateTime?
+  applyError String?   @db.Text
+
+  rawRows AttendanceImportRawRow[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// One candidate per employee-day per batch. Two source rows for the same
+  /// employee-day must merge into one candidate, not create a second.
+  @@unique([batchId, employeeId, date])
+  @@index([batchId, classification])
+  @@index([employeeId, date])
+  @@index([batchId, hrDecision])
+  @@index([batchId, identityVerdict])
+  @@map("attendance_import_candidates")
+}
+
+/// Lifecycle of one attendance import. Transitions are guarded server-side; the
+/// move into APPLYING is conditional so a batch cannot be applied twice.
+enum AttendanceImportStatus {
+  UPLOADED
+  PARSING
+  VALIDATED
+  APPLYING
+  COMPLETED
+  PARTIALLY_APPLIED
+  CANCELLED
+  FAILED
+}
+
+/// How one normalized employee-day compares with what HRISense already holds.
+enum AttendanceImportClassification {
+  NEW
+  EXACT_DUPLICATE
+  ENRICHMENT
+  CONFLICT
+  CONFLICT_MANUAL
+  DUPLICATE_IN_FILE
+  UNKNOWN_EMPLOYEE
+  INVALID
+}
+
+/// Whether the name beside a device code still matches the employee it maps to.
+/// Never used to ASSIGN attendance - only to decide whether to ask HR about it.
+enum AttendanceImportIdentityVerdict {
+  MATCH
+  MISMATCH
+  UNCERTAIN
+  NO_NAME_IN_SOURCE
+  NO_EMPLOYEE_TO_CHECK
+}
+
+/// HR's decision for a candidate that cannot be applied automatically.
+enum AttendanceImportDecision {
+  PENDING
+  KEEP_EXISTING
+  USE_UPLOADED
+  SKIP
+}
+
+/// What last wrote an AttendanceRecord.
+/// LEGACY is the default for rows that pre-date provenance tracking: their real
+/// origin is unknown, and labelling them IMPORT would assert something false.
+enum AttendanceRecordSource {
+  LEGACY
+  IMPORT
+  MANUAL
+  SYSTEM
+}
+
+/// A unit that is expected to work on an organisation calendar entry (holiday,
+/// non-working day, suspension). Units not listed observe the entry as usual.
+model OrganizationCalendarWorkingUnit {
+  id          String                    @id @default(uuid())
+  entryId     String
+  entry       OrganizationCalendarEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  unitId      String
+  unit        Unit                      @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdAt   DateTime                  @default(now())
+
+  @@unique([entryId, unitId])
+  @@index([unitId])
+  @@map("organization_calendar_working_units")
+}

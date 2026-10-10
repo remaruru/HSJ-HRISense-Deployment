@@ -1,0 +1,21 @@
+-- Widen user_sessions.refreshToken from VARCHAR(191) to VARCHAR(512).
+--
+-- WHY: a signed refresh JWT is 192 characters. Prisma's default for an indexed
+-- MySQL String is varchar(191), and this MySQL runs without STRICT_TRANS_TABLES,
+-- so every insert silently truncated the token by one character. The subsequent
+-- lookup by the full token could therefore never match and POST /auth/refresh
+-- returned 401 for every session. Verified before this migration: all 113 rows
+-- in user_sessions were stored at exactly 191 characters.
+--
+-- SAFETY: widening only. No data is read, deleted or rewritten; existing rows
+-- keep their (already truncated) values. 512 utf8mb4 characters = 2048 bytes,
+-- within InnoDB's 3072-byte index limit for a DYNAMIC row format table, so both
+-- the unique constraint and the secondary index on this column remain valid.
+--
+-- SCOPE NOTE: `prisma migrate diff` also emitted 6 DROP INDEX statements, a
+-- dropped foreign key on `compliance_requirements`, and ~12 no-op `MODIFY ...
+-- JSON` statements. Those are PRE-EXISTING drift between the migration history
+-- and schema.prisma, not part of this change, and were deliberately excluded.
+-- Reconciling that drift is a separate, explicit task.
+
+ALTER TABLE `user_sessions` MODIFY `refreshToken` VARCHAR(512) NOT NULL;
