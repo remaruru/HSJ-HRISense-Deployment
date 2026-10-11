@@ -17,3 +17,4 @@
 # from a plain clone (no LFS fetch) would get pointer text instead of SQL / images.
 apps/api/prisma/migrations/**/migration.sql -filter -diff -merge text
 apps/web/src/assets/*.png -filter -diff -merge -text
+apps/web/public/**/*.png -filter -diff -merge -text
