@@ -132,11 +132,11 @@ const ASSIGNMENT_STATUS_META: Record<EvaluationAssignmentStatus, { label: string
   },
   IN_PROGRESS: {
     label: 'In Progress',
-    badgeClass: 'bg-status-info-surface text-status-info-foreground border-status-info-border',
+    badgeClass: 'bg-status-warning-surface text-status-warning-foreground border-status-warning-border',
   },
   SUBMITTED: {
     label: 'Awaiting Finalization',
-    badgeClass: 'bg-status-warning-surface text-status-warning-foreground border-status-warning-border',
+    badgeClass: 'bg-status-success-surface text-status-success-foreground border-status-success-border',
   },
   FINALIZED: {
     label: 'Completed',
@@ -510,7 +510,7 @@ export default function EvaluationsPage() {
         />
         <StatCard
           icon={<PenLine className="h-4 w-4" />}
-          tone="info"
+          tone="warning"
           label="In Progress"
           value={summaryMetrics.inProgress}
           hint="Draft evaluations"
@@ -518,7 +518,7 @@ export default function EvaluationsPage() {
         />
         <StatCard
           icon={<Hourglass className="h-4 w-4" />}
-          tone="warning"
+          tone="success"
           label={isFullHR ? 'Head Evaluation Submitted' : 'Submitted'}
           value={summaryMetrics.submitted}
           hint={isFullHR ? 'Discussion or HR finalization pending' : 'Waiting for HR'}
@@ -1353,8 +1353,8 @@ export default function EvaluationsPage() {
               {[
                 { label: 'Employees', value: selectedCycle?.metrics?.total ?? 0, cls: 'text-foreground' },
                 { label: 'Not Started', value: selectedCycle?.metrics?.notStarted ?? 0, cls: 'text-slate-600 dark:text-slate-400' },
-                { label: 'In Progress', value: selectedCycle?.metrics?.inProgress ?? 0, cls: 'text-status-info-foreground' },
-                { label: 'Discussion / HR Pending', value: selectedCycle?.metrics?.submitted ?? 0, cls: 'text-status-warning-foreground' },
+                { label: 'In Progress', value: selectedCycle?.metrics?.inProgress ?? 0, cls: 'text-status-warning-foreground' },
+                { label: 'Discussion / HR Pending', value: selectedCycle?.metrics?.submitted ?? 0, cls: 'text-status-success-foreground' },
                 { label: 'Finalized', value: selectedCycle?.metrics?.finalized ?? 0, cls: 'text-status-success-foreground' },
               ].map((m) => (
                 <div key={m.label} className="p-3 rounded-xl bg-surface border border-border text-center">

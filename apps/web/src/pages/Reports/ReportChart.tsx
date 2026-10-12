@@ -200,23 +200,39 @@ export function ReportChart({ spec }: { spec: ReportChartSpec }) {
   );
 }
 
+/**
+ * A figure's meaning as the same status colours the summary cards use
+ * elsewhere (green success, yellow pending, red urgent, purple review).
+ * Neutral figures keep the plain tile.
+ */
+const STAT_TONE: Record<Exclude<ReportTone, 'neutral'>, { tile: string; value: string }> = {
+  good: { tile: 'bg-status-success-surface border-status-success-border', value: 'text-status-success-foreground' },
+  warning: { tile: 'bg-status-warning-surface border-status-warning-border', value: 'text-status-warning-foreground' },
+  critical: { tile: 'bg-status-danger-surface border-status-danger-border', value: 'text-status-danger-foreground' },
+  review: { tile: 'bg-status-accent-surface border-status-accent-border', value: 'text-status-accent-foreground' },
+};
+
 /** The KPI row. A headline number is a stat tile, not a one-bar chart. */
 export function ReportStat({
   label,
   value,
   emphasis,
+  tone,
 }: {
   label: string;
   value: string | number;
   emphasis?: boolean;
+  tone?: ReportTone;
 }) {
+  const toned = tone && tone !== 'neutral' ? STAT_TONE[tone] : null;
   return (
     <div className={cn(
-      'rounded-2xl border border-border bg-surface p-4',
-      emphasis && 'bg-nav-selected-surface/30'
+      'rounded-2xl border p-4',
+      toned ? toned.tile : 'border-border bg-surface',
+      !toned && emphasis && 'bg-nav-selected-surface/30'
     )}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-bold tabular-nums text-foreground">{value}</p>
+      <p className={cn('text-xs font-semibold uppercase tracking-wide', toned ? 'text-foreground/70' : 'text-muted-foreground')}>{label}</p>
+      <p className={cn('mt-1 text-2xl font-bold tabular-nums', toned ? toned.value : 'text-foreground')}>{value}</p>
     </div>
   );
 }

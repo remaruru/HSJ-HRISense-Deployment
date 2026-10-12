@@ -501,8 +501,8 @@ export function EvaluationFormModal({
                     className={cn(
                       'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border',
                       assignment.status === 'NOT_STARTED' && 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-border-soft',
-                      assignment.status === 'IN_PROGRESS' && 'bg-status-info-surface text-status-info-foreground border-status-info-border',
-                      assignment.status === 'SUBMITTED' && 'bg-status-warning-surface text-status-warning-foreground border-status-warning-border',
+                      assignment.status === 'IN_PROGRESS' && 'bg-status-warning-surface text-status-warning-foreground border-status-warning-border',
+                      assignment.status === 'SUBMITTED' && 'bg-status-success-surface text-status-success-foreground border-status-success-border',
                       assignment.status === 'FINALIZED' && 'bg-status-success-surface text-status-success-foreground border-status-success-border'
                     )}
                   >

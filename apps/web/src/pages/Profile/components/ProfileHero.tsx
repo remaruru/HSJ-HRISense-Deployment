@@ -135,7 +135,9 @@ export function ProfileHero({
           </div>
         )}
       </div>
-      <div className="px-4 sm:px-6 pb-5 -mt-12 sm:-mt-14 flex flex-col lg:flex-row lg:items-end gap-4 lg:gap-6">
+      {/* `relative` keeps this content (it overlaps the banner) painted above the
+          positioned banner; the banner's own buttons sit higher still (z-10). */}
+      <div className="relative px-4 sm:px-6 pb-5 -mt-12 sm:-mt-14 flex flex-col lg:flex-row lg:items-end gap-4 lg:gap-6">
         <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-5 min-w-0 flex-1">
           <div className="group relative w-fit shrink-0 rounded-full">
             {/* No background override: without a photo the avatar keeps its own

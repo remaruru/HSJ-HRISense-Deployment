@@ -49,6 +49,25 @@ export interface ReportColumn {
  */
 export type ReportTone = 'good' | 'warning' | 'critical' | 'review' | 'neutral';
 
+/**
+ * Tone of a status figure, matching how the rest of HRISense colours the same
+ * status (pending = warning, approved / submitted / finalized = good, and so
+ * on). Anything not listed is a plain count and stays neutral.
+ */
+const STATUS_TONE: Record<string, ReportTone> = {
+  PENDING: 'warning',
+  APPROVED: 'good',
+  FOR_REVIEW: 'review',
+  REJECTED: 'critical',
+  CANCELLED: 'neutral',
+  NOT_STARTED: 'neutral',
+  IN_PROGRESS: 'warning',
+  SUBMITTED: 'good',
+  FINALIZED: 'good',
+  HIRED: 'good',
+};
+const statusTone = (status: string): ReportTone => STATUS_TONE[status] ?? 'neutral';
+
 export interface ReportChartSlice {
   label: string;
   value: number;
@@ -86,7 +105,7 @@ export interface ReportResult {
   columns: ReportColumn[];
   rows: Array<Record<string, string | number | null>>;
   /** Headline figures for the page, all derived from `rows` or direct counts. */
-  totals: Array<{ label: string; value: string | number }>;
+  totals: Array<{ label: string; value: string | number; tone?: ReportTone }>;
   /**
    * What THIS run found, in plain sentences — the summarised "about this report".
    * Every sentence is generated from the numbers above, never a stored blurb, so
@@ -486,7 +505,7 @@ export class ReportService {
       })),
       totals: [
         { label: 'Total requests', value: requests.length },
-        ...Object.entries(byStatus).map(([status, count]) => ({ label: status, value: count })),
+        ...Object.entries(byStatus).map(([status, count]) => ({ label: status, value: count, tone: statusTone(status) })),
       ],
       summary: (() => {
         const lines = [`${plural(requests.length, 'leave request')} filed in this period.`];
@@ -626,10 +645,10 @@ export class ReportService {
       totals: [
         { label: 'Employees', value: rows.length },
         { label: 'Active requirements', value: requirements.length },
-        { label: 'Missing', value: sum('missing') },
-        { label: 'Expired', value: sum('expired') },
-        { label: 'Expiring soon', value: sum('expiringSoon') },
-        { label: 'Needs review', value: sum('needsReview') },
+        { label: 'Missing', value: sum('missing'), tone: 'critical' as const },
+        { label: 'Expired', value: sum('expired'), tone: 'critical' as const },
+        { label: 'Expiring soon', value: sum('expiringSoon'), tone: 'warning' as const },
+        { label: 'Needs review', value: sum('needsReview'), tone: 'review' as const },
       ],
       summary: (() => {
         const missing = sum('missing'), expired = sum('expired');
@@ -762,8 +781,8 @@ export class ReportService {
       totals: [
         { label: 'Activities', value: rows.length },
         { label: 'Participants assigned', value: assigned },
-        { label: 'Completed', value: completed },
-        { label: 'Completion rate', value: assigned > 0 ? `${formatPercent(ratio(completed, assigned))} (${completed} of ${assigned})` : '—' },
+        { label: 'Completed', value: completed, tone: 'good' as const },
+        { label: 'Completion rate', value: assigned > 0 ? `${formatPercent(ratio(completed, assigned))} (${completed} of ${assigned})` : '—', tone: 'good' as const },
       ],
       summary: (() => {
         const noShow = rows.reduce((n, r) => n + r.didNotAttend, 0);
@@ -869,9 +888,9 @@ export class ReportService {
       totals: [
         { label: 'Assignments (all raters)', value: assignments.length },
         { label: 'Employees evaluated', value: new Set(assignments.map((a) => `${a.cycleId}|${a.employeeId}`)).size },
-        { label: 'Head evaluations finalised', value: assignments.filter((a) => a.raterType === 'HEAD' && a.status === 'FINALIZED').length },
-        { label: 'Discussions recorded', value: assignments.filter((a) => a.raterType === 'HEAD' && a.discussionCompletedAt).length },
-        ...Object.entries(byStatus).map(([status, count]) => ({ label: status, value: count })),
+        { label: 'Head evaluations finalised', value: assignments.filter((a) => a.raterType === 'HEAD' && a.status === 'FINALIZED').length, tone: 'good' as const },
+        { label: 'Discussions recorded', value: assignments.filter((a) => a.raterType === 'HEAD' && a.discussionCompletedAt).length, tone: 'good' as const },
+        ...Object.entries(byStatus).map(([status, count]) => ({ label: status, value: count, tone: statusTone(status) })),
       ],
       summary: (() => {
         const submitted = (byStatus['SUBMITTED'] ?? 0) + (byStatus['FINALIZED'] ?? 0);
@@ -968,8 +987,8 @@ export class ReportService {
       })),
       totals: [
         { label: 'Applications', value: applications.length },
-        { label: 'Open job openings', value: openOpenings },
-        ...Object.entries(byStatus).map(([status, count]) => ({ label: status, value: count })),
+        { label: 'Job Openings', value: openOpenings },
+        ...Object.entries(byStatus).map(([status, count]) => ({ label: status, value: count, tone: statusTone(status) })),
       ],
       summary: (() => {
         const hired = byStatus['HIRED'] ?? 0;

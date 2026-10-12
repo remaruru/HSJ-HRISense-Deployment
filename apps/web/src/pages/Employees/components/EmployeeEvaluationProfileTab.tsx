@@ -39,12 +39,12 @@ const STATUS_META: Record<EvaluationAssignmentStatus, { label: string; badgeClas
   },
   IN_PROGRESS: {
     label: 'In Progress',
-    badgeClass: 'bg-status-info-surface text-status-info-foreground border-status-info-border',
+    badgeClass: 'bg-status-warning-surface text-status-warning-foreground border-status-warning-border',
     icon: Sparkles,
   },
   SUBMITTED: {
     label: 'Awaiting Finalization',
-    badgeClass: 'bg-status-warning-surface text-status-warning-foreground border-status-warning-border',
+    badgeClass: 'bg-status-success-surface text-status-success-foreground border-status-success-border',
     icon: AlertCircle,
   },
   FINALIZED: {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ReportChart, ReportStat, type ReportChartSpec } from './ReportChart';
+import type { ReportTone } from './chartTheme';
 import { BarChart3, Download, FileSpreadsheet, FileText, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -37,7 +38,7 @@ interface ReportResult {
   period: { from: string | null; to: string | null };
   columns: ReportColumn[];
   rows: Array<Record<string, string | number | null>>;
-  totals: Array<{ label: string; value: string | number }>;
+  totals: Array<{ label: string; value: string | number; tone?: ReportTone }>;
   /** What this run found, generated from its own numbers. */
   summary: string[];
   charts: ReportChartSpec[];
@@ -261,7 +262,7 @@ export default function ReportsPage() {
           {report.totals.length > 0 && (
             <motion.div variants={staggerItem} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {report.totals.map((t, i) => (
-                <ReportStat key={t.label} label={t.label.replace(/_/g, ' ')} value={t.value} emphasis={i === 0} />
+                <ReportStat key={t.label} label={t.label.replace(/_/g, ' ')} value={t.value} emphasis={i === 0} tone={t.tone} />
               ))}
             </motion.div>
           )}

@@ -89,7 +89,9 @@ interface Facts {
   recruitment: { openOpenings: number; applicationsInPeriod: number };
 }
 
+/** Turns a status code (FOR_REVIEW) into words; an already-written label is kept as it is. */
 function humanise(value: string): string {
+  if (!value.includes('_') && value !== value.toUpperCase()) return value;
   return value.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
 }
 
@@ -257,10 +259,10 @@ export function WorkforceSummaryPanel() {
             <motion.div variants={staggerItem} className="hrisense-surface p-5">
               <h3 className="font-bold font-heading text-foreground mb-3">Compliance standing</h3>
               <ul className="space-y-2 text-sm">
-                <FactRow label="Missing" value={facts.compliance.missing} />
-                <FactRow label="Needs review" value={facts.compliance.needsReview} />
-                <FactRow label="Expiring soon" value={facts.compliance.expiringSoon} />
-                <FactRow label="Expired" value={facts.compliance.expired} />
+                <FactRow label="Missing" value={facts.compliance.missing} tone="danger" />
+                <FactRow label="Needs review" value={facts.compliance.needsReview} tone="accent" />
+                <FactRow label="Expiring soon" value={facts.compliance.expiringSoon} tone="warning" />
+                <FactRow label="Expired" value={facts.compliance.expired} tone="danger" />
               </ul>
               <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
                 "Expiring soon" only applies where HR has configured a reminder window on the
@@ -275,11 +277,12 @@ export function WorkforceSummaryPanel() {
                 <FactRow
                   label="Training completion"
                   value={formatPct(facts.training.completionRate, '—')}
+                  tone="success"
                   onBreakdown={() => setFactSpec(trainingSpec(facts))}
                 />
                 <FactRow label="Active evaluation cycles" value={facts.evaluations.activeCycles} />
                 <FactRow label="Evaluations overdue" value={facts.evaluations.overdue} />
-                <FactRow label="Open job openings" value={facts.recruitment.openOpenings} />
+                <FactRow label="Job Openings" value={facts.recruitment.openOpenings} />
                 <FactRow label="Applications received" value={facts.recruitment.applicationsInPeriod} />
                 <FactRow label="Pending supervisor assignment" value={facts.headcount.pendingSupervisorAssignment} />
               </ul>
@@ -518,13 +521,31 @@ function trainingSpec(f: Facts): MetricBreakdownSpec {
   });
 }
 
-function FactRow({ label, value, onBreakdown }: { label: string; value: string | number; onBreakdown?: () => void }) {
+/** The value takes the same status colour as the summary cards elsewhere. */
+const FACT_TONE = {
+  success: 'text-status-success-foreground',
+  warning: 'text-status-warning-foreground',
+  danger: 'text-status-danger-foreground',
+  accent: 'text-status-accent-foreground',
+} as const;
+
+function FactRow({
+  label,
+  value,
+  onBreakdown,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  onBreakdown?: () => void;
+  tone?: keyof typeof FACT_TONE;
+}) {
   return (
     <li className="flex items-center justify-between gap-2">
       <span className="text-muted-foreground">{humanise(label)}</span>
       <span className="flex items-center gap-2">
         {onBreakdown && <BreakdownButton label="Breakdown" onClick={onBreakdown} />}
-        <span className="font-bold text-foreground">{value}</span>
+        <span className={`font-bold ${tone ? FACT_TONE[tone] : 'text-foreground'}`}>{value}</span>
       </span>
     </li>
   );

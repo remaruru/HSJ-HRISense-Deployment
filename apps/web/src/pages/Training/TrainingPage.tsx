@@ -199,7 +199,7 @@ export default function TrainingPage() {
         />
         <StatCard
           icon={<CalendarDays className="h-4 w-4" />}
-          tone="info"
+          tone="warning"
           label="Upcoming / Scheduled"
           value={metrics.scheduled}
           hint="Active schedules"
@@ -215,7 +215,7 @@ export default function TrainingPage() {
         />
         <StatCard
           icon={<Users className="h-4 w-4" />}
-          tone="neutral"
+          tone="success"
           label="Enrolled Participants"
           value={metrics.totalEnrolled}
           hint={`${metrics.totalCompletedParticipants} marked completed`}
