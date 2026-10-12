@@ -138,8 +138,9 @@ export default function LoginPage() {
   }, []);
   const needCaptcha = !!captchaSiteKey;
 
-  // A wrong password locks this browser for a while (15 s, 30 s, 1 min, then
-  // 15 min — the API decides and sends the wait); the button counts it down.
+  // After 3 wrong passwords, each further one locks this browser for a while
+  // (15 s, 30 s, 1 min, then 15 min — the API decides and sends the wait);
+  // the button counts it down.
   const [lockedUntil, setLockedUntil] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -355,7 +356,7 @@ export default function LoginPage() {
 
             {needCaptcha && (
               <motion.div variants={staggerItem}>
-                <RecaptchaCheckbox siteKey={captchaSiteKey!} resetKey={captchaReset} onToken={setCaptchaToken} />
+                <RecaptchaCheckbox align="center" siteKey={captchaSiteKey!} resetKey={captchaReset} onToken={setCaptchaToken} />
               </motion.div>
             )}
 

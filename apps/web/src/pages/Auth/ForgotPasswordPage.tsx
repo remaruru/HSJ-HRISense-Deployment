@@ -128,7 +128,7 @@ export default function ForgotPasswordPage() {
               </div>
 
               {captchaSiteKey && (
-                <RecaptchaCheckbox siteKey={captchaSiteKey} resetKey={captchaReset} onToken={setCaptchaToken} />
+                <RecaptchaCheckbox align="center" siteKey={captchaSiteKey} resetKey={captchaReset} onToken={setCaptchaToken} />
               )}
 
               <Button

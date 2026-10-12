@@ -372,7 +372,7 @@ Browser ──HTTP/JSON──►│ Web app (React + Vite)        :3000      │
 | `jsonwebtoken` | 9.0 | access tokens (15 minutes) and refresh tokens (7 days), each refresh recorded as a session row |
 | `bcryptjs` | 2.4 | password hashing |
 | `google-auth-library` | 10.9 | **Continue with Google**: verifies the Google ID token's signature, that it was issued for HRISense (`GOOGLE_CLIENT_ID`) and that the email is verified; it then signs in the existing account with that email (§4.1) |
-| Account rules | — | wrong passwords make the failing browser wait (15 s, 30 s, 1 min, then 15 min) and never lock the account; a temporary password must be changed before anything else; reset links expire |
+| Account rules | — | after 3 free tries, wrong passwords make the failing browser wait (15 s, 30 s, 1 min, then 15 min) and never lock the account; a temporary password must be changed before anything else; reset links expire |
 | Helmet | 7.2 | security headers |
 | `cors` | 2.8 | only the web app's origin (`CLIENT_URL`) may call the API |
 | `express-rate-limit` | 7.5 | per-IP, per-user and per-email limits by request type, kept in memory |
@@ -701,14 +701,16 @@ These URLs exist only so old links keep working:
 - **Wrong passwords never lock the account.** Locking accounts would let anyone
   who knows an email keep its owner out on purpose. Instead the **browser that
   is failing** waits (`services/sign-in-lock.ts`): the sign-in page sends a
-  random browser id (`X-Browser-Id`, kept in local storage), and each wrong
-  sign-in from that browser on that network locks it for longer — **15 seconds,
-  30 seconds, 1 minute, then 15 minutes** for every further one. The response
+  random browser id (`X-Browser-Id`, kept in local storage). The first **3 wrong
+  sign-ins** from that browser on that network only show *"Invalid email or
+  password"*; after that each one locks it for longer — **15 seconds, 30
+  seconds, 1 minute, then 15 minutes** for every further one. The response
   carries `Retry-After`, and the button counts down (*"Try again in 15s"*).
   While the wait runs, every attempt is refused before anything else is checked
   (429, `SIGN_IN_LOCKED`, *"Too many wrong sign-in attempts. Please try again in
-  N seconds/minutes."*). A successful sign-in clears that browser's failures;
-  otherwise they are forgotten an hour after the last one. Another browser — the
+  N seconds/minutes."*). A successful sign-in clears that browser's failures (its
+  3 free tries come back); otherwise they are forgotten an hour after the last
+  one. Another browser — the
   owner's — is unaffected. Requests with no valid browser id share one wait per
   network. The waits are kept in memory, like the rate limiters, so an API
   restart clears them. The account's failed-attempt count is still kept for
@@ -1116,9 +1118,9 @@ Notes:
   Applications are layered: a wide per-IP limit (checked before the upload is
   read, so a flood never writes files), a per-email limit (refused uploads are
   deleted) and the existing one-application-per-opening rule.
-- **The wrong-password browser lock is separate** (§4.1): each wrong sign-in
-  makes the failing browser wait 15 seconds, 30 seconds, 1 minute, then 15
-  minutes, whatever the rate limits allow. Accounts are never locked by wrong
+- **The wrong-password browser lock is separate** (§4.1): after 3 free tries,
+  each wrong sign-in makes the failing browser wait 15 seconds, 30 seconds,
+  1 minute, then 15 minutes, whatever the rate limits allow. Accounts are never locked by wrong
   passwords, and *"I'm not a robot"* is required on every sign-in.
 - **The Google unregistered-email limit is 5 in development too** (not ten
   times higher), so the block can be seen locally.

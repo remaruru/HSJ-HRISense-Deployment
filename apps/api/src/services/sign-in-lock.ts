@@ -4,10 +4,10 @@
  * Locking the account would let anyone who knows an email keep its owner out by
  * typing wrong passwords on purpose. The lock falls on whoever is failing
  * instead: one browser (the random id the sign-in page sends) on one network.
- * Each wrong sign-in locks that browser for longer — 15 seconds, 30 seconds,
- * 1 minute, then 15 minutes for every further one — until it signs in
- * successfully, or an hour passes with no failures. The account's owner, on
- * their own browser, is not affected.
+ * The first 3 wrong sign-ins only say so; after that each one locks that
+ * browser for longer — 15 seconds, 30 seconds, 1 minute, then 15 minutes for
+ * every further one — until it signs in successfully, or an hour passes with
+ * no failures. The account's owner, on their own browser, is not affected.
  *
  * A request without a browser id shares one lock with every other such request
  * from its network, so scripts that leave the id out lock each other. One that
@@ -17,7 +17,10 @@
  * Kept in memory, like the rate limiters (one API instance; a restart forgets).
  */
 
-/** Lock after the 1st, 2nd, 3rd and every later wrong sign-in, in seconds. */
+/** Wrong sign-ins allowed before the first wait (typos happen). */
+export const SIGN_IN_FREE_ATTEMPTS = 3;
+
+/** The waits after the free attempts, in seconds; the last one repeats. */
 export const SIGN_IN_LOCK_STEPS_SECONDS = [15, 30, 60, 15 * 60];
 
 /** Failures are forgotten this long after the last one (once no lock is running). */
@@ -36,6 +39,7 @@ export class SignInLock {
 
   constructor(
     private steps: readonly number[] = SIGN_IN_LOCK_STEPS_SECONDS,
+    private freeAttempts = SIGN_IN_FREE_ATTEMPTS,
     private memoryMs = SIGN_IN_FAILURE_MEMORY_MS,
     private now: () => number = Date.now
   ) {}
@@ -65,10 +69,11 @@ export class SignInLock {
     return ms > 0 ? Math.ceil(ms / 1000) : 0;
   }
 
-  /** Records a wrong sign-in and returns how many seconds the browser is now locked. */
+  /** Records a wrong sign-in and returns how many seconds the browser is now locked (0 = not locked). */
   recordFailure(key: string): number {
     const failures = (this.entry(key)?.failures ?? 0) + 1;
-    const seconds = this.steps[Math.min(failures, this.steps.length) - 1];
+    const over = failures - this.freeAttempts;
+    const seconds = over > 0 ? this.steps[Math.min(over, this.steps.length) - 1] : 0;
     const t = this.now();
     this.entries.set(key, { failures, lockedUntil: t + seconds * 1000, lastFailureAt: t });
     // Keep memory bounded even under a flood of invented browser ids.

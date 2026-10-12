@@ -7,17 +7,20 @@ import { cn } from '@/lib/utils';
  *
  * `onToken` receives the token when the box is ticked, and `null` when it
  * expires or fails. A token works once: change `resetKey` after a failed
- * request to clear the box so the person ticks it again.
+ * request to clear the box so the person ticks it again. `align="center"`
+ * centres it under a centred form (sign-in, forgot password).
  */
 export function RecaptchaCheckbox({
   siteKey,
   onToken,
   resetKey = 0,
+  align = 'start',
   className,
 }: {
   siteKey: string;
   onToken: (token: string | null) => void;
   resetKey?: number;
+  align?: 'start' | 'center';
   className?: string;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -54,9 +57,9 @@ export function RecaptchaCheckbox({
   }, [resetKey]);
 
   return (
-    <div className={cn('min-w-0', className)}>
+    <div className={cn('min-w-0', align === 'center' && 'flex flex-col items-center text-center', className)}>
       {/* Google's checkbox is a fixed 304 px frame; it scales down on narrow phones. */}
-      <div className="origin-left max-[360px]:scale-90">
+      <div className={cn('max-[360px]:scale-90', align === 'center' ? 'origin-center' : 'origin-left')}>
         <div ref={host} />
       </div>
       {state === 'loading' && <div className="h-[78px] w-[304px] max-w-full animate-pulse rounded-md border border-border bg-surface-2" aria-hidden="true" />}

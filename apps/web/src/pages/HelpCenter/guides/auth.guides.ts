@@ -82,7 +82,7 @@ export const AUTH_GUIDES: HelpGuideDefinition[] = [
         },
         {
           problem: 'The button says "Try again in …" after a wrong password.',
-          solution: 'Each wrong password makes this browser wait before the next try: 15 seconds, then 30 seconds, then 1 minute, then 15 minutes for every further wrong password. Your account itself is never locked by wrong passwords, so you can still sign in from another device. A successful sign-in resets the waits; otherwise they are forgotten after an hour without failures.',
+          solution: 'You get 3 tries. After the third wrong password in a row, each further one makes this browser wait before the next try: 15 seconds, then 30 seconds, then 1 minute, then 15 minutes for every further wrong password. Your account itself is never locked by wrong passwords, so you can still sign in from another device. A successful sign-in gives you your 3 tries back; otherwise wrong passwords are forgotten after an hour without failures.',
         },
         {
           problem: 'It says my account is locked.',

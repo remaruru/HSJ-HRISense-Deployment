@@ -98,7 +98,8 @@ export class AuthController {
         // Wrong password, unknown email, locked or deactivated: all count alike,
         // so the wait never reveals whether an account exists.
         if (error instanceof AppError && (error.statusCode === 401 || error.statusCode === 403)) {
-          res.setHeader('Retry-After', String(signInLock.recordFailure(lockKey)));
+          const seconds = signInLock.recordFailure(lockKey);
+          if (seconds > 0) res.setHeader('Retry-After', String(seconds));
         }
         throw error;
       }
