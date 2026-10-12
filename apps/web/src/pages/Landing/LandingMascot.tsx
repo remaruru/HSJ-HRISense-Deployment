@@ -326,23 +326,23 @@ export function HeroMascot() {
   const { heroSlotRef, open, docked } = useMascot();
   return (
     <div ref={heroSlotRef} className="relative flex flex-col items-center">
-      <AnimatePresence>
-        {open && !docked && (
-          // Phones and tablets: below the mascot (the buttons are above it).
-          // Desktop: over the top of the mascot, never up under the fixed nav.
-          // The z-index sits on this wrapper, not the bubble: the mascot button
-          // lifts on hover with a transform, which would otherwise paint it
-          // over the bubble (it comes later in the page).
-          <div className="absolute left-1/2 top-[88%] z-30 -translate-x-1/2 lg:top-auto lg:bottom-[70%]">
-            <FactBubble />
-          </div>
-        )}
-      </AnimatePresence>
       <MascotButton
         sizeClass="h-[180px] w-auto sm:h-[230px] md:h-[260px] lg:h-[340px] xl:h-[400px]"
         label="HRISense assistant. Press for a quick fact about HSJ HRISense."
       />
       <p className="mt-1 text-xs font-medium text-muted-foreground">Press me for a quick fact</p>
+      <AnimatePresence>
+        {open && !docked && (
+          // Phones and tablets: in the page flow below the mascot, so the hero
+          // grows to fit it — floating, it hung past the hero's bottom edge and
+          // was cut off. Desktop: floats over the top of the mascot, never up
+          // under the fixed nav. The z-index sits on this wrapper, not the
+          // bubble, so the mascot's hover lift never paints over it.
+          <div className="z-30 mt-3 flex w-full justify-center lg:absolute lg:bottom-[70%] lg:left-1/2 lg:mt-0 lg:w-auto lg:-translate-x-1/2">
+            <FactBubble />
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
