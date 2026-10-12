@@ -46,6 +46,11 @@ declare global {
 
 let loading: Promise<GoogleId> | null = null;
 
+/** Google draws its button between 200 and 400 px wide. */
+export function googleButtonWidth(available: number): number {
+  return Math.max(200, Math.min(400, Math.floor(available)));
+}
+
 /** Loads Google's script once. Rejects if it cannot be reached. */
 export function loadGoogleIdentity(): Promise<GoogleId> {
   if (window.google?.accounts?.id) return Promise.resolve(window.google.accounts.id);
@@ -108,7 +113,6 @@ export async function renderGoogleButton(
     logo_alignment: 'center',
     // HRISense is in English; Google would otherwise follow the browser's language.
     locale: 'en',
-    // Google allows 200–400 px.
-    width: Math.max(200, Math.min(400, Math.floor(options.width))),
+    width: googleButtonWidth(options.width),
   });
 }

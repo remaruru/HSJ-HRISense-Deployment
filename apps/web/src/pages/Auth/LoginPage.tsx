@@ -21,7 +21,7 @@ import { getApiErrorMessage, getRetryAfterSeconds } from '@/utils/error-handler.
 import { tokenStorage } from '@/lib/tokenStorage';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { AuthService } from '@/services/auth.service';
-import { renderGoogleButton } from '@/lib/googleIdentity';
+import { googleButtonWidth, renderGoogleButton } from '@/lib/googleIdentity';
 import { RecaptchaCheckbox } from '@/components/common/RecaptchaCheckbox';
 import { getCaptchaConfig } from '@/services/captcha.service';
 
@@ -100,8 +100,12 @@ export default function LoginPage() {
     let drawnWidth = 0;
     const draw = () => {
       drawnWidth = host.clientWidth;
+      const available = drawnWidth || 360;
+      // Google stops at 400 px; scale it up a little so it is as wide as the form.
+      const button = googleButtonWidth(available);
+      host.style.transform = available > button ? `scale(${Math.min(1.15, available / button).toFixed(3)})` : '';
       return renderGoogleButton(host, googleClientId, onCredential, {
-        width: drawnWidth || 360,
+        width: available,
         dark: document.documentElement.classList.contains('dark'),
       })
         .then(() => alive && setGoogleState('ready'))
@@ -397,9 +401,11 @@ export default function LoginPage() {
                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">or</span>
                 <span className="h-px flex-1 bg-border" />
               </div>
-              <div className="relative min-h-[44px]">
-                {/* Google renders its own "Continue with Google" button here. */}
-                <div ref={googleRef} className="flex w-full justify-center" />
+              <div className="relative flex min-h-[52px] items-center">
+                {/* Google renders its own "Continue with Google" button here. Its
+                    frame is a light page: a light color scheme keeps Chrome from
+                    painting a white box behind it in dark mode. */}
+                <div ref={googleRef} className="flex w-full justify-center [color-scheme:light]" />
                 {googleState === 'loading' && (
                   <div className="absolute inset-0 animate-pulse rounded-full border-2 border-border bg-surface" aria-hidden="true" />
                 )}

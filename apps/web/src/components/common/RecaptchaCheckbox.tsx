@@ -58,8 +58,10 @@ export function RecaptchaCheckbox({
 
   return (
     <div className={cn('min-w-0', align === 'center' && 'flex flex-col items-center text-center', className)}>
-      {/* Google's checkbox is a fixed 304 px frame; it scales down on narrow phones. */}
-      <div className={cn('max-[360px]:scale-90', align === 'center' ? 'origin-center' : 'origin-left')}>
+      {/* Google's checkbox is a fixed 304 px frame; it scales down on narrow phones.
+          The frame is a light page: a light color scheme keeps Chrome from
+          painting a white box behind it in dark mode. */}
+      <div className={cn('max-[360px]:scale-90 [color-scheme:light]', align === 'center' ? 'origin-center' : 'origin-left')}>
         <div ref={host} />
       </div>
       {state === 'loading' && <div className="h-[78px] w-[304px] max-w-full animate-pulse rounded-md border border-border bg-surface-2" aria-hidden="true" />}
