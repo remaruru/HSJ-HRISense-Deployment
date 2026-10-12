@@ -17,13 +17,22 @@ import { staggerContainer, staggerItem } from '@/lib/motion';
 import { useAuth } from '@/providers/AuthProvider';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
-import { getApiErrorMessage, getRetryAfterSeconds } from '@/utils/error-handler.util';
+import { getApiErrorCode, getApiErrorMessage, getRetryAfterSeconds } from '@/utils/error-handler.util';
 import { tokenStorage } from '@/lib/tokenStorage';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { AuthService } from '@/services/auth.service';
 import { googleButtonWidth, renderGoogleButton } from '@/lib/googleIdentity';
 import { RecaptchaCheckbox } from '@/components/common/RecaptchaCheckbox';
 import { getCaptchaConfig } from '@/services/captcha.service';
+
+/** A Google sign-in with an email that has no HRISense account. */
+const GOOGLE_NO_ACCOUNT_ERROR = {
+  title: 'No HRISense account uses this Google email.',
+  details: [
+    'Hospicio de San Jose employees: choose the Google account with the email HR registered for you, or sign in with your email and password. If it still does not work, contact HR.',
+    'Not an employee? Please do not sign in. Repeated tries with unregistered emails will block Google sign-in on this network.',
+  ],
+};
 
 /** "15s" under a minute, "14:59" from there. */
 function formatCountdown(seconds: number): string {
@@ -39,6 +48,8 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  /** Extra lines under the error headline (only some errors have them). */
+  const [errorDetails, setErrorDetails] = useState<string[]>([]);
   // Default to the previous choice so returning users keep their preference.
   const [rememberMe, setRememberMe] = useState(() => tokenStorage.isRemembered());
 
@@ -84,6 +95,7 @@ export default function LoginPage() {
 
     const onCredential = async (credential: string) => {
       setErrorMsg('');
+      setErrorDetails([]);
       setGoogleBusy(true);
       try {
         // The server verifies the token with Google, then applies every
@@ -91,7 +103,14 @@ export default function LoginPage() {
         const { loginWithGoogle: signIn, rememberMe: remember, goOn: next } = latest.current;
         next(await signIn(credential, remember));
       } catch (err) {
-        setErrorMsg(getApiErrorMessage(err, 'Google sign-in failed. Please try again.'));
+        if (getApiErrorCode(err) === 'GOOGLE_NO_ACCOUNT') {
+          // The server's message is one long paragraph; split it into a
+          // headline and one line per audience so it can be read at a glance.
+          setErrorMsg(GOOGLE_NO_ACCOUNT_ERROR.title);
+          setErrorDetails(GOOGLE_NO_ACCOUNT_ERROR.details);
+        } else {
+          setErrorMsg(getApiErrorMessage(err, 'Google sign-in failed. Please try again.'));
+        }
       } finally {
         setGoogleBusy(false);
       }
@@ -169,6 +188,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setErrorDetails([]);
 
     try {
       // login() stores the token and user in AuthProvider before resolving.
@@ -278,10 +298,20 @@ export default function LoginPage() {
               <motion.div
                 variants={staggerItem}
                 role="alert"
-                className="p-4 rounded-xl bg-status-danger-surface border border-status-danger-border text-status-danger-foreground text-sm flex items-center gap-3"
+                className={cn(
+                  'p-4 rounded-xl bg-status-danger-surface border border-status-danger-border text-status-danger-foreground text-sm flex gap-3',
+                  errorDetails.length > 0 ? 'items-start' : 'items-center'
+                )}
               >
-                <AlertCircle className="h-5 w-5 shrink-0" />
-                <p className="font-medium">{errorMsg}</p>
+                <AlertCircle className={cn('h-5 w-5 shrink-0', errorDetails.length > 0 && 'mt-0.5')} />
+                <div className="min-w-0 space-y-2">
+                  <p className={errorDetails.length > 0 ? 'font-bold' : 'font-medium'}>{errorMsg}</p>
+                  {errorDetails.map((line) => (
+                    <p key={line} className="leading-relaxed">
+                      {line}
+                    </p>
+                  ))}
+                </div>
               </motion.div>
             )}
 
