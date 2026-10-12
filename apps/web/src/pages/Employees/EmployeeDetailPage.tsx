@@ -45,6 +45,7 @@ import { EmployeeEvaluationProfileTab } from "./components/EmployeeEvaluationPro
 import { EmployeeTrainingProfileTab } from "./components/EmployeeTrainingProfileTab";
 import { EmployeeAdditionalOversight } from "./components/EmployeeAdditionalOversight";
 import { LoadError } from "@/components/shared/LoadError";
+import { ProfileBannerImage } from "@/pages/Profile/components/ProfileHero";
 import { PersonalRecordFields, ResidenceFields, EducationLicensesSections } from "./components/EmployeeRecordSections";
 
 /**
@@ -457,6 +458,7 @@ export default function EmployeeDetailPage() {
 
       <motion.div variants={staggerItem} className="rounded-2xl border border-border-soft bg-surface shadow-card overflow-hidden">
         <div className="h-32 bg-gradient-to-r from-primary-600 to-primary-400 relative">
+          <ProfileBannerImage src={employee.bannerUrl} />
           {isArchived && (
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
               <Badge variant="danger" className="text-sm">ARCHIVED</Badge>

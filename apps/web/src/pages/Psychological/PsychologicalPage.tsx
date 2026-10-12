@@ -693,16 +693,16 @@ export default function PsychologicalPage() {
       </div>
 
       {/* ── SUMMARY CARDS ──
-          Same shared StatCard as Medical. Total Records carries the module's
-          purple identity (accent); the status tiles use the system's meaning
-          tones so "expired" looks the same here as everywhere else. */}
+          Same shared StatCard and the same tones as Medical, tile for tile:
+          Total Records the neutral total tone, Needs Review the purple review
+          (accent) tone, Expiring Soon warning and Expired danger. */}
       {summaryError && <LoadError compact message={summaryError} onRetry={fetchRecords} />}
       <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4", summaryError && "opacity-50")} aria-hidden={summaryError ? true : undefined}>
         <StatCard
           label="Total Records"
           value={summary.totalRecords}
           hint="Across all staff"
-          tone="accent"
+          tone="total"
           icon={<FileText />}
           selected={activeTab === "ALL"}
           onClick={() => {
@@ -714,7 +714,7 @@ export default function PsychologicalPage() {
           label="Needs Review"
           value={summary.needsReview}
           hint="Pending HR action"
-          tone="info"
+          tone="accent"
           icon={<AlertCircle />}
           selected={activeTab === "NEEDS_REVIEW"}
           onClick={() => {

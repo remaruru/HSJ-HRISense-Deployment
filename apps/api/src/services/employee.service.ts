@@ -507,6 +507,7 @@ export class EmployeeService {
       lastName: emp.lastName,
       suffix: emp.suffix ?? null,
       photoUrl: emp.photoUrl ?? null,
+      bannerUrl: emp.bannerUrl ?? null,
       jobRoleId: emp.jobRoleId ?? null,
       unitId: emp.unitId ?? null,
       departmentId: emp.departmentId ?? null,

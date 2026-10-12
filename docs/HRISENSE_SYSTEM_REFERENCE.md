@@ -1533,8 +1533,13 @@ saving**.
 Profile** (§6.11), never from this form. The API's self-edit list
 (`EmployeeService.update`) is the rule: mobile phone, home phone, present
 address, permanent address, emergency contacts (up to three) and religion. The
-list also accepts a photo address, but HRISense has no self-service photo upload
-(photos are filed at onboarding), so the photo stays read-only. The personal
+photo and banner are not in this form: they have their own camera buttons on
+the profile card (`POST /employees/me/photo`, `POST /employees/me/banner`,
+`DELETE /employees/me/banner`; JPG, PNG or WEBP up to 5 MB, checked by the
+file's first bytes). Each is stored as a protected document of the person, so
+exactly the people who can open the profile — the person, their supervisor and
+HR — see it; a new one removes the one it replaces. Audited as
+`PROFILE_PHOTO_CHANGED`, `PROFILE_BANNER_CHANGED` and `PROFILE_BANNER_REMOVED`. The personal
 email is the login, so HR changes it. Anything else sent by a non-HR user is
 dropped, and editing anyone else's record is refused: *"You can only update
 your own profile"* — supervisors included.
@@ -1744,8 +1749,8 @@ address are required. **Review changes** lists exactly what changed (old →
 new) before **Save changes**; saving sends only the changed fields
 (`PUT /employees/:id` on the person's own record, audited as
 `UPDATE_EMPLOYEE`). Fields HR keeps — name, personal email (the sign-in), birth
-details, employment, job role, unit, supervisor, government IDs and the profile
-photo — are shown on the profile, never as disabled fields in the form.
+details, employment, job role, unit, supervisor and government IDs — are shown
+on the profile, never as disabled fields in the form.
 
 ### 6.12 My Team (`/my-team`, supervisors)
 

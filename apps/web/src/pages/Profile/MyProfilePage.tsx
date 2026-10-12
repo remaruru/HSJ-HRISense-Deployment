@@ -103,7 +103,7 @@ const TIER_LABEL: Record<string, string> = {
 };
 
 export default function MyProfilePage() {
-  const { user } = useAuth();
+  const { user, fetchCurrentUser } = useAuth();
   const navigate = useNavigate();
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -185,6 +185,10 @@ export default function MyProfilePage() {
           context="self"
           completion={employee.profileCompletion ?? 0}
           onViewBreakdown={completionSpec ? () => setBreakdownOpen(true) : undefined}
+          // The top bar shows the photo too, so refresh the signed-in user as well.
+          onImagesChanged={async () => {
+            await Promise.all([load(), fetchCurrentUser().catch(() => null)]);
+          }}
           actions={
             <Button variant="update" leftIcon={<Edit2 className="h-4 w-4" />} onClick={() => setEditOpen(true)} className="w-full sm:w-auto">
               Edit My Profile
@@ -220,11 +224,11 @@ export default function MyProfilePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div className="rounded-xl border border-border-soft bg-muted/20 p-3.5">
                     <p className="font-semibold text-foreground">You can update</p>
-                    <p className="mt-1 text-muted-foreground">Mobile number, home phone, present and permanent address, emergency contacts (up to three) and religion — with <span className="font-semibold text-foreground">Edit My Profile</span>.</p>
+                    <p className="mt-1 text-muted-foreground">Mobile number, home phone, present and permanent address, emergency contacts (up to three) and religion — with <span className="font-semibold text-foreground">Edit My Profile</span>. Your profile photo and banner — with the camera button on each.</p>
                   </div>
                   <div className="rounded-xl border border-border-soft bg-muted/20 p-3.5">
                     <p className="font-semibold text-foreground">HR keeps</p>
-                    <p className="mt-1 text-muted-foreground">Your name, personal email (your sign-in), birth details, employment details, job role, unit, supervisor, government IDs and profile photo. Ask HR to correct any of these.</p>
+                    <p className="mt-1 text-muted-foreground">Your name, personal email (your sign-in), birth details, employment details, job role, unit, supervisor and government IDs. Ask HR to correct any of these.</p>
                   </div>
                 </div>
               </InfoSection>

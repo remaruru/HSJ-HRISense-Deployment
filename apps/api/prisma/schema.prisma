@@ -816,6 +816,8 @@ model Employee {
   supervisorOverrideAt       DateTime?
 
   photoUrl  String?
+  /// The person's own profile banner (protected document preview path); null = the default banner.
+  bannerUrl String?
   deletedAt DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

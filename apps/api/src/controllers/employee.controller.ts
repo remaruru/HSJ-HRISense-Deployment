@@ -7,6 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 import { OrgHierarchyService } from '../services/org-hierarchy.service';
 import { AdditionalOversightService } from '../services/additional-oversight.service';
 import { auditSnapshotDiff } from '../services/audit-catalog';
+import { ProfileImageService, type ProfileImageKind } from '../services/profile-image.service';
 
 export class EmployeeController {
   /**
@@ -208,6 +209,35 @@ export class EmployeeController {
     try {
       const employee = await EmployeeService.getById(req.user!.employeeId!);
       res.json({ success: true, data: employee });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /employees/me/photo and /employees/me/banner — the person's own profile
+   * photo or banner (multipart field `file`). Returns the new preview path.
+   */
+  static setMyProfileImage(kind: ProfileImageKind) {
+    return async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const employeeId = req.user?.employeeId;
+        if (!employeeId) throw new AppError('Your account has no employee record.', 400);
+        const url = await ProfileImageService.set(kind, employeeId, req.user!.userId, req.file, req.ip, req.headers['user-agent']);
+        res.json({ success: true, data: kind === 'photo' ? { photoUrl: url } : { bannerUrl: url } });
+      } catch (err) {
+        next(err);
+      }
+    };
+  }
+
+  /** DELETE /employees/me/banner — back to the default banner. */
+  static async removeMyBanner(req: Request, res: Response, next: NextFunction) {
+    try {
+      const employeeId = req.user?.employeeId;
+      if (!employeeId) throw new AppError('Your account has no employee record.', 400);
+      await ProfileImageService.removeBanner(employeeId, req.user!.userId, req.ip, req.headers['user-agent']);
+      res.json({ success: true, data: { bannerUrl: null } });
     } catch (err) {
       next(err);
     }

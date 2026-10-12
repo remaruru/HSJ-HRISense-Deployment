@@ -50,6 +50,16 @@ router.post('/export/pdf', authorize(['FULL', 'SUPERVISOR']), EmployeeController
 
 // ─── Own Profile / Subordinates ───────────────────────────────────────────────
 router.get('/me', EmployeeController.getMe);
+
+// The person's own profile photo and banner (any signed-in person, own record only).
+const profileImageUpload = createDiskUpload({
+  subdir: 'documents',
+  allowedMimeTypes: IMAGE_MIME_ALLOWLIST,
+  typeErrorMessage: 'Choose a JPG, PNG or WEBP image.',
+}).single('file');
+router.post('/me/photo', profileImageUpload, EmployeeController.setMyProfileImage('photo'));
+router.post('/me/banner', profileImageUpload, EmployeeController.setMyProfileImage('banner'));
+router.delete('/me/banner', EmployeeController.removeMyBanner);
 router.get('/subordinates', authorize(['FULL', 'SUPERVISOR']), EmployeeController.getSubordinates);
 
 // ─── Employee Directory List & Creation ────────────────────────────────────────

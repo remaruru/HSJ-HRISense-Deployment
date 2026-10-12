@@ -23,9 +23,8 @@ import { fullNameOf } from '../profileFormat';
  *
  * Not here, on purpose:
  *  • the personal email — it is the sign-in address, so only HR changes it;
- *  • the profile photo — the whitelist accepts a photo address, but HRISense
- *    has no self-service photo upload (photos are filed at onboarding), so it
- *    stays read-only rather than inventing one.
+ *  • the profile photo and banner — they have their own camera buttons on the
+ *    profile card (ProfileHero), separate from this form.
  *
  * HR and Sister use this same form for their own My Profile. Their full
  * administrative edit stays in Employee Management.
@@ -256,8 +255,9 @@ export function EditMyProfileDialog({
               </Group>
 
               <p className="text-xs text-muted-foreground">
-                Your name, personal email (your sign-in), employment details, job role, unit, supervisor, government IDs
-                and profile photo are kept by HR. Ask HR if any of them needs correcting.
+                Your name, personal email (your sign-in), employment details, job role, unit, supervisor and government
+                IDs are kept by HR. Ask HR if any of them needs correcting. To change your photo or banner, use the camera
+                button on your profile card.
               </p>
             </>
           ) : (
