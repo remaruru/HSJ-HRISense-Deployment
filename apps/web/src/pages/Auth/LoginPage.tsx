@@ -97,21 +97,29 @@ export default function LoginPage() {
       }
     };
 
-    const draw = () =>
-      renderGoogleButton(host, googleClientId, onCredential, {
-        width: host.clientWidth || 360,
+    let drawnWidth = 0;
+    const draw = () => {
+      drawnWidth = host.clientWidth;
+      return renderGoogleButton(host, googleClientId, onCredential, {
+        width: drawnWidth || 360,
         dark: document.documentElement.classList.contains('dark'),
       })
         .then(() => alive && setGoogleState('ready'))
         .catch(() => alive && setGoogleState('unavailable'));
+    };
     draw();
 
     // Redraw for a new width or theme (Google's button is a fixed-size frame).
+    // Height changes are ignored: every draw changes the box's height (and
+    // again when Google swaps in "Continue as …"), so redrawing on them would
+    // redraw the button forever.
     const redraw = () => {
       window.clearTimeout(timer);
       timer = window.setTimeout(draw, 150);
     };
-    const resize = new ResizeObserver(redraw);
+    const resize = new ResizeObserver(() => {
+      if (host.clientWidth !== drawnWidth) redraw();
+    });
     resize.observe(host);
     const theme = new MutationObserver(redraw);
     theme.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
