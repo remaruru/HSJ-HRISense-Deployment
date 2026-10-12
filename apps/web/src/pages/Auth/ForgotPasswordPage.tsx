@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Heart, Mail, MailCheck } from 'lucide-react';
@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { staggerContainer, staggerItem } from '@/lib/motion';
 import { AuthService } from '@/services/auth.service';
+import { RecaptchaCheckbox } from '@/components/common/RecaptchaCheckbox';
+import { getCaptchaConfig } from '@/services/captcha.service';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
 
 /**
@@ -21,14 +23,31 @@ export default function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // "I'm not a robot" every time, whenever the server has reCAPTCHA keys.
+  const [captchaSiteKey, setCaptchaSiteKey] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    getCaptchaConfig().then((c) => {
+      if (alive && c.enabled && c.siteKey) setCaptchaSiteKey(c.siteKey);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const captchaMissing = !!captchaSiteKey && !captchaToken;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setIsSubmitting(true);
     try {
-      await AuthService.forgotPassword(email.trim());
+      await AuthService.forgotPassword(email.trim(), captchaToken ?? undefined);
       setSubmitted(true);
     } catch (err) {
+      // A checkbox result works once: clear it so the next attempt is ticked again.
+      if (captchaToken) setCaptchaReset((n) => n + 1);
       setErrorMsg(getApiErrorMessage(err, 'We could not start the password reset. Please try again.'));
     } finally {
       setIsSubmitting(false);
@@ -108,15 +127,19 @@ export default function ForgotPasswordPage() {
                 </div>
               </div>
 
+              {captchaSiteKey && (
+                <RecaptchaCheckbox siteKey={captchaSiteKey} resetKey={captchaReset} onToken={setCaptchaToken} />
+              )}
+
               <Button
                 type="submit"
                 size="lg"
                 pill
                 isLoading={isSubmitting}
-                disabled={isSubmitting || !email.trim()}
+                disabled={isSubmitting || !email.trim() || captchaMissing}
                 className="w-full"
               >
-                {isSubmitting ? 'Sending...' : 'Send reset link'}
+                {isSubmitting ? 'Sending...' : captchaMissing ? 'Please finish the CAPTCHA' : 'Send reset link'}
               </Button>
             </form>
           )}

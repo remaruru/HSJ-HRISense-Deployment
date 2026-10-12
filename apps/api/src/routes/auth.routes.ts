@@ -23,8 +23,8 @@ import {
 
 const router = Router();
 
-// Sign-in is limited per IP and per IP + email. Account lockout (five wrong
-// passwords) still applies on top — the two do different jobs.
+// Sign-in is limited per IP and per IP + email. The wrong-password lock on the
+// failing browser (sign-in-lock.ts) applies on top — the two do different jobs.
 router.post('/login', loginIpLimiter, loginAccountLimiter, validate(loginSchema), asyncHandler(AuthController.login));
 
 // Google Sign-In: counts against the same per-IP sign-in limit as passwords,

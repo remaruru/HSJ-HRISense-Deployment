@@ -8,8 +8,8 @@ import { AppError } from '../middleware/errorHandler';
  * receives; the server checks that token with Google using the secret key
  * (server only). Off until both keys are configured.
  *
- * Used on the public job application (always) and on sign-in after repeated
- * failures (see login-captcha.ts).
+ * Required every time on sign-in, on "Forgot password" and on the public job
+ * application.
  */
 
 const VERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';

@@ -1,4 +1,5 @@
 import { api } from './api';
+import { getBrowserId } from '@/lib/browserId';
 
 export interface LoginPayload {
   email: string;
@@ -8,7 +9,7 @@ export interface LoginPayload {
    * (survives a browser restart) or sessionStorage. Never sent to the API.
    */
   rememberMe?: boolean;
-  /** The "I'm not a robot" token — only after repeated failed sign-ins. */
+  /** The "I'm not a robot" token — required on every sign-in when reCAPTCHA is on. */
   captchaToken?: string;
 }
 
@@ -72,7 +73,8 @@ export class AuthService {
   static async login(credentials: LoginPayload): Promise<LoginResult> {
     // rememberMe is a client-side storage preference — it must not be posted.
     const { rememberMe: _rememberMe, ...payload } = credentials;
-    const response = await api.post('/auth/login', payload);
+    // Wrong passwords lock this browser (by its random id), never the account.
+    const response = await api.post('/auth/login', payload, { headers: { 'X-Browser-Id': getBrowserId() } });
     return response.data.data;
   }
 
@@ -100,8 +102,8 @@ export class AuthService {
     return response.data.data;
   }
 
-  static async forgotPassword(email: string): Promise<ForgotPasswordResponse> {
-    const response = await api.post('/auth/forgot-password', { email });
+  static async forgotPassword(email: string, captchaToken?: string): Promise<ForgotPasswordResponse> {
+    const response = await api.post('/auth/forgot-password', { email, captchaToken });
     return response.data;
   }
 

@@ -55,17 +55,13 @@ export class AuthService {
     const isMatch = await comparePassword(password, user.passwordHash);
 
     if (!isMatch) {
-      // Increment failed attempts
+      // Count the failure for HR's account panel, but never lock the account:
+      // anyone who knows an email could then keep its owner out on purpose.
+      // The browser that is failing is locked instead (sign-in-lock.ts).
       const newAttempts = user.failedLoginAttempts + 1;
-      const isLockout = newAttempts >= 5;
-      const lockedUntil = isLockout ? new Date(Date.now() + 15 * 60 * 1000) : null; // 15 mins lock
-
       await prisma.user.update({
         where: { id: user.id },
-        data: {
-          failedLoginAttempts: isLockout ? 0 : newAttempts,
-          lockedUntil,
-        },
+        data: { failedLoginAttempts: newAttempts },
       });
 
       await createAuditLog({
@@ -75,12 +71,8 @@ export class AuthService {
         entityId: user.id,
         ipAddress,
         userAgent,
-        newValue: { failedAttempts: newAttempts, locked: isLockout },
+        newValue: { failedAttempts: newAttempts },
       });
-
-      if (isLockout) {
-        throw new AppError('Too many failed login attempts. Your account is locked for 15 minutes.', 403);
-      }
 
       throw new AppError('Invalid email or password', 401);
     }

@@ -155,8 +155,9 @@ api.interceptors.response.use(
 
     // 429 — the server's rate limit. One "slow down" toast at a time, saying how
     // long to wait when the server said so; no internals, no automatic retry.
+    // The sign-in page shows its own countdown for a locked browser.
     if (error.response?.status === 429) {
-      toast.error(rateLimitMessage(error), { id: 'rate-limited' });
+      if (error.response?.data?.code !== 'SIGN_IN_LOCKED') toast.error(rateLimitMessage(error), { id: 'rate-limited' });
       return Promise.reject(error);
     }
 

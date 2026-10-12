@@ -17,13 +17,19 @@ import { staggerContainer, staggerItem } from '@/lib/motion';
 import { useAuth } from '@/providers/AuthProvider';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { toast } from 'sonner';
-import { getApiErrorCode, getApiErrorMessage } from '@/utils/error-handler.util';
+import { getApiErrorMessage, getRetryAfterSeconds } from '@/utils/error-handler.util';
 import { tokenStorage } from '@/lib/tokenStorage';
 import { ThemeToggle } from '@/components/common/ThemeToggle';
 import { AuthService } from '@/services/auth.service';
 import { renderGoogleButton } from '@/lib/googleIdentity';
 import { RecaptchaCheckbox } from '@/components/common/RecaptchaCheckbox';
 import { getCaptchaConfig } from '@/services/captcha.service';
+
+/** "15s" under a minute, "14:59" from there. */
+function formatCountdown(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -117,9 +123,8 @@ export default function LoginPage() {
     };
   }, [googleClientId]);
 
-  // "I'm not a robot" appears only after repeated failed sign-ins (the server decides).
+  // "I'm not a robot" on every sign-in, whenever the server has reCAPTCHA keys.
   const [captchaSiteKey, setCaptchaSiteKey] = useState<string | null>(null);
-  const [captchaRequired, setCaptchaRequired] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaReset, setCaptchaReset] = useState(0);
   useEffect(() => {
@@ -131,7 +136,22 @@ export default function LoginPage() {
       alive = false;
     };
   }, []);
-  const needCaptcha = !!captchaSiteKey && captchaRequired;
+  const needCaptcha = !!captchaSiteKey;
+
+  // A wrong password locks this browser for a while (15 s, 30 s, 1 min, then
+  // 15 min — the API decides and sends the wait); the button counts it down.
+  const [lockedUntil, setLockedUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (lockedUntil <= Date.now()) return;
+    const timer = window.setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= lockedUntil) window.clearInterval(timer);
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [lockedUntil]);
+  const lockSecondsLeft = Math.max(0, Math.ceil((lockedUntil - now) / 1000));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,9 +163,11 @@ export default function LoginPage() {
       const user = await login({ email, password, rememberMe, captchaToken: needCaptcha ? captchaToken ?? undefined : undefined });
       goOn(user);
     } catch (err: any) {
-      const code = getApiErrorCode(err);
-      if (err?.response?.headers?.['x-captcha-required'] === 'true' || code === 'CAPTCHA_REQUIRED' || code === 'CAPTCHA_FAILED') {
-        setCaptchaRequired(true);
+      const wait = getRetryAfterSeconds(err);
+      if (wait) {
+        const t = Date.now();
+        setNow(t);
+        setLockedUntil(t + wait * 1000);
       }
       // A checkbox result works once: clear it so the next attempt is ticked again.
       if (captchaToken) setCaptchaReset((n) => n + 1);
@@ -332,24 +354,29 @@ export default function LoginPage() {
             </motion.div>
 
             {needCaptcha && (
-              <motion.div variants={staggerItem} className="space-y-2">
-                <p className="text-xs text-muted-foreground">Several sign-in attempts failed. Please confirm you are not a robot.</p>
+              <motion.div variants={staggerItem}>
                 <RecaptchaCheckbox siteKey={captchaSiteKey!} resetKey={captchaReset} onToken={setCaptchaToken} />
               </motion.div>
             )}
 
-            {/* Submit */}
+            {/* Submit — says what is missing instead of silently doing nothing. */}
             <motion.div variants={staggerItem}>
               <Button
                 type="submit"
                 size="lg"
                 pill
                 isLoading={passwordBusy}
-                disabled={anyBusy || !email || !password || (needCaptcha && !captchaToken)}
+                disabled={anyBusy || !email || !password || lockSecondsLeft > 0 || (needCaptcha && !captchaToken)}
                 className="w-full"
-                rightIcon={!passwordBusy ? <ArrowRight className="h-4 w-4" /> : undefined}
+                rightIcon={!passwordBusy && lockSecondsLeft === 0 && (!needCaptcha || captchaToken) ? <ArrowRight className="h-4 w-4" /> : undefined}
               >
-                {passwordBusy ? 'Signing in...' : 'Sign In to HRISense'}
+                {passwordBusy
+                  ? 'Signing in...'
+                  : lockSecondsLeft > 0
+                    ? `Try again in ${formatCountdown(lockSecondsLeft)}`
+                    : needCaptcha && !captchaToken
+                      ? 'Please finish the CAPTCHA'
+                      : 'Sign In to HRISense'}
               </Button>
             </motion.div>
           </motion.form>

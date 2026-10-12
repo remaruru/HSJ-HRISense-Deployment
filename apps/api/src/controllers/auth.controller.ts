@@ -3,11 +3,7 @@ import { z } from 'zod';
 import { AuthService } from '../services/auth.service';
 import { GoogleAuthService } from '../services/google-auth.service';
 import { CaptchaService } from '../services/captcha.service';
-import { loginCaptcha } from '../services/login-captcha';
-import { captchaEnabled } from '../config/env';
-
-/** Tells the sign-in page to show the "I'm not a robot" checkbox (exposed through CORS). */
-const CAPTCHA_HEADER = 'X-Captcha-Required';
+import { BROWSER_ID_HEADER, SignInLock, signInLock, waitPhrase } from '../services/sign-in-lock';
 import { prisma } from '../config/prisma';
 import { AppError } from '../middleware/errorHandler';
 
@@ -15,7 +11,7 @@ export const loginSchema = z.object({
   body: z.object({
     email: z.string().email('Please enter a valid email address'),
     password: z.string().min(1, 'Password is required'),
-    /** The "I'm not a robot" result — only needed after repeated failed sign-ins. */
+    /** The "I'm not a robot" result — required on every sign-in when reCAPTCHA is on. */
     captchaToken: z.string().max(4096).optional(),
   }),
 });
@@ -36,6 +32,8 @@ export const refreshSchema = z.object({
 export const forgotPasswordSchema = z.object({
   body: z.object({
     email: z.string().email('Please enter a valid email address'),
+    /** The "I'm not a robot" result — required when reCAPTCHA is on. */
+    captchaToken: z.string().max(4096).optional(),
   }),
 });
 
@@ -81,25 +79,30 @@ export class AuthController {
       const ip = req.ip;
       const userAgent = req.headers['user-agent'];
 
-      // After repeated failures for this email or from this network, the
-      // checkbox must be passed before the password is even checked.
-      if (captchaEnabled && loginCaptcha.isRequired(email, ip)) {
-        res.setHeader(CAPTCHA_HEADER, 'true');
-        await CaptchaService.verify(captchaToken, ip);
+      // Wrong passwords lock this browser on this network, never the account
+      // (see sign-in-lock.ts). While locked, nothing else is checked.
+      const lockKey = SignInLock.key(ip, req.get(BROWSER_ID_HEADER));
+      const waiting = signInLock.secondsLeft(lockKey);
+      if (waiting > 0) {
+        res.setHeader('Retry-After', String(waiting));
+        throw new AppError(`Too many wrong sign-in attempts. Please try again in ${waitPhrase(waiting)}.`, 429, undefined, 'SIGN_IN_LOCKED');
       }
+
+      // "I'm not a robot" before the password is even checked (when reCAPTCHA is on).
+      await CaptchaService.verify(captchaToken, ip);
 
       let result;
       try {
         result = await AuthService.login(email, password, ip, userAgent);
       } catch (error) {
         // Wrong password, unknown email, locked or deactivated: all count alike,
-        // so the checkbox never reveals whether an account exists.
-        if (captchaEnabled && error instanceof AppError && (error.statusCode === 401 || error.statusCode === 403)) {
-          if (loginCaptcha.recordFailure(email, ip)) res.setHeader(CAPTCHA_HEADER, 'true');
+        // so the wait never reveals whether an account exists.
+        if (error instanceof AppError && (error.statusCode === 401 || error.statusCode === 403)) {
+          res.setHeader('Retry-After', String(signInLock.recordFailure(lockKey)));
         }
         throw error;
       }
-      loginCaptcha.recordSuccess(email);
+      signInLock.recordSuccess(lockKey);
 
       res.status(200).json({
         success: true,
@@ -171,7 +174,8 @@ export class AuthController {
 
   static async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { email } = req.body;
+      const { email, captchaToken } = req.body;
+      await CaptchaService.verify(captchaToken, req.ip);
       const result = await AuthService.forgotPassword(email);
 
       res.status(200).json(result);

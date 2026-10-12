@@ -47,7 +47,7 @@ app.use(
     // The web app runs on another origin, so it can only read these if listed:
     // the wait before retrying a rate-limited request, the error reference, and
     // a download's file name.
-    exposedHeaders: ["Retry-After", "X-Request-Id", "Content-Disposition", "X-Captcha-Required"],
+    exposedHeaders: ["Retry-After", "X-Request-Id", "Content-Disposition"],
   })
 );
 

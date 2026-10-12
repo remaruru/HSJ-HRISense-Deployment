@@ -82,7 +82,7 @@ export const globalApiLimiter = limiter(RATE_LIMITS.GLOBAL, byIp, {
 
 // ─── Sign-in and passwords ───────────────────────────────────────────────────
 
-/** Sign-in attempts for one email from one IP. Works alongside account lockout, never instead of it. */
+/** Sign-in attempts for one email from one IP. Works alongside the wrong-password browser lock (sign-in-lock.ts). */
 export const loginAccountLimiter = limiter(
   RATE_LIMITS.LOGIN_ACCOUNT,
   (req) => `${byIp(req)}|${String(req.body?.email ?? '').trim().toLowerCase()}`,

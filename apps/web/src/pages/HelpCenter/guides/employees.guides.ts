@@ -673,7 +673,7 @@ export const EMPLOYEE_GUIDES: HelpGuideDefinition[] = [
         {
           stepNumber: 3,
           title: 'Lock or unlock',
-          instruction: 'Use **Lock** to block sign-in for one hour for a security concern, and **Unlock** to clear a lock — including the 15-minute lock HRISense applies automatically after five wrong passwords.',
+          instruction: 'Use **Lock** to block sign-in for one hour for a security concern, and **Unlock** to clear it. Wrong passwords never lock an account — they only make the browser that typed them wait.',
           expectedResult: 'The lock state changes, and an unlocked account can sign in again straight away.',
           uiPath: 'Account Management -> Lock / Unlock',
         },
@@ -694,7 +694,7 @@ export const EMPLOYEE_GUIDES: HelpGuideDefinition[] = [
         },
         {
           problem: 'An employee says they are locked out but the panel shows no lock.',
-          solution: 'Check whether the account is deactivated instead, or whether they are simply using the wrong password. Reset & send new credentials is the quickest fix.',
+          solution: 'Wrong passwords make their browser wait (up to 15 minutes) without locking the account, so they can still sign in from another device, and Unlock does not shorten that wait. Also check whether the account is deactivated. Reset & send new credentials is the quickest fix for a forgotten password.',
         },
       ],
       tips: ['Deactivate is the right choice for long absences; lock is for security concerns.'],

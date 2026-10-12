@@ -601,12 +601,20 @@ export default function ApplyPage() {
         )}
 
         <div className="pt-4 border-t border-border flex justify-end">
-          <Button type="submit" disabled={submitting} aria-busy={submitting} className="w-full sm:w-auto h-12 px-8 text-base shadow-pop-color">
+          {/* Says what is missing instead of silently doing nothing. */}
+          <Button
+            type="submit"
+            disabled={submitting || (!!captchaSiteKey && !captchaToken)}
+            aria-busy={submitting}
+            className="w-full sm:w-auto h-12 px-8 text-base shadow-pop-color"
+          >
             {submitting ? (
               <span className="flex items-center gap-2">
                 <div className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
                 Submitting Application...
               </span>
+            ) : captchaSiteKey && !captchaToken ? (
+              "Please finish the CAPTCHA"
             ) : (
               "Submit Application"
             )}

@@ -60,7 +60,7 @@ export const AUTH_GUIDES: HelpGuideDefinition[] = [
         {
           stepNumber: 4,
           title: 'Select Sign In',
-          instruction: 'Select **Sign In to HRISense**.',
+          instruction: 'Tick **I\'m not a robot** if it is shown, then select **Sign In to HRISense**. Until the box is ticked, the button reads **Please finish the CAPTCHA** and cannot be selected.',
           expectedResult: 'Your dashboard opens. If this is your first sign-in, you are asked to set your own password first.',
           uiPath: 'Sign-in card -> Sign In to HRISense',
           tip: 'If **Continue with Google** is shown, you can use it instead of steps 2 and 4 — but only with the Google account whose email is the same personal email HR registered. It never creates an account, and a temporary password must still be changed first.',
@@ -77,12 +77,16 @@ export const AUTH_GUIDES: HelpGuideDefinition[] = [
           solution: 'That is normal for a new or reset account. Set your own password and you will continue straight to the dashboard.',
         },
         {
-          problem: 'An "I\'m not a robot" box appeared.',
-          solution: 'It appears after several failed sign-ins. Tick it (and complete the picture check if Google shows one), then select **Sign In to HRISense**. It goes away after a successful sign-in.',
+          problem: 'The button says "Please finish the CAPTCHA".',
+          solution: 'Tick **I\'m not a robot** above the button (and complete the picture check if Google shows one). The box is needed for every sign-in, and again after each failed attempt.',
+        },
+        {
+          problem: 'The button says "Try again in …" after a wrong password.',
+          solution: 'Each wrong password makes this browser wait before the next try: 15 seconds, then 30 seconds, then 1 minute, then 15 minutes for every further wrong password. Your account itself is never locked by wrong passwords, so you can still sign in from another device. A successful sign-in resets the waits; otherwise they are forgotten after an hour without failures.',
         },
         {
           problem: 'It says my account is locked.',
-          solution: 'After five wrong password attempts HRISense locks the account for 15 minutes. Wait, or ask HR Personnel to unlock it for you.',
+          solution: 'HR Personnel locked the account on purpose (for example for a security concern). Ask them to unlock it.',
         },
         {
           problem: 'It says my account is inactive.',
@@ -326,7 +330,7 @@ export const AUTH_GUIDES: HelpGuideDefinition[] = [
         {
           stepNumber: 2,
           title: 'Type your email address and send',
-          instruction: 'Type the email address your account uses and select **Send reset link**.',
+          instruction: 'Type the email address your account uses, tick **I\'m not a robot** if it is shown, and select **Send reset link**.',
           explanation: 'For safety, HRISense always shows the same confirmation message, whether or not the address belongs to an account. That way nobody can use this page to discover who has an account.',
           expectedResult: 'A message confirms that if the address belongs to an account, a reset link has been sent to it.',
           uiPath: 'Forgot Password page -> Send reset link',
@@ -522,7 +526,7 @@ export const AUTH_GUIDES: HelpGuideDefinition[] = [
         },
         {
           problem: 'It says my account is locked or deactivated.',
-          solution: 'Google sign-in follows the same account rules as a password. Wait for a lock to end, or ask HR about a deactivated account.',
+          solution: 'Google sign-in follows the same account rules as a password. Ask HR Personnel to unlock a locked account or reactivate a deactivated one.',
         },
         {
           problem: 'I do not see Continue with Google.',

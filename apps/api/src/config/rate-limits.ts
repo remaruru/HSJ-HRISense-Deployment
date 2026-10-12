@@ -48,7 +48,7 @@ export function buildRateLimits(source: EnvSource = process.env) {
     /** Every /api/v1 request, per IP — a flood guard sized for a shared office IP. */
     GLOBAL: rule('GLOBAL', { windowMinutes: 15, prodMax: 5000, devMax: 50000 }),
 
-    /** Sign-in attempts for one email from one IP. Account lockout (5 wrong passwords) still applies on top. */
+    /** Sign-in attempts for one email from one IP. The wrong-password browser lock (sign-in-lock.ts) applies on top. */
     LOGIN_ACCOUNT: rule('LOGIN_ACCOUNT', { windowMinutes: 15, prodMax: 10, devMax: 50 }),
     /** All sign-in attempts from one IP, any email — stops password spraying. */
     LOGIN_IP: rule('LOGIN_IP', { windowMinutes: 15, prodMax: 100, devMax: 1000 }),

@@ -271,7 +271,7 @@ Browser ──HTTP/JSON──►│ Web app (React + Vite)        :3000      │
 | **Frontend** | React 19.2 · TypeScript 6.0 · Vite 8.1 · Tailwind CSS 4.3 · TanStack Router 1.170 · axios 1.18 · Radix UI · Recharts 3.9 · framer-motion 12.42 · Sonner 2.0 · lucide-react 1.24 |
 | **Backend** | Node.js 22.19 · TypeScript 5.9 · Express 4.22 · Zod 3.25 · Prisma 5.22 |
 | **Database** | MariaDB 10.4.32 (the MySQL server bundled with XAMPP) |
-| **Authentication and security** | JWT access and refresh tokens · bcryptjs · Helmet · CORS · express-rate-limit · account lockout · Google Sign-In (ID token, `google-auth-library`) · Google reCAPTCHA v2 |
+| **Authentication and security** | JWT access and refresh tokens · bcryptjs · Helmet · CORS · express-rate-limit · per-browser wrong-password lock · Google Sign-In (ID token, `google-auth-library`) · Google reCAPTCHA v2 |
 | **Files, imports and exports** | Multer · file-type · adm-zip · SheetJS (xlsx) · ExcelJS · PDFKit · jsPDF |
 | **AI Assistance** | OpenAI (`gpt-4o-mini` by default) or Anthropic (Claude), behind one provider layer |
 | **Email** | Brevo transactional email API |
@@ -372,7 +372,7 @@ Browser ──HTTP/JSON──►│ Web app (React + Vite)        :3000      │
 | `jsonwebtoken` | 9.0 | access tokens (15 minutes) and refresh tokens (7 days), each refresh recorded as a session row |
 | `bcryptjs` | 2.4 | password hashing |
 | `google-auth-library` | 10.9 | **Continue with Google**: verifies the Google ID token's signature, that it was issued for HRISense (`GOOGLE_CLIENT_ID`) and that the email is verified; it then signs in the existing account with that email (§4.1) |
-| Account rules | — | 5 wrong passwords lock an account for 15 minutes; a temporary password must be changed before anything else; reset links expire |
+| Account rules | — | wrong passwords make the failing browser wait (15 s, 30 s, 1 min, then 15 min) and never lock the account; a temporary password must be changed before anything else; reset links expire |
 | Helmet | 7.2 | security headers |
 | `cors` | 2.8 | only the web app's origin (`CLIENT_URL`) may call the API |
 | `express-rate-limit` | 7.5 | per-IP, per-user and per-email limits by request type, kept in memory |
@@ -398,7 +398,7 @@ Browser ──HTTP/JSON──►│ Web app (React + Vite)        :3000      │
 | **Brevo** | transactional email API over HTTPS | welcome credentials, password resets and applicant emails; off unless `ENABLE_TRANSACTIONAL_EMAILS` is set (§4.9) |
 | **Nager.Date** | public-holiday API over HTTPS (`axios`) | suggested Philippine holidays for the Holiday & Work Calendar (§10) |
 | **Google Identity Services** | Google's sign-in button script in the browser; the API verifies the ID token | **Continue with Google** on `/login`, for existing accounts only; on when `GOOGLE_CLIENT_ID` is set (§4.1) |
-| **Google reCAPTCHA v2** | the "I'm not a robot" checkbox in the browser; the API checks each token with Google (`siteverify`) using the secret key | every public application, and sign-in after repeated failures; on when `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` are both set (§4.1, §17.5) |
+| **Google reCAPTCHA v2** | the "I'm not a robot" checkbox in the browser; the API checks each token with Google (`siteverify`) using the secret key | every sign-in, every Forgot password request and every public application; on when `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` are both set (§4.1, §17.5) |
 
 **Live updates and automation**
 
@@ -698,28 +698,42 @@ These URLs exist only so old links keep working:
 
 **Sign in (`/login`)** — email and password.
 
-- A wrong password adds one to the account's failed-attempt count. On the
-  **5th consecutive failure** the account is **locked for 15 minutes**: *"Too many
-  failed login attempts. Your account is locked for 15 minutes."* While locked:
-  *"Account is temporarily locked. Try again in N minute(s)."*
+- **Wrong passwords never lock the account.** Locking accounts would let anyone
+  who knows an email keep its owner out on purpose. Instead the **browser that
+  is failing** waits (`services/sign-in-lock.ts`): the sign-in page sends a
+  random browser id (`X-Browser-Id`, kept in local storage), and each wrong
+  sign-in from that browser on that network locks it for longer — **15 seconds,
+  30 seconds, 1 minute, then 15 minutes** for every further one. The response
+  carries `Retry-After`, and the button counts down (*"Try again in 15s"*).
+  While the wait runs, every attempt is refused before anything else is checked
+  (429, `SIGN_IN_LOCKED`, *"Too many wrong sign-in attempts. Please try again in
+  N seconds/minutes."*). A successful sign-in clears that browser's failures;
+  otherwise they are forgotten an hour after the last one. Another browser — the
+  owner's — is unaffected. Requests with no valid browser id share one wait per
+  network. The waits are kept in memory, like the rate limiters, so an API
+  restart clears them. The account's failed-attempt count is still kept for
+  HR's account panel, but never locks it.
+- An account HR locked on purpose (**Lock**, §4.2) is refused: *"Account is
+  temporarily locked. Try again in N minute(s)."*
 - A deactivated account is refused: *"Your account has been deactivated. Contact HR."*
 - A wrong email or password shows the same message for both, *"Invalid email or
-  password"*, so the screen does not reveal which accounts exist.
+  password"*, and both start the same wait, so the screen does not reveal which
+  accounts exist.
 - A successful sign-in resets the failure count and creates a **session**.
 - Every attempt is audited: `LOGIN_SUCCESS` or `LOGIN_FAILED`.
-- **"I'm not a robot" after repeated failures** (reCAPTCHA v2 checkbox, when
+- **"I'm not a robot" on every sign-in** (reCAPTCHA v2 checkbox, when
   `RECAPTCHA_SITE_KEY` and `RECAPTCHA_SECRET_KEY` are set in
-  `apps/api/.env.local`). Normal sign-in has no checkbox. After **3 failed
-  sign-ins for one email**, or **10 from one network**, within 15 minutes, the
-  API answers with the header `X-Captcha-Required` and the page shows the
-  checkbox; until it is ticked, even the right password is refused (*"Please tick
-  "I'm not a robot" to continue."*, `CAPTCHA_REQUIRED`). Failures are counted by
-  the typed email, so an email with no account behaves exactly like one with an
-  account. A successful sign-in clears that email's count. The server checks
-  each token with Google (`siteverify`) using the secret key, which never leaves
-  the server; if Google cannot be reached the sign-in is refused, not waved
-  through (`CAPTCHA_UNAVAILABLE`). Google sign-in has no checkbox (Google checks
-  for bots itself). `GET /api/v1/auth/captcha-config` gives pages only
+  `apps/api/.env.local`). The checkbox is on the sign-in page from the start, and
+  the button reads **Please finish the CAPTCHA** and cannot be pressed until it is
+  ticked. A token works once, so the box clears after every failed attempt. The
+  API refuses a sign-in without a valid token before checking the password
+  (*"Please tick "I'm not a robot" to continue."*, `CAPTCHA_REQUIRED`; an expired
+  or rejected one is `CAPTCHA_FAILED`). The same checkbox is required on
+  **Forgot password** and on the public job application. The server checks each
+  token with Google (`siteverify`) using the secret key, which never leaves the
+  server; if Google cannot be reached the request is refused, not waved through
+  (`CAPTCHA_UNAVAILABLE`). Google sign-in has no checkbox (Google checks for bots
+  itself). `GET /api/v1/auth/captcha-config` gives pages only
   `{ enabled, siteKey }`.
 
 **Continue with Google (optional)** — below the form, when the server has a
@@ -789,7 +803,9 @@ session keeps working. Email verification codes (OTP) for password changes are
 **not yet in place** — planned once email delivery is set up beyond local
 development.
 
-**Forgot password (`/forgot-password`)** — enter an email. If an account exists,
+**Forgot password (`/forgot-password`)** — enter an email and tick *"I'm not a
+robot"* (when reCAPTCHA is on; the button reads **Please finish the CAPTCHA**
+until then). If an account exists,
 a reset link valid for **60 minutes** is emailed (`PASSWORD_RESET_REQUESTED`
 audited). The screen responds the same way whether or not the email exists.
 
@@ -1100,10 +1116,10 @@ Notes:
   Applications are layered: a wide per-IP limit (checked before the upload is
   read, so a flood never writes files), a per-email limit (refused uploads are
   deleted) and the existing one-application-per-opening rule.
-- **Account lockout is separate** and unchanged: five wrong passwords lock the
-  account for 15 minutes, whatever the rate limits allow. Also separate: after
-  3 failed sign-ins for one email (or 10 from one address) in 15 minutes, the
-  sign-in needs the *"I'm not a robot"* checkbox (§4.1).
+- **The wrong-password browser lock is separate** (§4.1): each wrong sign-in
+  makes the failing browser wait 15 seconds, 30 seconds, 1 minute, then 15
+  minutes, whatever the rate limits allow. Accounts are never locked by wrong
+  passwords, and *"I'm not a robot"* is required on every sign-in.
 - **The Google unregistered-email limit is 5 in development too** (not ten
   times higher), so the block can be seen locally.
 - **Bulk actions** are one request each, so batches are capped instead: at most
