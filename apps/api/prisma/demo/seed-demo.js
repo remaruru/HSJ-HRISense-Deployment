@@ -30,6 +30,7 @@ const path = require('path');
 const { PrismaClient, Prisma } = require('@prisma/client');
 const { getDemoPassword, hashDemoPassword, isDemoEmail, DEMO_PASSWORD_ENV } = require('./demo-accounts');
 const { seedDevAccounts } = require('../../src/scripts/seed_dev_accounts');
+const { seedTeamAccounts } = require('./team-accounts');
 
 const DATA_FILE = path.join(__dirname, 'demo-data.json');
 const CHUNK = 200;
@@ -268,6 +269,8 @@ async function main() {
   if (!DRY_RUN) {
     // Any active job role still without a demo account gets one.
     await seedDevAccounts({ prisma });
+    // The team's own HR accounts (passwords from TEAM_ACCOUNT_PASSWORDS).
+    await seedTeamAccounts({ prisma });
   }
   const createdAny = result.summary.some((s) => s.name === 'User' && s.created > 0);
   if (createdAny || RESET_PASSWORDS) console.log(`\nDemo account password: the value of ${DEMO_PASSWORD_ENV} (not shown).`);
