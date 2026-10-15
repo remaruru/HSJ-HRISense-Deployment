@@ -1367,7 +1367,15 @@ function FullscreenOrgChartWorkspace({
   const [scale, setScale] = useState<number>(1.0);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 40 });
   const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef<{ x: number; y: number; initialPanX: number; initialPanY: number } | null>(null);
+  const dragStartRef = useRef<{
+    x: number;
+    y: number;
+    initialPanX: number;
+    initialPanY: number;
+    pointerId: number;
+    /** Becomes true once the pointer has moved far enough to count as a drag. */
+    moved: boolean;
+  } | null>(null);
 
   // Manual zoom protection flag — prevents auto-fit from immediately overwriting user zoom
   const userHasManuallyZoomedRef = useRef<boolean>(false);
@@ -1399,37 +1407,58 @@ function FullscreenOrgChartWorkspace({
   }, [onClose]);
 
   // ── Pointer Drag Handlers ──────────────────────────────────────────────────
+  // Mouse, touch and pen alike. A drag may start anywhere on the canvas —
+  // including on a card, which on a phone covers most of the screen — except on
+  // a control. It only becomes a drag after the pointer has moved a few pixels,
+  // so a tap on a card's name or button still works as a tap.
+  const PAN_THRESHOLD_PX = 6;
+
   const handlePointerDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('.no-pan, button, input, select, a, [role="button"]')) {
+    if (target.closest('button, input, select, textarea, a, [role="button"]')) {
       return;
     }
-    if (e.button !== 0) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (dragStartRef.current) return; // a second finger does not restart the drag
 
-    setIsDragging(true);
     dragStartRef.current = {
       x: e.clientX,
       y: e.clientY,
       initialPanX: panOffset.x,
       initialPanY: panOffset.y,
+      pointerId: e.pointerId,
+      moved: false,
     };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging || !dragStartRef.current) return;
-    const dx = e.clientX - dragStartRef.current.x;
-    const dy = e.clientY - dragStartRef.current.y;
+    const start = dragStartRef.current;
+    if (!start || e.pointerId !== start.pointerId) return;
+    const dx = e.clientX - start.x;
+    const dy = e.clientY - start.y;
+    if (!start.moved) {
+      if (Math.hypot(dx, dy) < PAN_THRESHOLD_PX) return;
+      start.moved = true;
+      setIsDragging(true);
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        // Capture is a convenience (it keeps the drag when the pointer leaves
+        // the canvas); panning works without it.
+      }
+    }
     setPanOffset({
-      x: dragStartRef.current.initialPanX + dx,
-      y: dragStartRef.current.initialPanY + dy,
+      x: start.initialPanX + dx,
+      y: start.initialPanY + dy,
     });
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (isDragging) {
-      setIsDragging(false);
-      dragStartRef.current = null;
+    const start = dragStartRef.current;
+    if (!start || e.pointerId !== start.pointerId) return;
+    dragStartRef.current = null;
+    setIsDragging(false);
+    if (start.moved) {
       try {
         (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
       } catch {
@@ -1689,14 +1718,16 @@ function FullscreenOrgChartWorkspace({
         onPointerCancel={handlePointerUp}
         onWheel={handleWheel}
         className={cn(
-          "flex-1 relative overflow-hidden bg-slate-950 transition-colors",
+          // touch-none: on phones and tablets the browser would otherwise take
+          // the finger drag for its own scrolling and cancel ours at once.
+          "flex-1 relative overflow-hidden bg-slate-950 transition-colors touch-none",
           isDragging ? "cursor-grabbing" : "cursor-grab"
         )}
       >
         {/* Canvas Background Hint */}
         <div className="absolute bottom-4 left-6 z-20 flex items-center gap-2 pointer-events-none text-muted-foreground text-xs bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800">
           <Move className="h-3.5 w-3.5" />
-          <span>Click & Drag to pan</span>
+          <span>Drag to move around</span>
         </div>
 
         {showOversight && (

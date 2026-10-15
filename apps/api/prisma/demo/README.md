@@ -10,7 +10,8 @@ and example records used to demonstrate the system.
 | `demo-accounts.js` | Shared rules: demo login domain, password policy, bcrypt hashing. |
 | `export-demo-data.js` | Rebuilds `demo-data.json` from a **local** development database. |
 | `../../src/scripts/seed_dev_accounts.js` | Gives any active job role without one a demo account. `seed-demo.js` runs it at the end. |
-| `team-accounts.js` | The team's own HR accounts (see below). `seed-demo.js` runs it last; it does nothing unless `TEAM_ACCOUNT_PASSWORDS` is set. |
+| `team-accounts.js` | The team's own HR accounts (see below). `seed-demo.js` runs it after the demo accounts; it does nothing unless `TEAM_ACCOUNT_PASSWORDS` is set. |
+| `sample-schedules.js` | Sample weekly schedules and timekeeping codes (see below). Runs once per database. |
 
 ## Deploying
 
@@ -143,6 +144,21 @@ landing page:
   Management.
 - These accounts are real people's, so the demo export never includes them
   (its privacy check rejects `tip.edu.ph` addresses).
+
+## Sample schedules and timekeeping codes
+
+`sample-schedules.js` gives every active employee **outside the HR department**
+a weekly schedule from **1 September 2026**, chosen by job role (`ROLE_PATTERNS`):
+office staff work the split office day (8–12 and 1–6) Monday to Friday, care
+and support staff work 6AM–2PM or 2PM–10PM six days a week with a rest day that
+differs between roles, and the part-time psychologist works mornings on Monday,
+Wednesday and Friday. It also gives a biometric code to the employees that had
+none (`MISSING_CODES`), so a timekeeping file can match everyone.
+
+It runs **once per database**: a `system_settings` row
+(`demo.sample_schedules_seeded`) records the run, so later deploys never
+re-create a schedule HR has changed or removed. Even on that run, an employee
+who already has a weekly schedule, and a code already in use, are left alone.
 
 ## What the dataset contains
 
