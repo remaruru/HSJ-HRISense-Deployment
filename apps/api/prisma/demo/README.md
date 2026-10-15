@@ -10,6 +10,7 @@ and example records used to demonstrate the system.
 | `demo-accounts.js` | Shared rules: demo login domain, password policy, bcrypt hashing. |
 | `export-demo-data.js` | Rebuilds `demo-data.json` from a **local** development database. |
 | `../../src/scripts/seed_dev_accounts.js` | Gives any active job role without one a demo account. `seed-demo.js` runs it at the end. |
+| `team-accounts.js` | The team's own HR accounts (see below). `seed-demo.js` runs it last; it does nothing unless `TEAM_ACCOUNT_PASSWORDS` is set. |
 
 ## Deploying
 
@@ -25,8 +26,10 @@ npm start
 ```
 
 Run these in `apps/api` (from the repository root, add `--workspace=apps/api`
-to the npm commands). `DEMO_ACCOUNT_PASSWORD` is the password every demo account
-gets. Set it in the hosting service's environment settings, never in a committed
+to the npm commands). On the hosted site, Railway's pre-deploy step runs 1 and 2
+on every deploy, which is safe because the seed never changes existing rows
+(see [`docs/DEVELOPMENT_SETUP.md`](../../../../docs/DEVELOPMENT_SETUP.md) §6).
+`DEMO_ACCOUNT_PASSWORD` is the password every demo account gets. Set it in the hosting service's environment settings, never in a committed
 file. It must have at least 8 characters, with an uppercase letter, a lowercase
 letter, a number and a special character (the same rule as the login).
 
@@ -115,6 +118,31 @@ Google account there, so no outsider can take a demo account over through
 
 A few logins do not match their role's name (for example `preschool@` is the CIP
 Coordinator). They are kept exactly as they were in the local demo database.
+
+## The team's HR accounts
+
+`team-accounts.js` adds three **Human Resource Officer** accounts for the
+HRISense team — the names and `@tip.edu.ph` emails already listed on the public
+landing page:
+
+| Employee no. | Name | Login |
+|---|---|---|
+| TEAM-HRD-001 | Earl Angelo Roldan | mearoldan@tip.edu.ph |
+| TEAM-HRD-002 | Enzo Benedict Rosales | mebrosales@tip.edu.ph |
+| TEAM-HRD-003 | Maria Cielo Salazar | mmcsalazar02@tip.edu.ph |
+
+- **Passwords are not in this repository.** Set `TEAM_ACCOUNT_PASSWORDS` in the
+  hosting service's environment settings, as JSON mapping each email to its
+  password: `{"mearoldan@tip.edu.ph": "…", …}`. Each password must meet the
+  same rule as `DEMO_ACCOUNT_PASSWORD` and is stored only as a bcrypt hash.
+  Without the variable, this step is skipped.
+- **Created once.** An email that already has an account is left exactly as it
+  is — a redeploy never resets a password someone changed.
+- Gender, date of birth, address and contacts are **placeholders** (gender is
+  "Prefer not to say"); each person corrects their own record in Employee
+  Management.
+- These accounts are real people's, so the demo export never includes them
+  (its privacy check rejects `tip.edu.ph` addresses).
 
 ## What the dataset contains
 

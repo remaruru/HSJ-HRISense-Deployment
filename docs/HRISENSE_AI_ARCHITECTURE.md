@@ -1,8 +1,11 @@
 # HSJ HRISense — AI Assistance Architecture
 
-> **Status:** implemented 1 October 2026; analytical view verified and completed the same day (§19). Works end-to-end without an AI key
-> (it reports itself unavailable and still serves Help Center guides); adding one
-> provider key switches on AI answers. User-facing description: §20 of
+> **Status:** implemented 1 October 2026, analytical view completed the same day
+> (§19); last checked against the code 15 October 2026. Works end-to-end without
+> an AI key (it reports itself unavailable and still serves Help Center guides
+> and Quick analytics); adding one provider key switches on AI answers — in
+> `apps/api/.env.local` locally, or as an environment variable on the host
+> (§13). User-facing description: §20 of
 > [`HRISENSE_SYSTEM_REFERENCE.md`](HRISENSE_SYSTEM_REFERENCE.md).
 
 ## 1. What it is, in one paragraph
@@ -26,7 +29,7 @@ sequenceDiagram
     participant O as Orchestrator
     participant M as AI provider (OpenAI / Anthropic)
     participant T as Tool registry + tools
-    participant DB as MariaDB
+    participant DB as MySQL / MariaDB
     U->>R: { message, conversationId? }  (nothing else accepted)
     R->>R: JWT verified · body validated strictly · per-user rate limit
     R->>O: handle(userId from token, message)
@@ -223,14 +226,14 @@ Philippine government ID formats (SSS, PhilHealth, Pag-IBIG, TIN); caps length.
 ## 8. Knowledge: the Help Center is the source
 
 `scripts/ai/build-knowledge.ts` compiles
-`apps/web/src/pages/HelpCenter/guides/*.guides.ts` (79 guides, with the roles
-each is published to) and `docs/HRISENSE_SYSTEM_REFERENCE.md` (110 sections,
+`apps/web/src/pages/HelpCenter/guides/*.guides.ts` (90 guides, with the roles
+each is published to) and `docs/HRISENSE_SYSTEM_REFERENCE.md` (123 sections,
 each tagged with the tiers it concerns; the generated API/data/enum appendices
 are excluded) into `src/services/ai/knowledge/knowledge.generated.json`.
 
 * Instructions are written **once** — in the guides and the reference. Edit
   those, then `npm run ai:knowledge --workspace=apps/api` (it also runs before
-  `dev` and `build`).
+  `dev` and `build`, so a hosted build always compiles the current bundle).
 * A unit test fails if the bundle is stale (`ai:knowledge:check`).
 * Search is BM25-style and **filters by tier before searching**; an employee
   cannot retrieve an HR-only guide even by exact slug.
@@ -320,12 +323,16 @@ Placeholder keys (`your-…-here`, `changeme`…) are treated as not configured.
 `GET /ai/status` reports configuration only — never key material, never a
 reachability claim.
 
-**Turning it on:** put the key in **`apps/api/.env.local`** (e.g.
-`OPENAI_API_KEY=sk-…`) and restart the API. Nothing else changes.
+**Turning it on:**
 
-`.env.local` is git-ignored; `apps/api/.env` is **tracked by git** (committed
-before the ignore rule existed), so a key placed there would be pushed with the
-next commit. Precedence: real environment variables > `.env.local` > `.env`
+* **Locally:** put the key in **`apps/api/.env.local`** (e.g.
+  `OPENAI_API_KEY=sk-…`) and restart the API.
+* **Hosted:** add the same variable in the hosting service's environment
+  settings (on the live site, the API service's variables) and redeploy.
+
+Nothing else changes. In this repository every `.env` file is git-ignored and
+only the `*.env.example` templates are committed, so a key can never be pushed
+with the code. Precedence: real environment variables > `.env.local` > `.env`
 (`src/config/env.ts`).
 
 If the provider account has no credit left, the assistant says exactly that
@@ -347,13 +354,13 @@ If the provider account has no credit left, the assistant says exactly that
 
 `apps/api/src/services/ai/__tests__/` — run with `npm test --workspace=apps/api`.
 
-* **`ai-units.test.ts` (47, no database):** the attendance calculation (every status rule, null coverage without a schedule, totals from sums, period keys, empty datasets refused), input guard (secrets, SQL, injection,
+* **`ai-units.test.ts` (51, no database):** the attendance calculation (every status rule, null coverage without a schedule, totals from sums, period keys, empty datasets refused), input guard (secrets, SQL, injection,
   false role claims, payroll, off-topic, and the legitimate questions that must
   pass), output guard, link allowlist, chart building and schema, role-filtered
   knowledge search, knowledge bundle in sync, strict tool schemas, tier tool
   lists, UUID-only ids, policy content and exact refusal wording, configuration
   and key checks, Anthropic message mapping, the compliance scope fix.
-* **`ai-assistant.integration.test.ts` (60, `hrisense_migration_dev_db`):** exact attendance figures for a fixture with every status, leave, a holiday, days off and a record-less workday; monthly trends with a no-data month; August vs September; the range schedule resolver equals the per-day one; chart labels limited to the asker's scope (team, another supervisor's team, organisation, another employee); bar/line/area/pie through the whole pipeline; every Quick analytics view per tier with no provider; quick views outside the tier refused and not widenable over HTTP; follow-up context carries the chart the user saw; and:
+* **`ai-assistant.integration.test.ts` (59, `hrisense_migration_dev_db`):** exact attendance figures for a fixture with every status, leave, a holiday, days off and a record-less workday; monthly trends with a no-data month; August vs September; the range schedule resolver equals the per-day one; chart labels limited to the asker's scope (team, another supervisor's team, organisation, another employee); bar/line/area/pie through the whole pipeline; every Quick analytics view per tier with no provider; quick views outside the tier refused and not widenable over HTTP; follow-up context carries the chart the user saw; and:
   builds an organisation (HR, a supervisor, two direct reports, a same-unit
   colleague who is *not* a report, an outsider) and proves: employees read only
   themselves (every person tool against every other person); fake ids are
@@ -417,9 +424,9 @@ If the provider account has no credit left, the assistant says exactly that
 * Attendance hours and statuses are only as complete as the imports (Appendix
   E.4 #13, #16, #17 of the reference); approved leave is taken from Leave
   records, not attendance statuses.
-* Not yet verified against a live provider in this environment: no key was
-  configured while building it; all behaviour above was proven with a scripted
-  model. Quick analytics need no provider and can be checked now.
+* The tests prove the behaviour with a scripted model; a real provider was
+  checked for the HR summary (§19.6). Answer quality with any other model or
+  provider depends on that model. Quick analytics need no provider.
 
 ## 19. The analytical view
 
@@ -521,7 +528,7 @@ Supervisor team analytics follow the same path with `get_team_attendance`
 
 ### 19.5 How it was verified
 
-* API tests above (107 AI tests, 0 failures).
+* API tests above (110 AI tests, 0 failures).
 * **Rendering:** the 39 chart payloads the integration run produced from the
   database (bar, line, area, pie) were validated with the browser's own schema
   and rendered through the real `AssistantChart` (React 19 + Recharts 3) in a
