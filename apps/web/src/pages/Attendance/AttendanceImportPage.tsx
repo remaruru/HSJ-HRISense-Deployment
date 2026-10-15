@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
 import { CodeMappingPanel } from './components/CodeMappingPanel';
 import { IdentityIssuesPanel } from './components/IdentityIssuesPanel';
+import { ImportDecisionsDialog } from './components/ImportDecisionsDialog';
 import {
   AttendanceImportService, CLASSIFICATION_LABELS, FLAG_LABELS,
   type ImportBatch, type ImportCandidate, type ImportClassification, type ImportPreview,
@@ -71,6 +72,7 @@ export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean
   const [filter, setFilter] = useState<ImportClassification | ''>('');
   const [page, setPage] = useState(1);
   const [applying, setApplying] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   // A failed history load is not "nothing imported yet".
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -144,7 +146,10 @@ export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean
   };
 
   const batch = preview?.batch;
+  // The API's own count — the same rows its apply gate checks, held new days
+  // included (missing clock-outs, holidays, days off …), not just conflicts.
   const needsDecision =
+    preview?.pendingDecisions ??
     (batch?.countConflict ?? 0) + (batch?.countConflictManual ?? 0) + (batch?.countEnrichment ?? 0);
 
   const actions = (
@@ -332,23 +337,40 @@ export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              {needsDecision > 0
-                ? `${needsDecision} record${needsDecision === 1 ? '' : 's'} need a decision before this import can be applied.`
-                : 'Every record has a decision.'}
-            </p>
+            {needsDecision > 0 ? (
+              <button
+                type="button"
+                onClick={() => setReviewOpen(true)}
+                className="inline-flex items-center gap-1.5 text-sm font-semibold text-status-warning-foreground hover:underline underline-offset-2"
+              >
+                <AlertTriangle className="h-4 w-4" />
+                {needsDecision} record{needsDecision === 1 ? '' : 's'} need a decision before this import can be applied — review them
+              </button>
+            ) : (
+              <p className="text-sm text-muted-foreground">Every record has a decision.</p>
+            )}
             <div className="flex items-center gap-2">
               {filter && <Button variant="outline" size="sm" onClick={() => { setFilter(''); setPage(1); }}>Clear filter</Button>}
+              {/* With records still waiting, Apply opens the review window instead. */}
               <Button
                 variant="solid"
-                onClick={handleApply}
-                disabled={applying || batch.status !== 'VALIDATED' || needsDecision > 0}
-                title={needsDecision > 0 ? 'Decide on every conflict first' : undefined}
+                onClick={() => (needsDecision > 0 ? setReviewOpen(true) : handleApply())}
+                disabled={applying || batch.status !== 'VALIDATED'}
               >
                 <CheckCircle2 /> {applying ? 'Applying…' : 'Apply import'}
               </Button>
             </div>
           </div>
+
+          {activeId && (
+            <ImportDecisionsDialog
+              batchId={activeId}
+              open={reviewOpen}
+              onOpenChange={setReviewOpen}
+              onChanged={() => { loadPreview(activeId, filter, page); loadBatches(); }}
+              onApply={handleApply}
+            />
+          )}
 
           <div className="bg-surface border border-border rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
@@ -399,6 +421,8 @@ function PreviewRow({
   const overlaps = flags.filter((f) => OVERLAP_FLAGS.has(f));
   const others = flags.filter((f) => !OVERLAP_FLAGS.has(f));
   const decidable = ['CONFLICT', 'CONFLICT_MANUAL', 'ENRICHMENT'].includes(row.classification);
+  // A new day held by its review flags is decided too: import it, or skip it.
+  const heldNew = row.classification === 'NEW' && !!row.held;
 
   return (
     <tr className="border-b border-border last:border-0 align-top">
@@ -476,6 +500,23 @@ function PreviewRow({
               onClick={() => onDecide([row.id], 'KEEP_EXISTING')}
             >
               Keep record
+            </Button>
+          </div>
+        ) : heldNew ? (
+          <div className="flex justify-end gap-1.5">
+            <Button
+              variant={row.hrDecision === 'USE_UPLOADED' ? 'create' : 'outline'}
+              size="xs"
+              onClick={() => onDecide([row.id], 'USE_UPLOADED')}
+            >
+              Import
+            </Button>
+            <Button
+              variant={row.hrDecision === 'SKIP' ? 'review' : 'outline'}
+              size="xs"
+              onClick={() => onDecide([row.id], 'SKIP')}
+            >
+              Skip
             </Button>
           </div>
         ) : (

@@ -17,7 +17,7 @@ import {
   type ExistingRecordState,
 } from './classification.service';
 import { AttendanceDayContextService, DAY_FLAGS } from './day-context.service';
-import { heldReason } from './review-flags';
+import { heldReason, isHeld } from './review-flags';
 import { flagForVerdict, verifyIdentity, type IdentityCheck } from './identity-verification.service';
 import { MustardParseError, MustardSeedtimeReader } from './mustard-seedtime.reader';
 import {
@@ -426,7 +426,30 @@ export class AttendanceImportService {
 
   // ── 3. Preview ─────────────────────────────────────────────────────────────
 
-  static async getPreview(batchId: string, filters: { classification?: string; page?: number; limit?: number }) {
+  /**
+   * Rows that still need HR's decision before the batch can be applied — the
+   * same set the apply gate counts, so the screen and the gate never disagree.
+   */
+  private static pendingWhere(batchId: string): Prisma.AttendanceImportCandidateWhereInput {
+    return {
+      batchId,
+      appliedAt: null,
+      hrDecision: AttendanceImportDecision.PENDING,
+      classification: {
+        in: [
+          AttendanceImportClassification.NEW,
+          AttendanceImportClassification.CONFLICT,
+          AttendanceImportClassification.CONFLICT_MANUAL,
+          AttendanceImportClassification.ENRICHMENT,
+        ],
+      },
+    };
+  }
+
+  static async getPreview(
+    batchId: string,
+    filters: { classification?: string; needsDecision?: boolean; page?: number; limit?: number }
+  ) {
     const batch = await prisma.attendanceImportBatch.findUnique({
       where: { id: batchId },
       include: { uploadedByUser: { select: { email: true } } },
@@ -436,12 +459,14 @@ export class AttendanceImportService {
     const page = Math.max(1, filters.page ?? 1);
     const limit = Math.min(200, Math.max(1, filters.limit ?? 50));
 
-    const where: Prisma.AttendanceImportCandidateWhereInput = {
-      batchId,
-      ...(filters.classification ? { classification: filters.classification as AttendanceImportClassification } : {}),
-    };
+    const where: Prisma.AttendanceImportCandidateWhereInput = filters.needsDecision
+      ? this.pendingWhere(batchId)
+      : {
+          batchId,
+          ...(filters.classification ? { classification: filters.classification as AttendanceImportClassification } : {}),
+        };
 
-    const [rows, total, unmatched] = await Promise.all([
+    const [found, total, unmatched, pendingDecisions] = await Promise.all([
       prisma.attendanceImportCandidate.findMany({
         where,
         include: {
@@ -458,7 +483,10 @@ export class AttendanceImportService {
         where: { batchId, classification: AttendanceImportClassification.UNKNOWN_EMPLOYEE },
         _count: { _all: true },
       }),
+      prisma.attendanceImportCandidate.count({ where: this.pendingWhere(batchId) }),
     ]);
+    // `held`: a new day HR must still accept or skip because of its review flags.
+    const rows = found.map((r) => ({ ...r, held: isHeld(r.reviewFlags as string[] | null) }));
 
     // ── who each troublesome code looks like ────────────────────────────────
     //
@@ -505,6 +533,8 @@ export class AttendanceImportService {
       batch,
       rows,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+      /** How many rows still need HR's decision before Apply can succeed. */
+      pendingDecisions,
       unmatchedCodes: unmatched
         .map((u) => {
           const id = u.sourceEmployeeCode ? identityByCode.get(u.sourceEmployeeCode) : undefined;

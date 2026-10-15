@@ -5,7 +5,7 @@ import {
   AlertTriangle, ShieldAlert, Maximize2, Minimize2,
   UserX, UserCog, Heart, Building2, ChevronUp,
   ZoomIn, ZoomOut, RotateCcw, X, Layers, CheckCircle2,
-  Move, Target, Terminal, Eye
+  Move, Target, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -341,7 +341,8 @@ function OversightToggle({ checked, onChange, dark = false }: { checked: boolean
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={cn(
-        "no-pan inline-flex items-center gap-2 rounded-lg border px-2.5 py-1 text-xs font-semibold transition-colors",
+        // Finger-sized on phones, compact from md up.
+        "no-pan inline-flex items-center gap-2 rounded-lg border px-3 py-2.5 md:px-2.5 md:py-1 text-sm md:text-xs font-semibold transition-colors",
         dark ? "border-slate-800 bg-slate-950 text-slate-200 hover:text-white" : "border-border bg-surface text-foreground hover:bg-muted/60"
       )}
     >
@@ -1380,23 +1381,6 @@ function FullscreenOrgChartWorkspace({
   // Manual zoom protection flag — prevents auto-fit from immediately overwriting user zoom
   const userHasManuallyZoomedRef = useRef<boolean>(false);
 
-  // Dev Diagnostics Panel State
-  const [showDevPanel, setShowDevPanel] = useState<boolean>(true);
-  const [rootToUnitCount, setRootToUnitCount] = useState<number>(0);
-  const [employeePathCount, setEmployeePathCount] = useState<number>(0);
-
-  // Calculate Expected Employee Connector Count from dataset
-  const expectedEmployeeConnectors = useMemo(() => {
-    const activeNodeIds = new Set(nodes.filter(n => !n.isArchived).map(n => n.id));
-    let count = 0;
-    nodes.forEach(n => {
-      if (!n.isArchived && n.immediateSupervisorId && activeNodeIds.has(n.immediateSupervisorId)) {
-        count++;
-      }
-    });
-    return count;
-  }, [nodes]);
-
   // Keyboard Escape listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1564,77 +1548,66 @@ function FullscreenOrgChartWorkspace({
     return () => observer.disconnect();
   }, [handleFitScreen]);
 
-  // Live Measurements for Dev Panel & Evidence Report
-  const liveStats = useMemo(() => {
-    const wsW = workspaceRef.current?.clientWidth || 0;
-    const wsH = workspaceRef.current?.clientHeight || 0;
-    const cW = contentRef.current ? (contentRef.current.scrollWidth || contentRef.current.offsetWidth) : 0;
-    const cH = contentRef.current ? (contentRef.current.scrollHeight || contentRef.current.offsetHeight) : 0;
-    const sX = cW > 0 ? (wsW - 80) / cW : 0;
-    const sY = cH > 0 ? (wsH - 80) / cH : 0;
-    const fit = Math.min(sX, sY);
-
-    return { wsW, wsH, cW, cH, sX, sY, fit };
-  }, [scale, panOffset, fullscreenMode, selectedUnit]);
-
   const canvasLayoutKey = `${fullscreenMode}|${selectedUnit}|${[...expandedNodeIds].sort().join(",")}|${nodes.length}|${showOversight}`;
 
   return (
     <OversightProvider show={showOversight} data={oversight} people={oversightPeople}>
     <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col overflow-hidden text-slate-100 select-none">
 
-      {/* Top Controls Bar */}
-      <div className="no-pan bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-6 py-3 flex flex-wrap items-center justify-between gap-4 z-30 shadow-md">
-        
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-primary-600 flex items-center justify-center font-bold text-white shadow-sm">
-            <Heart className="h-4 w-4 fill-white" />
+      {/* Top Controls Bar — on phones each group takes its own full-width row,
+          with finger-sized (40 px) controls; from md up it is the compact
+          single bar it always was. */}
+      <div className="no-pan bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 md:px-6 flex flex-wrap items-center justify-between gap-3 md:gap-4 z-30 shadow-md">
+
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="h-10 w-10 md:h-8 md:w-8 rounded-lg bg-primary-600 flex items-center justify-center font-bold text-white shadow-sm shrink-0">
+            <Heart className="h-5 w-5 md:h-4 md:w-4 fill-white" />
           </div>
-          <div>
-            <h2 className="text-sm font-bold text-white font-heading">Org Chart Workspace</h2>
-            <p className="text-[11px] text-muted-foreground">Full Pyramid Tree Workspace</p>
+          <div className="min-w-0 flex-1 md:flex-none">
+            <h2 className="text-base md:text-sm font-bold text-white font-heading">Org Chart Workspace</h2>
+            <p className="text-xs md:text-[11px] text-muted-foreground">Full Pyramid Tree Workspace</p>
           </div>
 
           {/* Mode Switcher */}
-          <div className="bg-slate-950 p-1 rounded-lg border border-slate-800 flex items-center gap-1 ml-4">
+          <div className="bg-slate-950 p-1 rounded-lg border border-slate-800 flex items-center gap-1 w-full sm:w-auto md:ml-4">
             <button
               onClick={() => setFullscreenMode("FULL_ORG")}
               className={cn(
-                "no-pan px-3 py-1 text-xs rounded-md font-medium transition-all",
+                "no-pan flex-1 sm:flex-none px-3 py-2.5 md:py-1 text-sm md:text-xs rounded-md font-medium transition-all",
                 fullscreenMode === "FULL_ORG" ? "bg-primary-600 text-white shadow-sm" : "text-muted-foreground hover:text-white"
               )}
             >
-              <Layers className="h-3.5 w-3.5 inline mr-1.5" /> Full Organization
+              <Layers className="h-4 w-4 md:h-3.5 md:w-3.5 inline mr-1.5" /> Full Organization
             </button>
             <button
               onClick={() => setFullscreenMode("UNIT")}
               className={cn(
-                "no-pan px-3 py-1 text-xs rounded-md font-medium transition-all",
+                "no-pan flex-1 sm:flex-none px-3 py-2.5 md:py-1 text-sm md:text-xs rounded-md font-medium transition-all",
                 fullscreenMode === "UNIT" ? "bg-primary-600 text-white shadow-sm" : "text-muted-foreground hover:text-white"
               )}
             >
-              <Building2 className="h-3.5 w-3.5 inline mr-1.5" /> Selected Unit
+              <Building2 className="h-4 w-4 md:h-3.5 md:w-3.5 inline mr-1.5" /> Selected Unit
             </button>
           </div>
         </div>
 
         {/* Search & Unit Filter */}
-        <div className="flex items-center gap-3 flex-1 max-w-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 md:gap-3 w-full md:w-auto md:flex-1 md:max-w-xl">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 md:h-3.5 md:w-3.5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search employee..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="no-pan w-full pl-8 pr-3 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-primary-500"
+              className="no-pan w-full pl-9 md:pl-8 pr-3 py-2.5 md:py-1.5 text-sm md:text-xs bg-slate-950 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-primary-500"
             />
           </div>
 
           <select
             value={selectedUnit}
             onChange={(e) => setSelectedUnit(e.target.value)}
-            className="no-pan py-1.5 px-3 text-xs bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-primary-500"
+            className="no-pan w-full sm:w-auto py-2.5 md:py-1.5 px-3 text-sm md:text-xs bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-primary-500"
           >
             <option value="ALL">All Units</option>
             {units.map((u) => (
@@ -1644,70 +1617,41 @@ function FullscreenOrgChartWorkspace({
         </div>
 
         {/* Zoom & Action Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <div className="bg-slate-950 border border-slate-800 rounded-lg flex items-center p-0.5">
-            <Button size="sm" variant="ghost" onClick={handleZoomOut} className="no-pan h-7 w-7 p-0 text-slate-300 hover:text-white" title="Zoom Out (-10%)">
-              <ZoomOut className="h-3.5 w-3.5" />
+            <Button size="sm" variant="ghost" onClick={handleZoomOut} className="no-pan h-10 w-10 md:h-7 md:w-7 p-0 text-slate-300 hover:text-white" title="Zoom Out (-10%)" aria-label="Zoom out">
+              <ZoomOut className="h-4 w-4 md:h-3.5 md:w-3.5" />
             </Button>
-            <span className="text-xs font-mono px-2 text-slate-300 min-w-12 text-center">
+            <span className="text-sm md:text-xs font-mono px-2 text-slate-300 min-w-12 text-center">
               {Math.round(scale * 100)}%
             </span>
-            <Button size="sm" variant="ghost" onClick={handleZoomIn} className="no-pan h-7 w-7 p-0 text-slate-300 hover:text-white" title="Zoom In (+10%)">
-              <ZoomIn className="h-3.5 w-3.5" />
+            <Button size="sm" variant="ghost" onClick={handleZoomIn} className="no-pan h-10 w-10 md:h-7 md:w-7 p-0 text-slate-300 hover:text-white" title="Zoom In (+10%)" aria-label="Zoom in">
+              <ZoomIn className="h-4 w-4 md:h-3.5 md:w-3.5" />
             </Button>
-            <Button size="sm" variant="ghost" onClick={handleResetZoom} className="no-pan h-7 w-7 p-0 text-slate-300 hover:text-white" title="Reset Zoom (100%)">
-              <RotateCcw className="h-3.5 w-3.5" />
+            <Button size="sm" variant="ghost" onClick={handleResetZoom} className="no-pan h-10 w-10 md:h-7 md:w-7 p-0 text-slate-300 hover:text-white" title="Reset Zoom (100%)" aria-label="Reset zoom">
+              <RotateCcw className="h-4 w-4 md:h-3.5 md:w-3.5" />
             </Button>
           </div>
 
-          <Button size="sm" variant="outline" onClick={handleExplicitFitScreen} className="no-pan h-8 text-xs bg-slate-950 border-slate-800 text-slate-200 hover:bg-slate-900 gap-1.5">
-            <Target className="h-3.5 w-3.5" /> Fit Screen
+          <Button size="sm" variant="outline" onClick={handleExplicitFitScreen} className="no-pan h-10 md:h-8 text-sm md:text-xs bg-slate-950 border-slate-800 text-slate-200 hover:bg-slate-900 gap-1.5">
+            <Target className="h-4 w-4 md:h-3.5 md:w-3.5" /> Fit Screen
           </Button>
 
           <OversightToggle checked={showOversight} onChange={setShowOversight} dark />
 
-          <Button size="sm" variant="ghost" onClick={() => setShowDevPanel(prev => !prev)} className="no-pan h-8 w-8 p-0 text-muted-foreground hover:text-white" title="Toggle Dev Diagnostics">
-            <Terminal className="h-3.5 w-3.5" />
-          </Button>
-
-          <Button size="sm" variant="ghost" onClick={fetchOrgChart} className="no-pan h-8 text-xs text-muted-foreground hover:text-white" title="Refresh">
-            <RefreshCw className="h-3.5 w-3.5" />
+          <Button size="sm" variant="ghost" onClick={fetchOrgChart} className="no-pan h-10 w-10 md:h-8 md:w-auto text-xs text-muted-foreground hover:text-white" title="Refresh" aria-label="Refresh">
+            <RefreshCw className="h-4 w-4 md:h-3.5 md:w-3.5" />
           </Button>
 
           <Button
             size="sm"
             onClick={onClose}
-            className="no-pan h-8 bg-danger/80 hover:bg-danger text-white font-semibold text-xs gap-1"
+            className="no-pan h-10 md:h-8 ml-auto md:ml-0 bg-danger/80 hover:bg-danger text-white font-semibold text-sm md:text-xs gap-1"
           >
             <X className="h-4 w-4" /> Exit Fullscreen
           </Button>
         </div>
       </div>
-
-      {/* Temporary Development Diagnostics Overlay Panel */}
-      {showDevPanel && (
-        <div className="no-pan fixed bottom-4 right-4 z-40 bg-slate-900/95 border border-slate-700 text-slate-200 rounded-xl p-3.5 shadow-2xl font-mono text-[11px] max-w-sm space-y-1.5 backdrop-blur-md">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-1.5">
-            <span className="font-bold text-warning flex items-center gap-1.5">
-              <Terminal className="h-3.5 w-3.5" /> Dev Diagnostics
-            </span>
-            <button onClick={() => setShowDevPanel(false)} className="text-muted-foreground hover:text-white text-xs">✕</button>
-          </div>
-          <div>Mode: <strong className="text-white">{fullscreenMode}</strong> | Selected Unit: <strong className="text-white">{selectedUnit}</strong></div>
-          <div>Scale State: <strong className="text-success">{(scale * 100).toFixed(0)}% ({scale})</strong></div>
-          <div>Translate: <strong className="text-slate-300">({panOffset.x.toFixed(0)}, {panOffset.y.toFixed(0)})</strong></div>
-          <div>Viewport: <strong className="text-slate-300">{liveStats.wsW} × {liveStats.wsH}</strong></div>
-          <div>Content: <strong className="text-slate-300">{liveStats.cW} × {liveStats.cH}</strong></div>
-          <div>Calculated scaleX / Y: <strong className="text-slate-300">{liveStats.sX.toFixed(2)} / {liveStats.sY.toFixed(2)}</strong></div>
-          <div>Calculated fitScale: <strong className="text-status-warning-border">{liveStats.fit.toFixed(2)}</strong></div>
-          <div className="pt-1 border-t border-slate-800 text-[10px] text-muted-foreground">
-            <div>Active Employees: {nodes.length}</div>
-            <div>Expected Employee Connectors: {expectedEmployeeConnectors}</div>
-            <div>Root-to-Unit Connectors: {rootToUnitCount}</div>
-            <div>Manual Zoom Lock Active: {userHasManuallyZoomedRef.current ? "YES (protected)" : "NO"}</div>
-          </div>
-        </div>
-      )}
 
       {/* Pointer Pan Workspace Canvas */}
       <div
@@ -1758,7 +1702,6 @@ function FullscreenOrgChartWorkspace({
                 unitRefs={unitCardRefs}
                 visibleUnitCodes={visibleUnitCodes}
                 containerRef={contentRef}
-                onPathsCalculated={setRootToUnitCount}
               />
             )}
 

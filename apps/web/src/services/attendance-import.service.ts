@@ -60,6 +60,8 @@ export interface ImportCandidate {
   classificationReason: string | null;
   existingSnapshot: Record<string, unknown> | null;
   hrDecision: ImportDecision;
+  /** A new day HR must still accept or skip because of its review flags. */
+  held?: boolean;
   appliedAt: string | null;
   applyError: string | null;
   employee: { id: string; employeeNumber: string; firstName: string; lastName: string } | null;
@@ -73,6 +75,8 @@ export interface ImportPreview {
   rows: ImportCandidate[];
   pagination: { page: number; limit: number; total: number; totalPages: number };
   unmatchedCodes: UnmatchedCode[];
+  /** How many rows still need HR's decision before Apply can succeed (the apply gate's own count). */
+  pendingDecisions?: number;
   /**
    * Codes that resolved to an employee whose name no longer matches the file —
    * the reassigned-device-number case. Held, never applied.
@@ -99,9 +103,10 @@ export const AttendanceImportService = {
     return res.data.data;
   },
 
-  async preview(batchId: string, opts: { classification?: string; page?: number; limit?: number } = {}) {
+  async preview(batchId: string, opts: { classification?: string; needsDecision?: boolean; page?: number; limit?: number } = {}) {
     const params = new URLSearchParams();
     if (opts.classification) params.set('classification', opts.classification);
+    if (opts.needsDecision) params.set('needsDecision', 'true');
     params.set('page', String(opts.page ?? 1));
     params.set('limit', String(opts.limit ?? 50));
     const res = await api.get<{ data: ImportPreview }>(`/attendance/imports/${batchId}/preview?${params}`);

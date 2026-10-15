@@ -51,6 +51,7 @@ export class AttendanceImportController {
   static async preview(req: Request, res: Response) {
     const data = await AttendanceImportService.getPreview(req.params.id, {
       classification: req.query.classification as string | undefined,
+      needsDecision: req.query.needsDecision === 'true',
       page: req.query.page ? Number(req.query.page) : undefined,
       limit: req.query.limit ? Number(req.query.limit) : undefined,
     });
