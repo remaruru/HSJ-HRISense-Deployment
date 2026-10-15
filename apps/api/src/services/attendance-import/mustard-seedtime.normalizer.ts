@@ -34,7 +34,7 @@ const PHT_OFFSET_MINUTES = 8 * 60;
  * which formats in the viewer's own zone — shows the same clock face the
  * timekeeping device printed.
  */
-function phtInstant(date: string, minutesFromMidnight: number): Date | null {
+export function phtInstant(date: string, minutesFromMidnight: number): Date | null {
   const [y, m, d] = date.split('-').map(Number);
   if (!y || !m || !d) return null;
   return new Date(Date.UTC(y, m - 1, d, 0, minutesFromMidnight - PHT_OFFSET_MINUTES, 0, 0));

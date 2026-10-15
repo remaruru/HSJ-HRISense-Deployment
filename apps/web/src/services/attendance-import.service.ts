@@ -62,6 +62,15 @@ export interface ImportCandidate {
   hrDecision: ImportDecision;
   /** A new day HR must still accept or skip because of its review flags. */
   held?: boolean;
+  /** The status HR chose when correcting the day (null until corrected). */
+  status?: string | null;
+  /** HR's correction before import, with the device's original values. */
+  hrCorrection?: {
+    original: { sessions: Array<{ in: string | null; out: string | null }> | null };
+    status: string;
+    reason: string;
+    correctedAt: string;
+  } | null;
   appliedAt: string | null;
   applyError: string | null;
   employee: { id: string; employeeNumber: string; firstName: string; lastName: string } | null;
@@ -113,6 +122,16 @@ export const AttendanceImportService = {
     return res.data.data;
   },
 
+  /** HR fixes a day before it is imported; the day is then decided (imported with the fix). */
+  async correct(
+    batchId: string,
+    candidateId: string,
+    body: { sessions: Array<{ in: string; out: string }>; status: CorrectionStatus; reason: string }
+  ) {
+    const res = await api.post<{ data: ImportCandidate }>(`/attendance/imports/${batchId}/candidates/${candidateId}/correct`, body);
+    return res.data.data;
+  },
+
   async decide(batchId: string, candidateIds: string[], decision: Exclude<ImportDecision, 'PENDING'>, reason?: string) {
     const res = await api.post<{ data: { updated: number } }>(`/attendance/imports/${batchId}/decisions`, {
       candidateIds,
@@ -141,7 +160,18 @@ export const AttendanceImportService = {
 };
 
 /** Plain-language labels. The review flags are facts, never verdicts. */
+/** The statuses HR can give a day when correcting it before import. */
+export const CORRECTION_STATUSES = [
+  { value: 'PRESENT', label: 'Present' },
+  { value: 'LATE', label: 'Late' },
+  { value: 'HALF_DAY', label: 'Half day' },
+  { value: 'ABSENT', label: 'Absent (no punches)' },
+  { value: 'ON_LEAVE', label: 'On leave (no punches)' },
+] as const;
+export type CorrectionStatus = (typeof CORRECTION_STATUSES)[number]['value'];
+
 export const FLAG_LABELS: Record<string, string> = {
+  HR_CORRECTED: 'Corrected by HR before import',
   INCOMPLETE_PUNCH: 'Punch not closed',
   OUT_WITHOUT_IN: 'Time out with no time in',
   MULTIPLE_SESSIONS: 'More than one session',

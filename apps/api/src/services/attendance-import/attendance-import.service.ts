@@ -21,7 +21,9 @@ import { heldReason, isHeld } from './review-flags';
 import { flagForVerdict, verifyIdentity, type IdentityCheck } from './identity-verification.service';
 import { MustardParseError, MustardSeedtimeReader } from './mustard-seedtime.reader';
 import {
+  MUSTARD_FLAGS,
   MustardSeedtimeNormalizer,
+  phtInstant,
   toRawSourceRows,
   type MustardRowPayload,
 } from './mustard-seedtime.normalizer';
@@ -57,6 +59,22 @@ const normalizer = new MustardSeedtimeNormalizer({
   resolveEmployeeIdsByCode: (codes) => AttendanceImportService.resolveEmployeeIdsByCode(codes),
 });
 registerAttendanceNormalizer(normalizer);
+
+/** Warnings about the punches themselves — a correction by HR resolves them. */
+const CORRECTABLE_FLAGS: ReadonlySet<string> = new Set([
+  MUSTARD_FLAGS.INCOMPLETE_PUNCH,
+  MUSTARD_FLAGS.OUT_WITHOUT_IN,
+  MUSTARD_FLAGS.NON_SEQUENTIAL_PUNCHES,
+  MUSTARD_FLAGS.HOURS_WITHOUT_PUNCHES,
+  MUSTARD_FLAGS.PUNCHES_WITHOUT_HOURS,
+  MUSTARD_FLAGS.HOURS_DISAGREE_WITH_PUNCHES,
+  MUSTARD_FLAGS.IMPLAUSIBLE_DURATION,
+  MUSTARD_FLAGS.NO_PUNCHES,
+  MUSTARD_FLAGS.MULTIPLE_SESSIONS,
+]);
+
+/** Informational: the day was corrected by HR before it was imported. */
+const HR_CORRECTED_FLAG = 'HR_CORRECTED';
 
 /** True when the row reports neither a punch nor any worked hours. */
 function carriesNoFact(candidate: NormalizedDailyCandidate): boolean {
@@ -589,6 +607,111 @@ export class AttendanceImportService {
     return { updated: result.count };
   }
 
+  /**
+   * HR fixes a day BEFORE it is imported — the missing clock-out, punches in the
+   * wrong order, or the status — with a reason.
+   *
+   * The candidate's own fields become the corrected day, and the device's
+   * original values are kept beside them in `hrCorrection` (the raw rows still
+   * hold the file itself). The punch-data warnings the fix resolves are dropped;
+   * the facts about the day (holiday, day off, leave) stay, because a fix does
+   * not change them. The day is then decided: it will be imported, as an HR
+   * correction that no later import overwrites.
+   */
+  static async correctCandidate(
+    batchId: string,
+    candidateId: string,
+    input: { sessions: Array<{ in: string; out: string }>; status: AttendanceStatus; reason: string },
+    userId: string
+  ) {
+    const batch = await prisma.attendanceImportBatch.findUnique({ where: { id: batchId } });
+    if (!batch) throw new AppError('Import batch not found.', 404);
+    if (batch.status !== AttendanceImportStatus.VALIDATED) {
+      throw new AppError('Days can only be corrected while the import is awaiting confirmation.', 409);
+    }
+    const candidate = await prisma.attendanceImportCandidate.findFirst({ where: { id: candidateId, batchId } });
+    if (!candidate) throw new AppError('That day is not part of this import.', 404);
+    if (candidate.appliedAt) throw new AppError('This day has already been imported.', 409);
+    if (!candidate.employeeId || !candidate.date || !AttendanceImportClassificationService.canWrite(candidate.classification)) {
+      throw new AppError('This day cannot be corrected here. Map its code to an employee first, or skip it.', 400);
+    }
+
+    // Absent / on leave: there are no punches to keep.
+    const noPunches = input.status === AttendanceStatus.ABSENT || input.status === AttendanceStatus.ON_LEAVE;
+    const sessions = noPunches ? [] : input.sessions;
+    if (!noPunches && sessions.length === 0) {
+      throw new AppError('Enter at least one clock-in and clock-out for a day that was worked.', 400);
+    }
+    const toMinutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+    let previousOut = -1;
+    let workedMinutes = 0;
+    for (const [i, s] of sessions.entries()) {
+      const inM = toMinutes(s.in);
+      const outM = toMinutes(s.out);
+      if (outM <= inM) throw new AppError(`Pair ${i + 1}: the clock-out must be later than the clock-in.`, 400);
+      if (inM < previousOut) throw new AppError(`Pair ${i + 1} starts before the previous pair ends.`, 400);
+      previousOut = outM;
+      workedMinutes += outM - inM;
+    }
+
+    const dateKey = candidate.date.toISOString().slice(0, 10);
+    const previous = candidate.hrCorrection as { original?: unknown } | null;
+    // A second correction keeps the device's values from before the FIRST one.
+    const original = previous?.original ?? {
+      timeIn: candidate.timeIn,
+      timeOut: candidate.timeOut,
+      sessions: candidate.sessions,
+      hoursWorked: candidate.hoursWorked,
+      overtimeHours: candidate.overtimeHours,
+      status: candidate.status,
+      reviewFlags: candidate.reviewFlags,
+    };
+    const originalFlags = ((previous?.original as { reviewFlags?: string[] } | undefined)?.reviewFlags ??
+      (candidate.reviewFlags as string[] | null) ??
+      []) as string[];
+    const flags = new Set(originalFlags.filter((f) => !CORRECTABLE_FLAGS.has(f)));
+    if (sessions.length > 1) flags.add(MUSTARD_FLAGS.MULTIPLE_SESSIONS);
+    flags.add(HR_CORRECTED_FLAG);
+
+    const reason = input.reason.trim();
+    const updated = await prisma.attendanceImportCandidate.update({
+      where: { id: candidate.id },
+      data: {
+        timeIn: sessions.length ? phtInstant(dateKey, toMinutes(sessions[0].in)) : null,
+        timeOut: sessions.length ? phtInstant(dateKey, toMinutes(sessions[sessions.length - 1].out)) : null,
+        sessions: sessions.length ? sessions : Prisma.DbNull,
+        hoursWorked: Math.round((workedMinutes / 60) * 100) / 100,
+        // The device's overtime no longer describes the corrected punches.
+        overtimeHours: null,
+        status: input.status,
+        reviewFlags: [...flags],
+        hrCorrection: {
+          original,
+          status: input.status,
+          reason,
+          correctedByUserId: userId,
+          correctedAt: new Date().toISOString(),
+        } as Prisma.InputJsonValue,
+        hrDecision: AttendanceImportDecision.USE_UPLOADED,
+        hrDecisionByUserId: userId,
+        hrDecisionAt: new Date(),
+        hrDecisionReason: reason,
+      },
+      include: { employee: { select: { id: true, employeeNumber: true, firstName: true, lastName: true } } },
+    });
+
+    await createAuditLog({
+      actorUserId: userId,
+      action: 'ATTENDANCE_IMPORT_DAY_CORRECTED',
+      entityType: 'EMPLOYEE',
+      entityId: candidate.employeeId,
+      oldValue: { date: dateKey, sessions: (original as { sessions?: unknown }).sessions ?? null },
+      newValue: { date: dateKey, sessions, status: input.status, reason, batchId },
+    });
+
+    return { ...updated, held: isHeld(updated.reviewFlags as string[] | null) };
+  }
+
   // ── 5. Apply ───────────────────────────────────────────────────────────────
 
   /**
@@ -647,7 +770,8 @@ export class AttendanceImportService {
       // Second line of defence: even an explicit decision cannot write a record
       // that asserts attendance the file never reported.
       const sessions = candidate.sessions as Array<unknown> | null;
-      if (!sessions?.length && !(candidate.hoursWorked ?? 0)) continue;
+      const correction = candidate.hrCorrection as { reason?: string; correctedByUserId?: string } | null;
+      if (!sessions?.length && !(candidate.hoursWorked ?? 0) && !correction) continue;
 
       try {
         await prisma.$transaction(async (tx) => {
@@ -671,6 +795,17 @@ export class AttendanceImportService {
             reviewFlags: (candidate.reviewFlags ?? undefined) as Prisma.InputJsonValue,
             sourceType: AttendanceRecordSource.IMPORT,
             lastImportBatchId: batchId,
+            // Corrected by HR before import: their status and reason, marked as
+            // a manual correction so no later import overwrites it.
+            ...(correction
+              ? {
+                  status: candidate.status ?? AttendanceStatus.PRESENT,
+                  remarks: correction.reason ?? null,
+                  sourceType: AttendanceRecordSource.MANUAL,
+                  manuallyModifiedAt: new Date(),
+                  manuallyModifiedById: correction.correctedByUserId ?? userId,
+                }
+              : {}),
           };
 
           if (existing) {

@@ -480,6 +480,18 @@ function PreviewRow({
         {others.length > 0 && (
           <p className="text-xs text-muted-foreground mt-1">{others.map((f) => FLAG_LABELS[f] ?? f).join(' · ')}</p>
         )}
+        {/* Corrected before import: HR's reason, and what the device recorded. */}
+        {row.hrCorrection && (
+          <p className="text-xs text-muted-foreground mt-1">
+            <span className="font-semibold text-foreground">HR's reason:</span> {row.hrCorrection.reason}
+            {' · '}device had{' '}
+            <span className="font-mono">
+              {row.hrCorrection.original.sessions?.length
+                ? row.hrCorrection.original.sessions.map((s) => `${s.in ?? '—'}→${s.out ?? 'not closed'}`).join(', ')
+                : 'no punches'}
+            </span>
+          </p>
+        )}
         {row.applyError && <p className="text-xs text-status-danger-foreground mt-1">{row.applyError}</p>}
       </td>
       <td className="px-5 py-3 text-right whitespace-nowrap">

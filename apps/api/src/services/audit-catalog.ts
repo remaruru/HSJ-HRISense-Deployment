@@ -194,6 +194,7 @@ const ENTRIES: Record<string, Entry> = {
   ATTENDANCE_IMPORT_UPLOADED: E('ATTENDANCE', 'UPLOAD', 'uploaded the biometric attendance file {r}'),
   ATTENDANCE_IMPORT_APPLIED: E('ATTENDANCE', 'IMPORT', 'imported attendance from {r}'),
   ATTENDANCE_IMPORT_CANCELLED: E('ATTENDANCE', 'STATUS_CHANGE', 'cancelled the attendance import {r}', 'Cancelled'),
+  ATTENDANCE_IMPORT_DAY_CORRECTED: E('ATTENDANCE', 'UPDATE', 'corrected an imported attendance day of {s} before importing it', 'Corrected before import'),
   ATTENDANCE_BIOMETRIC_CODE_MAPPED: E('ATTENDANCE', 'UPDATE', 'matched a biometric code to {s}', 'Code matched'),
   TEMPLATE_CREATED: E('SCHEDULES', 'CREATE', 'created the schedule template {r}'),
   TEMPLATE_REVISED: E('SCHEDULES', 'UPDATE', 'revised the schedule template {r}', 'Revised'),

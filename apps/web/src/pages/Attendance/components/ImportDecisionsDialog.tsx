@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
 import {
-  AttendanceImportService, CLASSIFICATION_LABELS, FLAG_LABELS,
-  type ImportCandidate,
+  AttendanceImportService, CLASSIFICATION_LABELS, CORRECTION_STATUSES, FLAG_LABELS,
+  type CorrectionStatus, type ImportCandidate,
 } from '@/services/attendance-import.service';
 
 /**
@@ -16,8 +16,10 @@ import {
  * Opened from "Apply import" (and the "need a decision" line) when the batch is
  * not ready, so HR does not have to page through every row of the preview to
  * find the few that are holding it up. Records are grouped by why they are
- * held; each group can be decided at once, or each record on its own. When none
- * are left, the import can be applied from here.
+ * held; each group can be decided at once, or each record on its own — or
+ * fixed first ("Fix": correct the punches and status, with a reason), which
+ * imports the day with HR's correction. When none are left, the import can be
+ * applied from here.
  */
 
 /** Flags that describe the day but never hold it, so they never name a group. */
@@ -121,6 +123,25 @@ export function ImportDecisionsDialog({
     }
   };
 
+  /** Saves HR's correction; the day is then decided (imported with the fix). */
+  const fix = async (row: ImportCandidate, body: FixBody) => {
+    setBusy(true);
+    try {
+      await AttendanceImportService.correct(batchId, row.id, body);
+      const left = rows.filter((r) => r.id !== row.id);
+      setRows(left);
+      if (group && !left.some((r) => reasonOf(r) === group)) setGroup('');
+      toast.success('Corrected — this day will be imported with your fix.');
+      onChanged();
+      return true;
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'The correction could not be saved.'));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const allNew = visible.length > 0 && visible.every((r) => !isConflict(r));
   const allConflicts = visible.length > 0 && visible.every(isConflict);
   const acceptLabel = allNew ? 'Import' : allConflicts ? 'Use file' : 'Import / use file';
@@ -190,7 +211,13 @@ export function ImportDecisionsDialog({
 
             <ul className="flex-1 overflow-y-auto divide-y divide-border">
               {visible.map((row) => (
-                <DecisionRow key={row.id} row={row} busy={busy} onDecide={(choice) => decide([row], choice)} />
+                <DecisionRow
+                  key={row.id}
+                  row={row}
+                  busy={busy}
+                  onDecide={(choice) => decide([row], choice)}
+                  onFix={(body) => fix(row, body)}
+                />
               ))}
             </ul>
           </>
@@ -217,11 +244,25 @@ function GroupChip({ label, count, active, onClick }: { label: string; count: nu
   );
 }
 
-function DecisionRow({ row, busy, onDecide }: { row: ImportCandidate; busy: boolean; onDecide: (choice: Choice) => void }) {
+type FixBody = { sessions: Array<{ in: string; out: string }>; status: CorrectionStatus; reason: string };
+
+function DecisionRow({
+  row,
+  busy,
+  onDecide,
+  onFix,
+}: {
+  row: ImportCandidate;
+  busy: boolean;
+  onDecide: (choice: Choice) => void;
+  onFix: (body: FixBody) => Promise<boolean>;
+}) {
   const conflict = isConflict(row);
   const flags = (row.reviewFlags ?? []).filter((f) => !INFORMATIONAL.has(f));
+  const [editing, setEditing] = useState(false);
   return (
-    <li className="px-5 py-3 flex flex-col sm:flex-row sm:items-start gap-3">
+    <li className="px-5 py-3 space-y-3">
+     <div className="flex flex-col sm:flex-row sm:items-start gap-3">
       <div className="min-w-0 flex-1 space-y-1">
         <p className="text-sm font-semibold text-foreground">
           {row.employee ? `${row.employee.firstName} ${row.employee.lastName}` : `Code ${row.sourceEmployeeCode ?? '—'}`}
@@ -243,14 +284,162 @@ function DecisionRow({ row, busy, onDecide }: { row: ImportCandidate; busy: bool
           </p>
         ))}
       </div>
-      <div className="flex gap-1.5 shrink-0">
-        <Button size="xs" variant="create" disabled={busy} onClick={() => onDecide('accept')}>
+      <div className="flex flex-wrap gap-1.5 shrink-0">
+        <Button size="xs" variant="create" disabled={busy || editing} onClick={() => onDecide('accept')}>
           {conflict ? 'Use file' : 'Import'}
         </Button>
-        <Button size="xs" variant="outline" disabled={busy} onClick={() => onDecide('reject')}>
+        <Button size="xs" variant="outline" disabled={busy || editing} onClick={() => onDecide('reject')}>
           {conflict ? 'Keep record' : 'Skip'}
         </Button>
+        {row.employee && (
+          <Button size="xs" variant="update" disabled={busy || editing} onClick={() => setEditing(true)}>
+            <Pencil /> Fix
+          </Button>
+        )}
       </div>
+     </div>
+      {editing && (
+        <FixEditor
+          row={row}
+          busy={busy}
+          onCancel={() => setEditing(false)}
+          onSave={async (body) => {
+            if (await onFix(body)) setEditing(false);
+          }}
+        />
+      )}
     </li>
+  );
+}
+
+const toMinutes = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+const NO_PUNCH_STATUSES: ReadonlySet<string> = new Set(['ABSENT', 'ON_LEAVE']);
+
+/**
+ * Corrects one day before it is imported: the clock-in/clock-out pairs, the
+ * status, and a reason (kept on the record and in the audit log). The device's
+ * own punches stay on file beside the correction.
+ */
+function FixEditor({
+  row,
+  busy,
+  onSave,
+  onCancel,
+}: {
+  row: ImportCandidate;
+  busy: boolean;
+  onSave: (body: FixBody) => void;
+  onCancel: () => void;
+}) {
+  const [pairs, setPairs] = useState<Array<{ in: string; out: string }>>(() =>
+    row.sessions?.length ? row.sessions.map((s) => ({ in: s.in ?? '', out: s.out ?? '' })) : [{ in: '', out: '' }]
+  );
+  const [status, setStatus] = useState<CorrectionStatus>(
+    (CORRECTION_STATUSES.find((s) => s.value === row.status)?.value ?? 'PRESENT') as CorrectionStatus
+  );
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const noPunches = NO_PUNCH_STATUSES.has(status);
+
+  const setPair = (i: number, side: 'in' | 'out', value: string) => {
+    setPairs((prev) => prev.map((p, k) => (k === i ? { ...p, [side]: value } : p)));
+    setError(null);
+  };
+
+  const save = () => {
+    if (!noPunches) {
+      let previousOut = -1;
+      for (const [i, p] of pairs.entries()) {
+        if (!p.in || !p.out) return setError(`Pair ${i + 1}: enter both the clock-in and the clock-out.`);
+        if (toMinutes(p.out) <= toMinutes(p.in)) return setError(`Pair ${i + 1}: the clock-out must be later than the clock-in.`);
+        if (toMinutes(p.in) < previousOut) return setError(`Pair ${i + 1} starts before the previous pair ends.`);
+        previousOut = toMinutes(p.out);
+      }
+    }
+    if (reason.trim().length < 3) return setError('Say why this day was corrected — it is kept with the record.');
+    onSave({ sessions: noPunches ? [] : pairs, status, reason: reason.trim() });
+  };
+
+  return (
+    <div className="rounded-xl border border-border bg-surface-2 p-3 space-y-3">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-foreground">Clock-in and clock-out</p>
+          {noPunches ? (
+            <p className="text-xs text-muted-foreground">No punches are saved for this status.</p>
+          ) : (
+            <>
+              {pairs.map((p, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2">
+                  <span className="w-12 text-xs text-muted-foreground">Pair {i + 1}</span>
+                  <input
+                    type="time"
+                    aria-label={`Pair ${i + 1} clock-in`}
+                    value={p.in}
+                    onChange={(e) => setPair(i, 'in', e.target.value)}
+                    className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
+                  />
+                  <span className="text-xs text-muted-foreground">to</span>
+                  <input
+                    type="time"
+                    aria-label={`Pair ${i + 1} clock-out`}
+                    value={p.out}
+                    onChange={(e) => setPair(i, 'out', e.target.value)}
+                    className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
+                  />
+                  {pairs.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setPairs((prev) => prev.filter((_, k) => k !== i))}
+                      aria-label={`Remove pair ${i + 1}`}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface hover:text-foreground"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {pairs.length < 6 && (
+                <button
+                  type="button"
+                  onClick={() => setPairs((prev) => [...prev, { in: '', out: '' }])}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:underline dark:text-primary-300"
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add a pair
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        <label className="block space-y-1">
+          <span className="text-xs font-semibold text-foreground">Status</span>
+          <select
+            value={status}
+            onChange={(e) => { setStatus(e.target.value as CorrectionStatus); setError(null); }}
+            className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
+          >
+            {CORRECTION_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label className="block space-y-1">
+        <span className="text-xs font-semibold text-foreground">Reason for the correction</span>
+        <input
+          type="text"
+          value={reason}
+          maxLength={500}
+          onChange={(e) => { setReason(e.target.value); setError(null); }}
+          placeholder="e.g. Forgot to clock out; supervisor confirmed 2:00 PM"
+          className="h-9 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground placeholder:text-muted-foreground"
+        />
+      </label>
+      {error && <p role="alert" className="text-xs font-semibold text-status-danger-foreground">{error}</p>}
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button size="sm" variant="outline" disabled={busy} onClick={onCancel}>Cancel</Button>
+        <Button size="sm" variant="create" disabled={busy} onClick={save}>Save fix &amp; import</Button>
+      </div>
+    </div>
   );
 }

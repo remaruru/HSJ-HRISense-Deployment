@@ -52,6 +52,17 @@ const decideSchema = z.object({
   }),
 });
 
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+const correctSchema = z.object({
+  body: z.object({
+    sessions: z
+      .array(z.object({ in: z.string().regex(HHMM, 'Use a 24-hour time like 08:00.'), out: z.string().regex(HHMM, 'Use a 24-hour time like 17:00.') }))
+      .max(6, 'At most six clock-in/clock-out pairs.'),
+    status: z.enum(['PRESENT', 'LATE', 'HALF_DAY', 'ABSENT', 'ON_LEAVE']),
+    reason: z.string().trim().min(3, 'Say why this day was corrected.').max(500),
+  }),
+});
+
 const mapCodeSchema = z.object({
   body: z.object({
     employeeId: z.string().uuid(),
@@ -63,6 +74,7 @@ router.get('/', asyncHandler(AttendanceImportController.list));
 router.post('/', upload.single('file'), asyncHandler(AttendanceImportController.upload));
 router.get('/:id/preview', asyncHandler(AttendanceImportController.preview));
 router.post('/:id/decisions', validate(decideSchema), asyncHandler(AttendanceImportController.decide));
+router.post('/:id/candidates/:candidateId/correct', validate(correctSchema), asyncHandler(AttendanceImportController.correct));
 router.post('/:id/apply', asyncHandler(AttendanceImportController.apply));
 router.post('/:id/cancel', asyncHandler(AttendanceImportController.cancel));
 router.post('/map-code', validate(mapCodeSchema), asyncHandler(AttendanceImportController.mapCode));

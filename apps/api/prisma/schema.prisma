@@ -3176,6 +3176,10 @@ model AttendanceImportCandidate {
   hrDecisionByUser   User?                    @relation("AttendanceImportDecider", fields: [hrDecisionByUserId], references: [id])
   hrDecisionAt       DateTime?
   hrDecisionReason   String?                  @db.Text
+  /// HR's correction of this day before it was imported (fixed punches, status,
+  /// reason) together with the device's ORIGINAL values. The candidate's own
+  /// fields then hold the corrected day; the raw rows still hold the file.
+  hrCorrection       Json?
 
   /// Stamped ONLY after the AttendanceRecord write committed. Makes resume after
   /// a partial failure exact rather than a guess.

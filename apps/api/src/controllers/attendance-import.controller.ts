@@ -74,6 +74,12 @@ export class AttendanceImportController {
     res.json({ success: true, data });
   }
 
+  /** POST /attendance/imports/:id/candidates/:candidateId/correct — HR fixes a day before importing it. */
+  static async correct(req: Request, res: Response) {
+    const data = await AttendanceImportService.correctCandidate(req.params.id, req.params.candidateId, req.body, req.user!.userId);
+    res.json({ success: true, data });
+  }
+
   static async apply(req: Request, res: Response) {
     const data = await AttendanceImportService.apply(req.params.id, req.user!.userId);
     res.json({ success: true, data });

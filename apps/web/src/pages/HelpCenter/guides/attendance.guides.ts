@@ -458,15 +458,15 @@ export const ATTENDANCE_GUIDES: HelpGuideDefinition[] = [
         {
           stepNumber: 3,
           title: 'Review what was held back (HR)',
-          instruction: 'Rows that differ from a record already on file, carry a warning flag (for example a punch outside the schedule, or a name that does not match the code), or belong to an unknown code wait for you. Choose **Use file** or **Keep record** on each.',
-          warning: 'A record HR corrected by hand is kept unless you deliberately choose Use file.',
+          instruction: 'Select **Apply import** (or the "need a decision" line): if anything is waiting, the **Review before applying** window lists only those days, grouped by reason — a clock-in that was never closed, work on a holiday or a day off, a record that differs from the one on file. For each day, or a whole group at once, choose **Import** / **Use file** to take the file\'s version, **Skip** / **Keep record** to leave it out, or **Fix** to correct the clock-in and clock-out pairs and the status yourself, with a reason. A fixed day is imported as an HR correction.',
+          warning: 'A record HR corrected — by hand or with Fix before import — is never overwritten by a later import unless you deliberately choose Use file. The device\'s original punches stay on file beside your fix.',
           expectedResult: 'Every row that could write has a decision.',
           uiPath: 'Import -> review list',
         },
         {
           stepNumber: 4,
           title: 'Apply the import (HR)',
-          instruction: 'Select **Apply import**. Only the rows you accepted are written.',
+          instruction: 'Select **Apply import** — in the review window once nothing is left, or on the page. Only the days you accepted or fixed are written.',
           expectedResult: 'Attendance for the imported period appears in Daily Monitoring and the Attendance Tally.',
           uiPath: 'Import -> Apply import',
         },
@@ -479,7 +479,7 @@ export const ATTENDANCE_GUIDES: HelpGuideDefinition[] = [
         },
         {
           problem: 'Apply import is refused.',
-          solution: 'Some rows still need a decision. Filter the review list and choose Use file or Keep record for each.',
+          solution: 'Some days still need a decision. Select Apply import to open the Review before applying window, and choose Import, Skip or Fix for each day (or for a whole group).',
         },
         {
           problem: 'A code in the file matches nobody.',
