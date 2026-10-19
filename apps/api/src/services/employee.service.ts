@@ -103,6 +103,35 @@ function toNullableDate(value: unknown): Date | null | undefined {
   return d;
 }
 
+/**
+ * The employee list search, one condition per word: every word must appear
+ * somewhere in the person's name, employee number, timekeeping code, email, job
+ * role, unit or department. So "Juan Cruz", "Cruz Juan" and "Cruz, Juan" all
+ * find the same person, and stray spaces don't matter. "%" and "_" are escaped
+ * so they are searched for as typed instead of matching everyone.
+ */
+function employeeSearchConditions(search: unknown): any[] {
+  const words = String(search ?? '').split(/[\s,]+/).filter(Boolean).slice(0, 8);
+  return words.map((word) => {
+    const q = word.replace(/[\\%_]/g, (c) => `\\${c}`);
+    return {
+      OR: [
+        { firstName: { contains: q } },
+        { lastName: { contains: q } },
+        { middleName: { contains: q } },
+        { suffix: { contains: q } },
+        { employeeNumber: { contains: q } },
+        { biometricCode: { contains: q } },
+        { personalEmail: { contains: q } },
+        { user: { email: { contains: q } } },
+        { jobRole: { title: { contains: q } } },
+        { department: { name: { contains: q } } },
+        { unit: { name: { contains: q } } },
+      ],
+    };
+  });
+}
+
 export class EmployeeService {
   /**
    * List employees — HR sees all, supervisors see direct reports + own profile, standard sees own profile.
@@ -172,23 +201,7 @@ export class EmployeeService {
           { immediateSupervisorId: requestingEmployeeId, deletedAt: null },
         ],
       };
-      const andConditions: any[] = [];
-
-      if (search) {
-        andConditions.push({
-          OR: [
-            { firstName: { contains: search } },
-            { lastName: { contains: search } },
-            { middleName: { contains: search } },
-            { employeeNumber: { contains: search } },
-            { personalEmail: { contains: search } },
-            { user: { email: { contains: search } } },
-            { jobRole: { title: { contains: search } } },
-            { department: { name: { contains: search } } },
-            { unit: { name: { contains: search } } },
-          ],
-        });
-      }
+      const andConditions: any[] = [...employeeSearchConditions(search)];
 
       if (unitId) andConditions.push({ unitId });
       if (departmentId) andConditions.push({ departmentId });
@@ -266,19 +279,8 @@ export class EmployeeService {
       where.deletedAt = null;
     }
 
-    if (search) {
-      where.OR = [
-        { firstName: { contains: search } },
-        { lastName: { contains: search } },
-        { middleName: { contains: search } },
-        { employeeNumber: { contains: search } },
-        { personalEmail: { contains: search } },
-        { user: { email: { contains: search } } },
-        { jobRole: { title: { contains: search } } },
-        { department: { name: { contains: search } } },
-        { unit: { name: { contains: search } } },
-      ];
-    }
+    const searchConditions = employeeSearchConditions(search);
+    if (searchConditions.length) where.AND = searchConditions;
 
     if (unitId) where.unitId = unitId;
     if (departmentId) where.departmentId = departmentId;
@@ -1677,7 +1679,7 @@ export class EmployeeService {
     }
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+      const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape', bufferPages: true });
       const buffers: Buffer[] = [];
 
       doc.on('data', (chunk) => buffers.push(chunk));
@@ -1687,47 +1689,98 @@ export class EmployeeService {
       doc.fontSize(16).fillColor('#148281').text('HOSPICIO DE SAN JOSE', { align: 'center' });
       doc.fontSize(12).fillColor('#333333').text('Employee Directory Report', { align: 'center' });
       doc.fontSize(9).fillColor('#666666').text(`Generated: ${new Date().toLocaleString('en-PH')} | Total Records: ${records.length}`, { align: 'center' });
-      doc.moveDown(1.5);
 
-      const tableTop = 100;
-      doc.fontSize(8).fillColor('#148281').font('Helvetica-Bold');
-      doc.text('Emp #', 30, tableTop, { width: 60 });
-      doc.text('Full Name', 90, tableTop, { width: 120 });
-      doc.text('Job Role', 210, tableTop, { width: 110 });
-      doc.text('Dept / Unit', 320, tableTop, { width: 110 });
-      doc.text('Supervisor', 430, tableTop, { width: 110 });
-      doc.text('State', 540, tableTop, { width: 60 });
-      doc.text('Account', 600, tableTop, { width: 60 });
-      doc.text('Completion', 660, tableTop, { width: 60 });
-      doc.text('Hired', 720, tableTop, { width: 60 });
+      // Each row is as tall as its tallest cell, so a long name or unit wraps
+      // inside its own column instead of running into the next row.
+      const left = 30;
+      const columns = [
+        { label: 'Emp #', width: 68 },
+        { label: 'Full Name', width: 128 },
+        { label: 'Job Role', width: 118 },
+        { label: 'Dept / Unit', width: 132 },
+        { label: 'Supervisor', width: 118 },
+        { label: 'State', width: 58 },
+        { label: 'Account', width: 56 },
+        { label: 'Profile', width: 48 },
+        { label: 'Hired', width: 56 },
+      ];
+      const tableWidth = columns.reduce((sum, c) => sum + c.width, 0);
+      const padX = 4;
+      const padY = 5;
+      const bottom = doc.page.height - 40;
+      const label = (v: string | null | undefined) =>
+        v ? v.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : '—';
 
-      doc.moveTo(30, tableTop + 12).lineTo(780, tableTop + 12).stroke('#148281');
+      const cellHeight = (cells: string[]) =>
+        Math.max(...cells.map((text, i) => doc.heightOfString(text, { width: columns[i].width - padX * 2 }))) + padY * 2;
 
-      let y = tableTop + 18;
-      doc.font('Helvetica').fontSize(8).fillColor('#333333');
+      // Text first, then the cell borders, so every cell is boxed in by grid lines.
+      const drawRow = (cells: string[], y: number, height: number) => {
+        let x = left;
+        cells.forEach((text, i) => {
+          doc.text(text, x + padX, y + padY, { width: columns[i].width - padX * 2 });
+          x += columns[i].width;
+        });
+        x = left;
+        doc.lineWidth(0.5).strokeColor('#b9cccc');
+        for (const c of columns) {
+          doc.rect(x, y, c.width, height).stroke();
+          x += c.width;
+        }
+        return y + height;
+      };
 
-      records.forEach((e: any) => {
-        if (y > 520) {
-          doc.addPage({ margin: 30, layout: 'landscape' });
-          y = 40;
+      const drawHeader = (y: number) => {
+        doc.font('Helvetica-Bold').fontSize(8);
+        const labels = columns.map((c) => c.label);
+        const height = cellHeight(labels);
+        doc.rect(left, y, tableWidth, height).fill('#e6f2f2');
+        doc.fillColor('#0f5f5e');
+        const next = drawRow(labels, y, height);
+        doc.moveTo(left, next).lineTo(left + tableWidth, next).lineWidth(0.8).stroke('#148281');
+        doc.font('Helvetica').fontSize(8);
+        return next;
+      };
+
+      let y = drawHeader(doc.y + 14);
+
+      if (!records.length) {
+        doc.fillColor('#666666').text('No employees match the current search and filters.', left + padX, y + padY * 2);
+      }
+
+      records.forEach((e: any, index: number) => {
+        const cells = [
+          e.employeeNumber || '—',
+          [e.firstName, e.lastName, e.suffix].filter(Boolean).join(' '),
+          e.jobRole?.title || '—',
+          [e.department?.name, e.unit?.name].filter(Boolean).join(' / ') || '—',
+          e.immediateSupervisor ? `${e.immediateSupervisor.firstName} ${e.immediateSupervisor.lastName}` : 'Not Assigned',
+          label(e.employmentState),
+          e.user ? (e.user.isActive ? 'Active' : 'Inactive') : 'No account',
+          `${e.profileCompletion || 0}%`,
+          e.hireDate ? new Date(e.hireDate).toISOString().split('T')[0] : '—',
+        ];
+        const height = cellHeight(cells);
+
+        if (y + height > bottom) {
+          doc.addPage({ margin: 30, size: 'A4', layout: 'landscape' });
+          y = drawHeader(30);
         }
 
-        const fullName = `${e.firstName} ${e.lastName}`;
-        const deptUnit = `${e.department?.name || ''} / ${e.unit?.name || ''}`;
-        const supName = e.immediateSupervisor ? `${e.immediateSupervisor.firstName} ${e.immediateSupervisor.lastName}` : 'Not Assigned';
-
-        doc.text(e.employeeNumber || '—', 30, y, { width: 60 });
-        doc.text(fullName, 90, y, { width: 120 });
-        doc.text(e.jobRole?.title || '—', 210, y, { width: 110 });
-        doc.text(deptUnit, 320, y, { width: 110 });
-        doc.text(supName, 430, y, { width: 110 });
-        doc.text(e.employmentState || '—', 540, y, { width: 60 });
-        doc.text(e.user ? (e.user.isActive ? 'Active' : 'Inactive') : 'No Acc', 600, y, { width: 60 });
-        doc.text(`${e.profileCompletion || 0}%`, 660, y, { width: 60 });
-        doc.text(e.hireDate ? new Date(e.hireDate).toISOString().split('T')[0] : '—', 720, y, { width: 60 });
-
-        y += 16;
+        if (index % 2 === 1) doc.rect(left, y, tableWidth, height).fill('#f6f9f9');
+        doc.fillColor('#333333');
+        y = drawRow(cells, y, height);
       });
+
+      // Page numbers. Writing below the bottom margin would start a new page,
+      // so the margin is lifted while the footer is drawn.
+      const range = doc.bufferedPageRange();
+      for (let i = range.start; i < range.start + range.count; i++) {
+        doc.switchToPage(i);
+        doc.page.margins.bottom = 0;
+        doc.font('Helvetica').fontSize(8).fillColor('#888888')
+          .text(`Page ${i + 1} of ${range.count}`, left, doc.page.height - 25, { width: tableWidth, align: 'right' });
+      }
 
       doc.end();
     });

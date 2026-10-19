@@ -217,7 +217,8 @@ export function EmployeesPage() {
  );
 
  // Search
- const [searchInput, setSearchInput] = useState(searchParams.search || "");
+ // The router reads a numbers-only search in the URL (a timekeeping code such as 927) as a number.
+ const [searchInput, setSearchInput] = useState(searchParams.search != null ? String(searchParams.search) : "");
  const [debouncedSearch, setDebouncedSearch] = useState(searchInput);
  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -339,7 +340,11 @@ export function EmployeesPage() {
  unitFilter, departmentFilter, jobRoleFilter, accountStatusFilter, hireDateFrom, hireDateTo, isArchivedFilter, sorting]);
 
  // ─── Data Fetch ───────────────────────────────────────────────────────────
+ // Only the newest request may fill the table: while typing, an older, slower
+ // search could otherwise answer last and show results for the wrong words.
+ const latestRequest = useRef(0);
  const fetchData = useCallback(async () => {
+ const requestId = ++latestRequest.current;
  try {
  setLoading(true);
  setError(null);
@@ -362,12 +367,14 @@ export function EmployeesPage() {
  sortOrder: sorting.length > 0 ? (sorting[0].desc ?"desc" :"asc") : undefined,
  },
  });
+ if (requestId !== latestRequest.current) return;
  setData(res.data.data || []);
  setTotal(res.data.total || 0);
  } catch (err) {
+ if (requestId !== latestRequest.current) return;
  setError(getApiErrorMessage(err, "The employee list could not be loaded."));
  } finally {
- setLoading(false);
+ if (requestId === latestRequest.current) setLoading(false);
  }
  }, [pagination.pageIndex, pagination.pageSize, debouncedSearch, employmentStateFilter,
  supervisorStatusFilter, unitFilter, departmentFilter, jobRoleFilter,
@@ -885,7 +892,11 @@ export function EmployeesPage() {
  className="hrisense-control w-full pl-9"
  />
  {searchInput && (
- <button onClick={() => { setSearchInput(""); setDebouncedSearch(""); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+ <button
+ onClick={() => { setSearchInput(""); setDebouncedSearch(""); setPagination(p => ({ ...p, pageIndex: 0 })); }}
+ aria-label="Clear search"
+ className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+ >
  <X className="h-3.5 w-3.5" />
  </button>
  )}
