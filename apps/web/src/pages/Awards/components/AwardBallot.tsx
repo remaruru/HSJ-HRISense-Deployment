@@ -55,9 +55,15 @@ export function AwardBallot({ award, onSubmitted }: { award: VotingAward; onSubm
   return (
     <section aria-labelledby={`ballot-${award.id}`} className="rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-sm space-y-4">
       <header className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+        <div className="space-y-1">
+          <span className="inline-block rounded-full border border-status-info-border bg-status-info-surface px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-status-info-foreground">Voting open</span>
           <h3 id={`ballot-${award.id}`} className="text-base font-bold text-foreground font-heading">{award.title} — {award.periodLabel}</h3>
-          {award.description && <p className="mt-0.5 text-xs text-muted-foreground">{award.description}</p>}
+          {!award.submittedAt && (
+            <p className="text-xs text-muted-foreground">
+              Tap the people you choose in each category, then press <strong className="text-foreground">Submit ballot</strong> at the bottom. You can submit only once.
+            </p>
+          )}
+          {award.description && <p className="text-xs text-muted-foreground">{award.description}</p>}
         </div>
         {award.submittedAt ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-status-success-border bg-status-success-surface px-2.5 py-1 text-xs font-semibold text-status-success-foreground">

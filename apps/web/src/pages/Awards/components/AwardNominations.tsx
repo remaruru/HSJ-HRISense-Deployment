@@ -36,9 +36,13 @@ export function AwardNominations({ award, onChanged }: { award: NominationAward;
 
   return (
     <section aria-labelledby={`nom-${award.id}`} className="rounded-2xl border border-border bg-surface p-4 sm:p-5 shadow-sm space-y-4">
-      <header>
-        <h3 id={`nom-${award.id}`} className="text-base font-bold text-foreground font-heading">{award.title} — {award.periodLabel}: nominations open</h3>
-        {award.description && <p className="mt-0.5 text-xs text-muted-foreground">{award.description}</p>}
+      <header className="space-y-1">
+        <span className="inline-block rounded-full border border-status-info-border bg-status-info-surface px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-status-info-foreground">Nominations open</span>
+        <h3 id={`nom-${award.id}`} className="text-base font-bold text-foreground font-heading">{award.title} — {award.periodLabel}</h3>
+        <p className="text-xs text-muted-foreground">
+          For each category, pick a co-worker who deserves it, say why if you like, and press <strong className="text-foreground">Nominate</strong>. You can nominate more than one person. Voting comes after nominations close.
+        </p>
+        {award.description && <p className="text-xs text-muted-foreground">{award.description}</p>}
       </header>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {award.categories.map((c) => (

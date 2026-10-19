@@ -17,14 +17,14 @@ export const AWARD_TYPE_LABEL: Record<AwardType, string> = {
 };
 
 export const AWARD_ACTION_LABEL: Record<AwardAction, string> = {
-  OPEN_NOMINATION: 'Open nomination',
-  CLOSE_NOMINATION: 'Close nomination',
+  OPEN_NOMINATION: 'Open nominations',
+  CLOSE_NOMINATION: 'Close nominations',
   OPEN_VOTING: 'Open voting',
   CLOSE_VOTING: 'Close voting',
-  START_REVIEW: 'Review results',
-  VERIFY: 'Verify results',
-  RETURN_TO_REVIEW: 'Return to review',
-  FINALIZE: 'Declare final results',
+  START_REVIEW: 'Start the review',
+  VERIFY: 'Mark results as checked',
+  RETURN_TO_REVIEW: 'Back to the review',
+  FINALIZE: 'Announce final results',
 };
 
 export interface AwardPerson {

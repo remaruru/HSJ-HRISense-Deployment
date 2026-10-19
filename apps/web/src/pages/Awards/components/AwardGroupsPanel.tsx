@@ -1,29 +1,32 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, Briefcase, Building2, CheckCircle2, Loader2, Plus, User, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LoadError } from "@/components/shared/LoadError";
+import { cn } from "@/lib/utils";
 import { api } from "@/services/api";
 import { getApiErrorMessage } from "@/utils/error-handler.util";
 import { AwardsService, type AwardGroup } from "@/services/awards.service";
 import { OfficialBadge } from "./AwardManager";
+import { GroupEditorDialog, type GroupPerson, type GroupRole, type GroupUnit } from "./GroupEditorDialog";
 
-interface Opt { id: string; label: string }
+const NEW_GROUP: AwardGroup = {
+  id: "", name: "", description: null, isOfficial: false, unitIds: [], departmentIds: [], jobRoleIds: [], employeeIds: [],
+  memberCount: 0, hospicioTerms: [], unresolvedTerms: [],
+};
 
 /**
- * Voting / nominee groups: Hospicio's grouping words mapped by HR to CURRENT
- * job roles, units and employees. HRISense mapped only the words that clearly
- * name a current job role; the rest are listed for HR — never invented as roles.
+ * Award groups: who belongs to Hospicio's four groups (and any custom ones).
+ * Set once, reused by every award. HRISense mapped only the Hospicio words that
+ * clearly name a current job role; HR adds the rest — nothing is guessed.
  */
 export function AwardGroupsPanel() {
   const [groups, setGroups] = useState<AwardGroup[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [roles, setRoles] = useState<Opt[]>([]);
-  const [units, setUnits] = useState<Opt[]>([]);
-  const [people, setPeople] = useState<Opt[]>([]);
+  const [roles, setRoles] = useState<GroupRole[]>([]);
+  const [units, setUnits] = useState<GroupUnit[]>([]);
+  const [people, setPeople] = useState<GroupPerson[]>([]);
   const [editing, setEditing] = useState<AwardGroup | null>(null);
-  const [newName, setNewName] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
     setError(null);
@@ -31,138 +34,158 @@ export function AwardGroupsPanel() {
   }, []);
   useEffect(() => {
     load();
-    Promise.all([api.get("/employees/job-roles"), api.get("/employees/units"), api.get("/employees", { params: { limit: 500, isArchived: "false" } })])
+    Promise.all([api.get("/employees/job-roles"), api.get("/employees/units"), api.get("/employees", { params: { limit: 1000, isArchived: "false" } })])
       .then(([r, u, e]) => {
-        setRoles((r.data?.data ?? []).map((x: any) => ({ id: x.id, label: x.title })).sort((a: Opt, b: Opt) => a.label.localeCompare(b.label)));
-        setUnits((u.data?.data ?? []).map((x: any) => ({ id: x.id, label: x.name })));
-        setPeople((e.data?.data ?? []).map((x: any) => ({ id: x.id, label: `${`${x.firstName} ${x.lastName}`.trim()} — ${x.jobRole?.title ?? ""}` })).sort((a: Opt, b: Opt) => a.label.localeCompare(b.label)));
+        setRoles((r.data?.data ?? []).map((x: any) => ({ id: x.id, title: x.title, unitId: x.unitId ?? null })));
+        setUnits((u.data?.data ?? []).map((x: any) => ({ id: x.id, name: x.name })));
+        setPeople(
+          (e.data?.data ?? [])
+            .map((x: any) => ({
+              id: x.id,
+              name: `${x.firstName} ${x.lastName}`.trim(),
+              jobRoleId: x.jobRoleId ?? x.jobRole?.id ?? null,
+              jobRoleTitle: x.jobRole?.title ?? "",
+              unitId: x.unitId ?? x.unit?.id ?? null,
+              departmentId: x.departmentId ?? x.department?.id ?? null,
+              employmentState: x.employmentState ?? null,
+            }))
+            .sort((a: GroupPerson, b: GroupPerson) => a.name.localeCompare(b.name))
+        );
       })
       .catch(() => toast.error("Job roles, units or employees could not be loaded."));
   }, [load]);
 
-  const save = async () => {
-    if (!editing) return;
-    setBusy(true);
-    try {
-      setGroups(await AwardsService.saveGroup(editing.id || null, editing));
-      toast.success("Group saved.");
-      setEditing(null);
-    } catch (err) {
-      toast.error(getApiErrorMessage(err, "The group could not be saved."));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const nameOf = useMemo(() => {
-    const m = new Map([...roles, ...units, ...people].map((o) => [o.id, o.label]));
-    return (id: string) => m.get(id) ?? "—";
-  }, [roles, units, people]);
+  const names = useMemo(
+    () => ({
+      role: new Map(roles.map((r) => [r.id, r.title])),
+      unit: new Map(units.map((u) => [u.id, u.name])),
+      person: new Map(people.map((p) => [p.id, p.name])),
+    }),
+    [roles, units, people]
+  );
 
   if (error) return <LoadError message={error} onRetry={load} />;
   if (!groups) return <p className="py-6 text-center text-sm text-muted-foreground"><Loader2 className="mx-auto mb-2 h-5 w-5 animate-spin" />Loading…</p>;
 
-  const checklist = (title: string, opts: Opt[], key: "jobRoleIds" | "unitIds") => (
-    <div className="space-y-1">
-      <p className="text-xs font-semibold text-foreground">{title}</p>
-      <div className="grid max-h-56 grid-cols-1 gap-x-4 overflow-y-auto rounded-lg border border-border p-2 text-xs sm:grid-cols-2">
-        {opts.map((o) => (
-          <label key={o.id} className="inline-flex items-center gap-1.5">
-            <input
-              type="checkbox"
-              checked={editing![key].includes(o.id)}
-              onChange={(e) => setEditing({ ...editing!, [key]: e.target.checked ? [...editing![key], o.id] : editing![key].filter((x) => x !== o.id) })}
-            />
-            {o.label}
-          </label>
-        ))}
-      </div>
-    </div>
-  );
+  const official = groups.filter((g) => g.isOfficial);
+  const custom = groups.filter((g) => !g.isOfficial);
+  const ready = official.filter((g) => g.memberCount > 0).length;
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Who belongs to each Employee of the Quarter / Vincentian group. Employees match a group by job role, unit or by name. Only employees in a group vote in that group's Employee of the Quarter category.
-      </p>
-      <ul className="space-y-3">
-        {groups.map((g) => (
-          <li key={g.id} className="rounded-2xl border border-border bg-surface p-4 space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="flex items-center gap-2 font-bold text-foreground">{g.name} <OfficialBadge official={g.isOfficial} /></p>
-              <span className="text-xs text-muted-foreground">{g.memberCount} employee{g.memberCount === 1 ? "" : "s"}</span>
-            </div>
-            {g.hospicioTerms.length > 0 && <p className="text-xs text-muted-foreground">Hospicio grouping: {g.hospicioTerms.join(", ")}</p>}
-            {g.unresolvedTerms.length > 0 && (
-              <p className="flex items-start gap-1.5 rounded-lg border border-status-warning-border bg-status-warning-surface px-2 py-1 text-xs text-status-warning-foreground">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                Not matched to a current job role — map by job role, unit or employee if they belong here: {g.unresolvedTerms.join(", ")}.
-              </p>
-            )}
-            <p className="text-xs text-foreground">
-              {[...g.jobRoleIds.map(nameOf), ...g.unitIds.map((u) => `Unit: ${nameOf(u)}`), ...g.employeeIds.map((e) => nameOf(e))].join(" · ") || <span className="text-muted-foreground">Nothing mapped yet.</span>}
-            </p>
-            {editing?.id === g.id ? (
-              <div className="space-y-3 border-t border-border pt-3">
-                {checklist("Job roles", roles, "jobRoleIds")}
-                {checklist("Whole units", units, "unitIds")}
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-foreground">Individual employees</p>
-                  <select
-                    value=""
-                    onChange={(e) => e.target.value && !editing.employeeIds.includes(e.target.value) && setEditing({ ...editing, employeeIds: [...editing.employeeIds, e.target.value] })}
-                    className="h-8 w-full rounded-lg border border-border bg-background px-1 text-xs"
-                  >
-                    <option value="">Add an employee…</option>
-                    {people.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-                  </select>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {editing.employeeIds.map((id) => (
-                      <li key={id} className="rounded border border-border px-1.5 text-xs">
-                        {nameOf(id)} <button type="button" aria-label={`Remove ${nameOf(id)}`} onClick={() => setEditing({ ...editing, employeeIds: editing.employeeIds.filter((x) => x !== id) })} className="ml-1 text-muted-foreground">×</button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
-                  <Button size="sm" onClick={save} disabled={busy}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save group</Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <Button size="xs" variant="outline" onClick={() => setEditing({ ...g })}>Edit mapping</Button>
-                {!g.isOfficial && (
-                  <Button size="xs" variant="ghost" className="text-status-danger-foreground" onClick={async () => {
-                    if (!window.confirm(`Delete the group “${g.name}”?`)) return;
-                    try { setGroups(await AwardsService.deleteGroup(g.id)); toast.success("Group deleted."); } catch (err) { toast.error(getApiErrorMessage(err, "The group could not be deleted.")); }
-                  }}>Delete</Button>
-                )}
-              </div>
-            )}
-          </li>
-        ))}
+    <div className="space-y-5">
+      <section className="rounded-2xl border border-border bg-surface p-4 sm:p-5 space-y-3">
+        <h2 className="text-base font-bold text-foreground font-heading">What are groups?</h2>
+        <p className="text-sm text-muted-foreground">
+          Employee of the Quarter and the Vincentian award are voted within Hospicio's four groups: Admin, Social, Pastoral &amp; Homelife, and Health.
+          Tell HRISense <strong className="text-foreground">once</strong> who belongs to each group. Every award after that reuses it.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="h-2 w-40 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+            <div className="h-full rounded-full bg-status-success-foreground" style={{ width: `${official.length ? (ready / official.length) * 100 : 0}%` }} />
+          </div>
+          <p className={cn("text-sm font-semibold", ready === official.length ? "text-status-success-foreground" : "text-foreground")}>
+            {ready === official.length ? "All groups are ready." : `${ready} of ${official.length} groups are ready. Add people to the rest.`}
+          </p>
+        </div>
+      </section>
+
+      <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {official.map((g) => <GroupCard key={g.id} group={g} names={names} onEdit={() => setEditing({ ...g })} />)}
       </ul>
-      <div className="flex flex-wrap items-end gap-2 rounded-xl border border-dashed border-border p-3">
-        <label className="space-y-1 text-xs">
-          <span className="block font-semibold">New group (for custom awards)</span>
-          <input value={newName} onChange={(e) => setNewName(e.target.value)} className="h-8 w-64 rounded-lg border border-border bg-background px-2" />
-        </label>
-        <Button size="sm" variant="outline" disabled={!newName.trim()} className="gap-1" onClick={() => { setEditing({ id: "", name: newName.trim(), description: null, isOfficial: false, unitIds: [], departmentIds: [], jobRoleIds: [], employeeIds: [], memberCount: 0, hospicioTerms: [], unresolvedTerms: [] }); setNewName(""); }}>
-          <Plus className="h-4 w-4" /> Add group
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-bold text-foreground">Your own groups</h2>
+            <p className="text-xs text-muted-foreground">Only needed for a custom award that should be voted within a group of your own.</p>
+          </div>
+          <Button size="sm" variant="outline" className="gap-1" onClick={() => setEditing({ ...NEW_GROUP })}>
+            <Plus className="h-4 w-4" /> New group
+          </Button>
+        </div>
+        {custom.length > 0 && (
+          <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {custom.map((g) => <GroupCard key={g.id} group={g} names={names} onEdit={() => setEditing({ ...g })} />)}
+          </ul>
+        )}
+      </section>
+
+      <GroupEditorDialog group={editing} roles={roles} units={units} people={people} onClose={() => setEditing(null)} onSaved={setGroups} />
+    </div>
+  );
+}
+
+const SHOWN = 6;
+
+function GroupCard({
+  group: g,
+  names,
+  onEdit,
+}: {
+  group: AwardGroup;
+  names: { role: Map<string, string>; unit: Map<string, string>; person: Map<string, string> };
+  onEdit: () => void;
+}) {
+  const empty = g.memberCount === 0;
+  const chips = [
+    ...g.jobRoleIds.map((id) => ({ id, kind: "role" as const, label: names.role.get(id) ?? "Job role" })),
+    ...g.unitIds.map((id) => ({ id, kind: "unit" as const, label: names.unit.get(id) ?? "Unit" })),
+    ...g.employeeIds.map((id) => ({ id, kind: "person" as const, label: names.person.get(id) ?? "Employee" })),
+  ];
+  const icon = { role: Briefcase, unit: Building2, person: User };
+
+  return (
+    <li className={cn("flex flex-col gap-3 rounded-2xl border bg-surface p-4", empty ? "border-status-danger-border" : "border-border")}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-center gap-2 font-bold text-foreground">{g.name} <OfficialBadge official={g.isOfficial} /></p>
+          {g.isOfficial && <p className="text-xs text-muted-foreground">Used by Employee of the Quarter and the Vincentian award.</p>}
+        </div>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold",
+            empty
+              ? "border-status-danger-border bg-status-danger-surface text-status-danger-foreground"
+              : "border-status-success-border bg-status-success-surface text-status-success-foreground"
+          )}
+        >
+          {empty ? <AlertTriangle className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+          {empty ? "Nobody yet" : `${g.memberCount} ${g.memberCount === 1 ? "person" : "people"}`}
+        </span>
+      </div>
+
+      {empty && g.isOfficial && (
+        <p className="rounded-xl border border-status-danger-border bg-status-danger-surface px-3 py-2 text-xs text-status-danger-foreground">
+          Nobody is in this group, so Employee of the Quarter and the Vincentian award can't start yet. Choose who belongs here.
+        </p>
+      )}
+
+      {chips.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5" aria-label={`Who is in ${g.name}`}>
+          {chips.slice(0, SHOWN).map((c) => {
+            const Icon = icon[c.kind];
+            return (
+              <li key={`${c.kind}-${c.id}`} className="inline-flex items-center gap-1 rounded-full border border-border bg-surface-2 px-2.5 py-1 text-xs text-foreground">
+                <Icon className="h-3 w-3 text-muted-foreground" aria-hidden="true" />
+                {c.label}
+              </li>
+            );
+          })}
+          {chips.length > SHOWN && <li className="rounded-full px-2 py-1 text-xs text-muted-foreground">+{chips.length - SHOWN} more</li>}
+        </ul>
+      )}
+
+      {g.unresolvedTerms.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {g.unresolvedTerms.length === g.hospicioTerms.length ? "Hospicio describes this group as" : "Hospicio also lists"} <span className="text-foreground">{g.unresolvedTerms.join(", ")}</span>. No job role has {g.unresolvedTerms.length === 1 ? "that name" : "those names"}, so choose those people yourself.
+        </p>
+      )}
+
+      <div className="mt-auto">
+        <Button size="sm" variant={empty ? "primary" : "outline"} onClick={onEdit} className="gap-1">
+          <Users className="h-4 w-4" /> {empty ? "Choose who's in this group" : "Change who's in it"}
         </Button>
       </div>
-      {editing && !editing.id && (
-        <div className="rounded-2xl border border-primary-300 bg-surface p-4 space-y-3">
-          <p className="font-bold text-foreground">{editing.name}</p>
-          {checklist("Job roles", roles, "jobRoleIds")}
-          {checklist("Whole units", units, "unitIds")}
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>Cancel</Button>
-            <Button size="sm" onClick={save} disabled={busy}>Create group</Button>
-          </div>
-        </div>
-      )}
-    </div>
+    </li>
   );
 }

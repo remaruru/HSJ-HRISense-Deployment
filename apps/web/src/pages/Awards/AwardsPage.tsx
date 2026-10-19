@@ -11,6 +11,7 @@ import { AwardNominations } from "./components/AwardNominations";
 import { AwardManager, OfficialBadge } from "./components/AwardManager";
 import { AwardGroupsPanel } from "./components/AwardGroupsPanel";
 import { HallOfFamePanel } from "./components/HallOfFamePanel";
+import { HowItWorks } from "./components/AwardUi";
 
 type Tab = "mine" | "manage" | "groups" | "hof" | "history";
 
@@ -23,14 +24,17 @@ type Tab = "mine" | "manage" | "groups" | "hof" | "history";
 export default function AwardsPage() {
   const { user } = useAuth();
   const isHr = user?.permissionTier === "FULL";
-  const [tab, setTab] = useState<Tab>("mine");
+  // HR runs the awards, so they land on Manage Awards; their own ballot is one tab away.
+  const [tab, setTab] = useState<Tab>("manage");
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-screen-2xl mx-auto">
       <PageHeader
         icon={<Trophy className="h-5 w-5" />}
         title="Awards & Recognition"
-        subtitle="Nominations, voting and Hospicio's recognition awards. Votes are tallied automatically; people review and declare the final results."
+        subtitle={isHr
+          ? "Run Hospicio's awards step by step: set up the groups once, create an award, then follow its steps until the winners are announced."
+          : "Nominate co-workers, vote, and see the winners."}
       />
       {isHr && (
         <TabNav<Tab>
@@ -38,16 +42,26 @@ export default function AwardsPage() {
           value={tab}
           onChange={setTab}
           items={[
-            { id: "mine", label: "My Awards", icon: <Award /> },
             { id: "manage", label: "Manage Awards", icon: <Settings2 /> },
             { id: "groups", label: "Voting Groups", icon: <Users /> },
+            { id: "mine", label: "My Awards", icon: <Award /> },
             { id: "hof", label: "Hall of Fame", icon: <Landmark /> },
             { id: "history", label: "Award History", icon: <History /> },
           ]}
         />
       )}
       <div role={isHr ? "tabpanel" : undefined}>
-        {tab === "mine" || !isHr ? <MyAwardsView /> : tab === "manage" ? <AwardManager /> : tab === "groups" ? <AwardGroupsPanel /> : tab === "hof" ? <HallOfFamePanel /> : <HistoryView />}
+        {!isHr || tab === "mine" ? (
+          <MyAwardsView />
+        ) : tab === "manage" ? (
+          <AwardManager onGoToGroups={() => setTab("groups")} />
+        ) : tab === "groups" ? (
+          <AwardGroupsPanel />
+        ) : tab === "hof" ? (
+          <HallOfFamePanel />
+        ) : (
+          <HistoryView />
+        )}
       </div>
     </div>
   );
@@ -68,9 +82,16 @@ function MyAwardsView() {
   const nothingOpen = !data.nominationAwards.length && !data.votingAwards.length;
   return (
     <div className="space-y-6">
+      <HowItWorks
+        steps={[
+          { title: "Nominate", text: "When nominations open, suggest co-workers who deserve the award." },
+          { title: "Vote", text: "When voting opens, choose among the nominees. Your choices are private." },
+          { title: "See the winners", text: "The committee confirms the results, then they appear below." },
+        ]}
+      />
       <section className="space-y-3" aria-labelledby="open-heading">
-        <h2 id="open-heading" className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Open now</h2>
-        {nothingOpen && <p className="rounded-xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">No nominations or voting are open right now.</p>}
+        <h2 id="open-heading" className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Open for you now</h2>
+        {nothingOpen && <p className="rounded-xl border border-dashed border-border p-5 text-center text-sm text-muted-foreground">Nothing is open right now. When HR opens nominations or voting, it appears here.</p>}
         {data.nominationAwards.map((a) => <AwardNominations key={a.id} award={a} onChanged={load} />)}
         {data.votingAwards.map((a) => <AwardBallot key={a.id} award={a} onSubmitted={load} />)}
       </section>
