@@ -1,3 +1,4 @@
+import { confirmAction } from '@/components/shared/ConfirmProvider';
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Phone, MapPin, User, Siren, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
@@ -138,9 +139,9 @@ export function EditMyProfileDialog({
     setErrors((e) => ({ ...e, [key]: undefined }));
   };
 
-  const close = () => {
+  const close = async () => {
     if (saving) return;
-    if (dirty && !window.confirm('Discard the changes you have not saved?')) return;
+    if (dirty && !(await confirmAction({ title: 'Discard your changes?', message: 'The changes you have not saved will be lost.', confirmLabel: 'Discard', cancelLabel: 'Keep editing', danger: true }))) return;
     onClose();
   };
 

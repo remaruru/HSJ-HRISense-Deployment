@@ -1,3 +1,4 @@
+import { confirmAction } from '@/components/shared/ConfirmProvider';
 import { useEffect, useMemo, useState } from 'react';
 import { Loader2, Trash2, UserCheck, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -159,8 +160,8 @@ export function EvaluationParticipantsDialog({
                             size="xs"
                             disabled={busy}
                             className="gap-1 text-status-danger-foreground"
-                            onClick={() => {
-                              if (!confirm('Remove this peer evaluator? Their unsubmitted rating is discarded.')) return;
+                            onClick={async () => {
+                              if (!(await confirmAction({ title: 'Remove this peer evaluator?', message: 'Their unsubmitted rating is discarded.', confirmLabel: 'Remove', danger: true }))) return;
                               void run(() => EvaluationService.removePeer(p.assignmentId), 'Peer evaluator removed.');
                             }}
                           >

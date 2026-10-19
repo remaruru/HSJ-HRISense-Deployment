@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useCallback, useEffect, useState } from "react";
 import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -92,7 +93,7 @@ export function HallOfFamePanel() {
                 {r.notes && <span className="block text-xs text-muted-foreground">{r.notes}</span>}
               </span>
               <Button size="xs" variant="ghost" className="text-status-danger-foreground" onClick={async () => {
-                if (!window.confirm(`Remove ${r.employee.fullName}'s ${r.awardYear} Hall of Fame record? Only do this to correct a mistake.`)) return;
+                if (!(await confirmAction({ title: `Remove ${r.employee.fullName}'s ${r.awardYear} Hall of Fame record?`, message: "Only do this to correct a mistake.", confirmLabel: "Remove", danger: true }))) return;
                 try { setRows(await AwardsService.removeHallOfFame(r.id)); toast.success("Record removed."); } catch (err) { toast.error(getApiErrorMessage(err, "The record could not be removed.")); }
               }}>Remove</Button>
             </li>

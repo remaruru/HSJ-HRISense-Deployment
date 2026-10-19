@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Briefcase, Building2, Loader2, Trash2, User, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -93,7 +94,7 @@ export function GroupEditorDialog({
   };
 
   const remove = async () => {
-    if (!window.confirm(`Delete the group “${draft.name}”? Awards that already use it keep working, but it can't be picked for new ones.`)) return;
+    if (!(await confirmAction({ title: `Delete the group “${draft.name}”?`, message: "Awards that already use it keep working, but it can't be picked for new ones.", confirmLabel: "Delete", danger: true }))) return;
     setBusy(true);
     try {
       onSaved(await AwardsService.deleteGroup(draft.id));

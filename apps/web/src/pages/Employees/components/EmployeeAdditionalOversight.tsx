@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -49,7 +50,7 @@ export function EmployeeAdditionalOversight({ employeeId, immediateSupervisorNam
   useEffect(load, [load]);
 
   const remove = async (relationshipId: string, label: string) => {
-    if (!window.confirm(`Remove ${label}?`)) return;
+    if (!(await confirmAction({ title: `Remove ${label}?`, confirmLabel: "Remove", danger: true }))) return;
     try {
       await api.delete(`/employees/additional-oversight/${relationshipId}`);
       toast.success("Additional overseer removed.");

@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useMemo, useState } from "react";
 import { CheckCircle2, Loader2, Search, Vote } from "lucide-react";
 import { toast } from "sonner";
@@ -39,7 +40,12 @@ export function AwardBallot({ award, onSubmitted }: { award: VotingAward; onSubm
   const submit = async () => {
     if (!used) return toast.error("Choose at least one nominee first.");
     const unused = allowed - used;
-    if (!window.confirm(`Submit your ballot for ${award.title} — ${award.periodLabel}?${unused > 0 ? `\n\nYou still have ${unused} unused vote${unused === 1 ? "" : "s"}.` : ""}\n\nA ballot cannot be changed after it is submitted.`)) return;
+    const ok = await confirmAction({
+      title: `Submit your ballot for ${award.title} — ${award.periodLabel}?`,
+      message: `${unused > 0 ? `You still have ${unused} unused vote${unused === 1 ? "" : "s"}. ` : ""}A ballot can't be changed after it is submitted.`,
+      confirmLabel: "Submit ballot",
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await AwardsService.vote(award.id, Object.entries(picked).map(([categoryId, nomineeIds]) => ({ categoryId, nomineeIds })));

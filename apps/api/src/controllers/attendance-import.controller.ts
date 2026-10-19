@@ -85,6 +85,11 @@ export class AttendanceImportController {
     res.json({ success: true, data });
   }
 
+  static async progress(req: Request, res: Response) {
+    const data = await AttendanceImportService.getApplyProgress(req.params.id);
+    res.json({ success: true, data });
+  }
+
   static async cancel(req: Request, res: Response) {
     const data = await AttendanceImportService.cancel(req.params.id, req.user!.userId);
     res.json({ success: true, data });

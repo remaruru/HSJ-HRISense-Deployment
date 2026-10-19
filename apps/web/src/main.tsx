@@ -8,6 +8,7 @@ import { queryClient } from "@/lib/queryClient";
 import { router } from "@/lib/router";
 import { AuthProvider, useAuth } from "./providers/AuthProvider";
 import { ThemeProvider } from "./providers/ThemeProvider";
+import { ConfirmProvider } from "./components/shared/ConfirmProvider";
 import { AppErrorBoundary } from "@/components/shared/AppErrorBoundary";
 
 function InnerApp() {
@@ -23,6 +24,7 @@ createRoot(document.getElementById("root")!).render(
         <AuthProvider>
           <ThemeProvider>
             <InnerApp />
+            <ConfirmProvider />
             <Toaster
               position="top-right"
               // Every toast can be closed by hand — on a phone it may sit over

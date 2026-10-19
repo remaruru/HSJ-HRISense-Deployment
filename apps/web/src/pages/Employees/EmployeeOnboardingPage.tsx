@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useState, useEffect, useRef } from"react";
 import { useSearch, useNavigate } from "@tanstack/react-router";
 import { motion } from"framer-motion";
@@ -207,9 +208,9 @@ export default function EmployeeOnboardingPage() {
  }
  }, [currentStep]);
 
- const handleReturn = () => {
+ const handleReturn = async () => {
  if (isDirty) {
- if (window.confirm("You have unsaved changes. Are you sure you want to leave?")) {
+ if (await confirmAction({ title: "Leave without saving?", message: "The details you entered will be lost.", confirmLabel: "Leave", cancelLabel: "Stay", danger: true })) {
  navigate({ to: "/employees", search: {} as any });
  }
  } else {

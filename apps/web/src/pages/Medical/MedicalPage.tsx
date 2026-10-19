@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useState, useEffect, useMemo } from "react";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
@@ -483,7 +484,7 @@ export default function MedicalPage() {
 
   // ── Delete Record Handler ──
   const handleDeleteRecord = async (rec: MedicalRecord) => {
-    if (!confirm("Are you sure you want to delete this medical record? This action cannot be undone.")) return;
+    if (!(await confirmAction({ title: "Delete this medical record?", message: "This can't be undone.", confirmLabel: "Delete", danger: true }))) return;
 
     try {
       await MedicalService.deleteRecord(rec.id);
@@ -532,7 +533,7 @@ export default function MedicalPage() {
 
   // ── Delete Document Handler ──
   const handleDeleteDocument = async (docId: string) => {
-    if (!confirm("Delete this document?")) return;
+    if (!(await confirmAction({ title: "Delete this document?", confirmLabel: "Delete", danger: true }))) return;
     try {
       await MedicalService.deleteDocument(docId);
       toast.success("Document deleted");

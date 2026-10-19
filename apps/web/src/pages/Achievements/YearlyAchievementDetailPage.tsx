@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { ArrowDown, ArrowLeft, ArrowUp, Eye, EyeOff, FileText, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
@@ -67,7 +68,7 @@ export default function YearlyAchievementDetailPage() {
             </Button>
             <Button size="sm" variant="ghost" className="gap-1 text-status-danger-foreground" disabled={busy}
               onClick={async () => {
-                if (!window.confirm(`Delete the ${page.year} page and all its achievements?`)) return;
+                if (!(await confirmAction({ title: `Delete the ${page.year} page?`, message: "All of its achievements are deleted with it.", confirmLabel: "Delete", danger: true }))) return;
                 if (await run(() => AchievementsService.remove(page.id), "Page deleted.")) navigate({ to: "/achievements" as any });
               }}>
               <Trash2 className="h-4 w-4" /> Delete
@@ -165,7 +166,7 @@ export default function YearlyAchievementDetailPage() {
                         <Button size="icon-sm" variant="ghost" aria-label="Move down" disabled={busy || i === page.entries.length - 1} onClick={() => run(() => AchievementsService.moveEntry(e.id, "down"), "Moved.")}><ArrowDown className="h-4 w-4" /></Button>
                         <Button size="icon-sm" variant="ghost" aria-label="Edit" disabled={busy} onClick={() => setEditingEntry(e.id)}><Pencil className="h-4 w-4" /></Button>
                         <Button size="icon-sm" variant="ghost" aria-label="Remove" className="text-status-danger-foreground" disabled={busy}
-                          onClick={() => window.confirm(`Remove “${e.title}”?`) && run(() => AchievementsService.deleteEntry(e.id), "Achievement removed.")}>
+                          onClick={async () => { if (await confirmAction({ title: `Remove “${e.title}”?`, confirmLabel: "Remove", danger: true })) void run(() => AchievementsService.deleteEntry(e.id), "Achievement removed."); }}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

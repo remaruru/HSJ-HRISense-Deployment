@@ -1,3 +1,4 @@
+import { confirmAction } from '@/components/shared/ConfirmProvider';
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -173,9 +174,13 @@ export function AccountManagementPanel({
                     size="xs"
                     variant="outline"
                     disabled={isLoading || isArchived}
-                    onClick={() => {
-                      if (!confirm(`Change this employee's login to ${employee.personalEmail}? They will sign in with that address from now on.`)) return;
-                      void runAccountAction('use-personal-email', 'Login email updated.');
+                    onClick={async () => {
+                      const ok = await confirmAction({
+                        title: `Change this employee's login to ${employee.personalEmail}?`,
+                        message: 'They will sign in with that address from now on.',
+                        confirmLabel: 'Change login',
+                      });
+                      if (ok) void runAccountAction('use-personal-email', 'Login email updated.');
                     }}
                   >
                     Use personal email as login

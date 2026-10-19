@@ -719,6 +719,21 @@ export class AttendanceImportService {
    * about to touch against the snapshot taken at preview time, so a decision
    * made against a stale screen is refused rather than executed.
    */
+  /**
+   * How far an apply has got, for the progress bar while it runs. Each day is
+   * written in its own transaction, so the count moves as the work happens.
+   */
+  static async getApplyProgress(batchId: string) {
+    const batch = await prisma.attendanceImportBatch.findUnique({ where: { id: batchId }, select: { status: true } });
+    if (!batch) throw new AppError('Import not found.', 404);
+    const accepted = { batchId, hrDecision: AttendanceImportDecision.USE_UPLOADED };
+    const [total, done] = await Promise.all([
+      prisma.attendanceImportCandidate.count({ where: accepted }),
+      prisma.attendanceImportCandidate.count({ where: { ...accepted, OR: [{ appliedAt: { not: null } }, { applyError: { not: null } }] } }),
+    ]);
+    return { status: batch.status, done, total };
+  }
+
   static async apply(batchId: string, userId: string) {
     // The conditional update is what stops two people applying the same batch.
     const claimed = await prisma.attendanceImportBatch.updateMany({

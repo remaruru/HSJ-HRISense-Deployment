@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -25,9 +26,13 @@ export function DocumentReplaceDialog({
   const handleReplace = async () => {
     if (!file || !document) return;
 
-    if (!confirm("Are you sure you want to replace the physical file of this document? This action cannot be undone.")) {
-      return;
-    }
+    const ok = await confirmAction({
+      title: "Replace this document's file?",
+      message: "The current file is replaced by the one you chose. This can't be undone.",
+      confirmLabel: "Replace file",
+      danger: true,
+    });
+    if (!ok) return;
 
     setIsReplacing(true);
     setProgress(0);

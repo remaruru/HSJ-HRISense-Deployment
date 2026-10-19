@@ -15,6 +15,7 @@ import { getApiErrorMessage } from '@/utils/error-handler.util';
 import { CodeMappingPanel } from './components/CodeMappingPanel';
 import { IdentityIssuesPanel } from './components/IdentityIssuesPanel';
 import { ImportDecisionsDialog } from './components/ImportDecisionsDialog';
+import { ImportProgress, type ImportProgressState } from './components/ImportProgress';
 import {
   AttendanceImportService, CLASSIFICATION_LABELS, FLAG_LABELS,
   type ImportBatch, type ImportCandidate, type ImportClassification, type ImportPreview,
@@ -73,6 +74,7 @@ export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean
   const [page, setPage] = useState(1);
   const [applying, setApplying] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [progress, setProgress] = useState<ImportProgressState | null>(null);
 
   // A failed history load is not "nothing imported yet".
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -102,8 +104,12 @@ export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean
 
   const handleUpload = async (file: File) => {
     setUploading(true);
+    setProgress({ phase: 'uploading', fileName: file.name, percent: 0 });
     try {
-      const { batch, previouslyApplied } = await AttendanceImportService.upload(file);
+      const { batch, previouslyApplied } = await AttendanceImportService.upload(file, (percent) =>
+        // Once every byte is sent, the server is reading and checking the file.
+        setProgress(percent >= 100 ? { phase: 'reading', fileName: file.name } : { phase: 'uploading', fileName: file.name, percent })
+      );
       if (previouslyApplied) {
         toast.warning(`This file was already imported on ${fmtDate(previouslyApplied.at)}. Review the preview before applying it again.`);
       }
@@ -116,12 +122,20 @@ export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean
       toast.error(getApiErrorMessage(err, 'The file could not be imported.'));
     } finally {
       setUploading(false);
+      setProgress(null);
     }
   };
 
   const handleApply = async () => {
     if (!activeId) return;
     setApplying(true);
+    setProgress({ phase: 'applying', done: 0, total: null });
+    // The server writes day by day; ask how far it has got while the apply runs.
+    const poll = setInterval(() => {
+      AttendanceImportService.progress(activeId)
+        .then(({ done, total }) => setProgress((p) => (p?.phase === 'applying' ? { phase: 'applying', done, total } : p)))
+        .catch(() => undefined);
+    }, 1500);
     try {
       const batch = await AttendanceImportService.apply(activeId);
       toast.success(`Applied ${batch.countApplied} record${batch.countApplied === 1 ? '' : 's'}.`);
@@ -130,7 +144,9 @@ export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'The import could not be applied.'));
     } finally {
+      clearInterval(poll);
       setApplying(false);
+      setProgress(null);
     }
   };
 
@@ -171,7 +187,7 @@ export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean
                   uploading && 'pointer-events-none opacity-50'
                 )}>
                   <UploadCloud className="h-[1.125rem] w-[1.125rem]" />
-                  {uploading ? 'Reading…' : 'Upload export'}
+                  {uploading ? 'Uploading…' : 'Upload export'}
                 </span>
               </label>
     </div>
@@ -406,6 +422,7 @@ export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean
           </div>
         </motion.div>
       )}
+      <ImportProgress state={progress} />
     </motion.div>
   );
 }

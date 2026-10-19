@@ -101,13 +101,17 @@ export const AttendanceImportService = {
     return res.data.data;
   },
 
-  async upload(file: File) {
+  /** `onProgress` gets 0–100 while the file is being sent. */
+  async upload(file: File, onProgress?: (percent: number) => void) {
     const form = new FormData();
     form.append('file', file);
     const res = await api.post<{ data: { batch: ImportBatch; previouslyApplied: { at: string; filename: string } | null } }>(
       '/attendance/imports',
       form,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => onProgress?.(e.total ? (e.loaded / e.total) * 100 : 0),
+      }
     );
     return res.data.data;
   },
@@ -138,6 +142,12 @@ export const AttendanceImportService = {
       decision,
       reason,
     });
+    return res.data.data;
+  },
+
+  /** How many of the accepted days an apply has written so far. */
+  async progress(batchId: string) {
+    const res = await api.get<{ data: { status: string; done: number; total: number } }>(`/attendance/imports/${batchId}/progress`);
     return res.data.data;
   },
 

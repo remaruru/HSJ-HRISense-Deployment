@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
@@ -484,7 +485,12 @@ export function CalendarNotes({ onChange }: { onChange?: () => void }) {
 
   const deleteNote = async (note: Note) => {
     const shared = note.audience !== "PERSONAL";
-    if (!confirm(shared ? `Remove "${note.title}" from everyone's calendar?` : `Delete "${note.title}"?`)) return;
+    const ok = await confirmAction(
+      shared
+        ? { title: `Remove "${note.title}" from everyone's calendar?`, confirmLabel: "Remove", danger: true }
+        : { title: `Delete "${note.title}"?`, confirmLabel: "Delete", danger: true }
+    );
+    if (!ok) return;
     const before = notes;
     setNotes((prev) => prev.filter((n) => n.id !== note.id));
     try {

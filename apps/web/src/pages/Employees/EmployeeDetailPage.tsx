@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useState, useEffect } from "react";
 import { BreakdownButton, MetricBreakdownDialog } from '@/components/shared/MetricBreakdown';
 import { profileCompletionSpec } from '@/components/shared/profileCompletionSpec';
@@ -385,7 +386,7 @@ export default function EmployeeDetailPage() {
   // the employee exactly as shown, with the reason in a toast.
   const handleArchive = async () => {
     if (statusBusy) return;
-    if (!confirm("Are you sure you want to archive this employee? They will not be able to log in.")) return;
+    if (!(await confirmAction({ title: "Archive this employee?", message: "They will not be able to sign in.", confirmLabel: "Archive", danger: true }))) return;
     setStatusBusy(true);
     try {
       await api.patch(`/employees/${employeeId}/archive`);

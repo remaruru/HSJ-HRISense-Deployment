@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import React, { useState, useEffect } from 'react';
 import { CalendarDays, AlertCircle, CheckCircle2, XCircle, Plus, Info, Edit, Trash2, Building2 } from 'lucide-react';
 import { api } from '@/services/api';
@@ -102,13 +103,13 @@ export function HolidayCalendarPage() {
 
   const handleDeactivateManual = async (id: string) => {
     if (!isHR) return;
-    if (
-      !confirm(
-        'Deactivate this calendar entry?\n\nIt will no longer apply to attendance, but the record is kept for history. This is not a permanent delete.'
-      )
-    ) {
-      return;
-    }
+    const ok = await confirmAction({
+      title: 'Deactivate this calendar entry?',
+      message: 'It will no longer apply to attendance, but the record is kept for history. This is not a permanent delete.',
+      confirmLabel: 'Deactivate',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       // Named deactivate endpoint — entries are never hard-deleted because
       // historical attendance is interpreted against them.

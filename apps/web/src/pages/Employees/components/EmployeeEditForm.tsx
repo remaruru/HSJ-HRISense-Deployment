@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -242,9 +243,13 @@ export function EmployeeEditForm({
   const [newSupervisorId, setNewSupervisorId] = useState<string>("");
   const [overrideReason, setOverrideReason] = useState<string>("");
 
+  // Leaving the page with unsaved edits asks first. (It used to block with no
+  // question shown, so the page silently refused to change.)
   useBlocker({
-    shouldBlockFn: () => isDirty && !isSubmitting,
-    withResolver: true
+    shouldBlockFn: async () => {
+      if (!isDirty || isSubmitting) return false;
+      return !(await confirmAction({ title: 'Leave without saving?', message: 'The changes you have not saved will be lost.', confirmLabel: 'Leave', cancelLabel: 'Stay', danger: true }));
+    },
   });
 
   // Eligible Supervisors list for override selection
@@ -337,9 +342,9 @@ export function EmployeeEditForm({
       eligibility.soloParentLeaveEligible !== originalEligibility.soloParentLeaveEligible);
   const changeCount = changedKeys.length + (contactsChanged ? 1 : 0) + (eligibilityChanged ? 1 : 0);
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (isDirty) {
-      if (confirm('You have unsaved changes. Are you sure you want to discard them?')) {
+      if (await confirmAction({ title: 'Discard your changes?', message: 'The changes you have not saved will be lost.', confirmLabel: 'Discard', cancelLabel: 'Keep editing', danger: true })) {
         setIsDirty(false);
         onClose();
       }

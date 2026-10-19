@@ -76,6 +76,7 @@ router.get('/:id/preview', asyncHandler(AttendanceImportController.preview));
 router.post('/:id/decisions', validate(decideSchema), asyncHandler(AttendanceImportController.decide));
 router.post('/:id/candidates/:candidateId/correct', validate(correctSchema), asyncHandler(AttendanceImportController.correct));
 router.post('/:id/apply', asyncHandler(AttendanceImportController.apply));
+router.get('/:id/progress', asyncHandler(AttendanceImportController.progress));
 router.post('/:id/cancel', asyncHandler(AttendanceImportController.cancel));
 router.post('/map-code', validate(mapCodeSchema), asyncHandler(AttendanceImportController.mapCode));
 

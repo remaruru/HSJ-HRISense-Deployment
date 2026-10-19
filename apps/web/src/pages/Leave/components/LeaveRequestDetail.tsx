@@ -1,3 +1,4 @@
+import { confirmAction } from '@/components/shared/ConfirmProvider';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, XCircle, X, FileText, CalendarRange, Ban, Loader2, Check } from 'lucide-react';
@@ -436,10 +437,15 @@ export function LeaveRequestDetail({
                     <Button
                       variant="outline"
                       disabled={busy}
-                      onClick={() => {
-                        if (confirm('Cancel this leave request? It will be withdrawn and its days released.')) {
-                          void act(() => leaveApi.cancel(leave.id), 'Leave request cancelled.');
-                        }
+                      onClick={async () => {
+                        const ok = await confirmAction({
+                          title: 'Cancel this leave request?',
+                          message: 'It will be withdrawn and its days released.',
+                          confirmLabel: 'Cancel request',
+                          cancelLabel: 'Keep it',
+                          danger: true,
+                        });
+                        if (ok) void act(() => leaveApi.cancel(leave.id), 'Leave request cancelled.');
                       }}
                     >
                       <Ban /> Cancel request

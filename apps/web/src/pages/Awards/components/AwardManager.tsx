@@ -1,3 +1,4 @@
+import { confirmAction, type ConfirmOptions } from "@/components/shared/ConfirmProvider";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -51,14 +52,14 @@ const STAGE: Record<AwardStatus, { title: string; summary: string }> = {
   FINALIZED: { title: "Announced", summary: "Employees see the winners. Saved in Award History." },
 };
 
-const CONFIRM_TEXT: Partial<Record<AwardAction, string>> = {
-  OPEN_NOMINATION: "Open nominations now? Every employee will see a Nominate form under My Awards.",
-  CLOSE_NOMINATION: "Close nominations? Nobody can nominate after this.",
-  OPEN_VOTING: "Open voting now? Employees will see their ballot under My Awards.",
-  CLOSE_VOTING: "Close voting? Nobody can vote after this, and the votes are counted.",
-  START_REVIEW: "Start the review? The vote count is frozen so the committee can decide. Nobody is a winner until you announce the results.",
-  VERIFY: "Mark the results as checked?",
-  FINALIZE: "Announce the final results? Employees will see the winners, and this becomes a permanent record.",
+const CONFIRM_TEXT: Partial<Record<AwardAction, ConfirmOptions>> = {
+  OPEN_NOMINATION: { title: "Open nominations now?", message: "Every employee will see a Nominate form under My Awards.", confirmLabel: "Open nominations" },
+  CLOSE_NOMINATION: { title: "Close nominations?", message: "Nobody can nominate after this.", confirmLabel: "Close nominations" },
+  OPEN_VOTING: { title: "Open voting now?", message: "Employees will see their ballot under My Awards.", confirmLabel: "Open voting" },
+  CLOSE_VOTING: { title: "Close voting?", message: "Nobody can vote after this, and the votes are counted.", confirmLabel: "Close voting" },
+  START_REVIEW: { title: "Start the review?", message: "The vote count is frozen so the committee can decide. Nobody is a winner until you announce the results.", confirmLabel: "Start the review" },
+  VERIFY: { title: "Mark the results as checked?", confirmLabel: "Mark as checked" },
+  FINALIZE: { title: "Announce the final results?", message: "Employees will see the winners, and this becomes a permanent record.", confirmLabel: "Announce" },
 };
 
 function stagesOf(a: { usesNomination: boolean; usesVoting: boolean; requiresConfirmation: boolean }): AwardStatus[] {
@@ -209,8 +210,9 @@ function AwardDetailView({ id, onBack, onGoToGroups }: { id: string; onBack: () 
     }
   };
 
-  const step = (action: AwardAction) => {
-    if (CONFIRM_TEXT[action] && !window.confirm(CONFIRM_TEXT[action])) return;
+  const step = async (action: AwardAction) => {
+    const question = CONFIRM_TEXT[action];
+    if (question && !(await confirmAction(question))) return;
     void run(() => AwardsService.transition(id, action), `${AWARD_ACTION_LABEL[action]}: done.`);
   };
 
@@ -315,7 +317,7 @@ function AwardDetailView({ id, onBack, onGoToGroups }: { id: string; onBack: () 
             variant="ghost" size="sm" disabled={busy}
             className="gap-1 text-status-danger-foreground"
             onClick={async () => {
-              if (!window.confirm("Delete this draft award? Only drafts with no nominations or votes can be deleted.")) return;
+              if (!(await confirmAction({ title: "Delete this draft award?", message: "Only drafts with no nominations or votes can be deleted.", confirmLabel: "Delete", danger: true }))) return;
               try { await AwardsService.remove(id); toast.success("Draft deleted."); onBack(); } catch (err) { toast.error(getApiErrorMessage(err, "The draft could not be deleted.")); }
             }}
           >
@@ -514,7 +516,7 @@ function ResultsReview({ award: a, busy, pending, onRun }: { award: AwardDetail;
           </p>
         </div>
         {deciding && pending > 0 && (
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => window.confirm(`Confirm all ${pending} people still waiting${longevity ? "" : ", in their ranked places"}?`) && onRun(() => AwardsService.confirmShortlist(a.id), "Confirmed.")}>
+          <Button size="sm" variant="outline" disabled={busy} onClick={async () => { if (await confirmAction({ title: `Confirm all ${pending} people still waiting?`, message: longevity ? undefined : "They are confirmed in their ranked places.", confirmLabel: "Confirm all" })) void onRun(() => AwardsService.confirmShortlist(a.id), "Confirmed."); }}>
             Confirm everyone left ({pending})
           </Button>
         )}

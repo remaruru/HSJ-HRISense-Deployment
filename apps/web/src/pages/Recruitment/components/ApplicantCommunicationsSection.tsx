@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +56,7 @@ export function ApplicantCommunicationsSection({
   }, [applicationId]);
 
   const handleRetry = async (communicationId: string) => {
-    if (!window.confirm("Are you sure you want to retry sending this failed email?")) return;
+    if (!(await confirmAction({ title: "Send this email again?", message: "It failed the last time it was sent.", confirmLabel: "Retry sending" }))) return;
     
     setRetryingId(communicationId);
     try {

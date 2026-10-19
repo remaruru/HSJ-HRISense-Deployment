@@ -174,13 +174,9 @@ export function ImportDecisionsDialog({
               variant="solid"
               disabled={busy}
               onClick={async () => {
-                setBusy(true);
-                try {
-                  await onApply();
-                  onOpenChange(false);
-                } finally {
-                  setBusy(false);
-                }
+                // Close first, so the apply progress window is what the person sees.
+                onOpenChange(false);
+                await onApply();
               }}
             >
               <CheckCircle2 /> Apply import

@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
@@ -196,7 +197,7 @@ export default function JobOpeningFormPage() {
       }
 
       if (publish && savedId) {
-        if (window.confirm("Are you sure you want to publish this opening? It will become publicly visible on the Careers portal if the dates are valid.")) {
+        if (await confirmAction({ title: "Publish this opening now?", message: "It has been saved. Publishing makes it publicly visible on the Careers portal if its dates are valid.", confirmLabel: "Publish", cancelLabel: "Not yet" })) {
           await RecruitmentService.changeJobOpeningStatus(savedId, "OPEN");
           toast.success("Job opening published successfully");
         }

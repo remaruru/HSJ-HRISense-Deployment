@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useState, useEffect, useMemo } from "react";
 import { HelpLink } from '@/components/common/HelpLink';
 import {
@@ -463,12 +464,13 @@ export default function CompliancePage() {
 
   // ── Deactivate Requirement ──
   const handleDeactivateRequirement = async (req: ComplianceRequirement) => {
-    if (
-      !confirm(
-        `Deactivate this requirement?\n\nIt will no longer be evaluated as an active requirement. Existing employee records and history will remain available.`
-      )
-    )
-      return;
+    const ok = await confirmAction({
+      title: "Deactivate this requirement?",
+      message: "It will no longer be evaluated as an active requirement. Existing employee records and history will remain available.",
+      confirmLabel: "Deactivate",
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       await ComplianceService.archiveRequirement(req.id);

@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -201,8 +202,8 @@ export function AdditionalOversightDialog({
                                 size="xs"
                                 variant="ghost"
                                 disabled={busy}
-                                onClick={() => {
-                                  if (!confirm(`Remove ${g.overseer.fullName}'s additional oversight of ${what}?`)) return;
+                                onClick={async () => {
+                                  if (!(await confirmAction({ title: `Remove ${g.overseer.fullName}'s additional oversight of ${what}?`, confirmLabel: "Remove", danger: true }))) return;
                                   void run(() => api.delete(`/employees/additional-oversight/${r.id}`), "Additional oversight removed.");
                                 }}
                                 className="gap-1 text-status-danger-foreground"

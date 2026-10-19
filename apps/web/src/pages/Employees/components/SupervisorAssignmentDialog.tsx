@@ -1,3 +1,4 @@
+import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -72,7 +73,13 @@ export function SupervisorAssignmentDialog({
   };
 
   const handleRemoveOverride = async () => {
-    if (!confirm("Are you sure you want to remove the manual override? The supervisor will be recalculated based on the organizational hierarchy.")) return;
+    const ok = await confirmAction({
+      title: "Remove the manual override?",
+      message: "The supervisor will be worked out again from the organizational hierarchy.",
+      confirmLabel: "Remove override",
+      danger: true,
+    });
+    if (!ok) return;
     setIsSubmitting(true);
     try {
       await api.delete(`/employees/${employeeId}/supervisor-override`);

@@ -1,3 +1,4 @@
+import { confirmAction, type ConfirmOptions } from "@/components/shared/ConfirmProvider";
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
@@ -52,9 +53,9 @@ export default function JobOpeningDetailPage() {
     fetchOpening();
   }, [openingId]);
 
-  const handleStatusChange = async (newStatus: JobOpeningStatus, confirmMessage: string) => {
+  const handleStatusChange = async (newStatus: JobOpeningStatus, question: ConfirmOptions) => {
     if (!opening || !openingId) return;
-    if (!window.confirm(confirmMessage)) return;
+    if (!(await confirmAction(question))) return;
 
     setActionPending(true);
     try {
@@ -104,24 +105,24 @@ export default function JobOpeningDetailPage() {
           )}
 
           {canPublish && opening.status === "DRAFT" && (
-            <Button variant="create" size="sm" onClick={() => handleStatusChange("OPEN", "Publish this opening? It will become publicly visible if dates are valid.")} disabled={actionPending} className="gap-2 border-transparent shadow-pop-color">
+            <Button variant="create" size="sm" onClick={() => handleStatusChange("OPEN", { title: "Publish this opening?", message: "It will become publicly visible if its dates are valid.", confirmLabel: "Publish" })} disabled={actionPending} className="gap-2 border-transparent shadow-pop-color">
               <Globe className="h-4 w-4" /> Publish
             </Button>
           )}
 
           {canManage && opening.status === "OPEN" && (
             <>
-              <Button variant="outline" size="sm" onClick={() => handleStatusChange("CLOSED", "Close this opening? It will no longer accept new applications.")} disabled={actionPending} className="gap-2 text-warning-dark hover:text-warning-dark hover:bg-warning-light border-warning-dark">
+              <Button variant="outline" size="sm" onClick={() => handleStatusChange("CLOSED", { title: "Close this opening?", message: "It will no longer accept new applications.", confirmLabel: "Close opening", danger: true })} disabled={actionPending} className="gap-2 text-warning-dark hover:text-warning-dark hover:bg-warning-light border-warning-dark">
                 <XCircle className="h-4 w-4" /> Close
               </Button>
-              <Button variant="outline" size="sm" onClick={() => handleStatusChange("FILLED", "Mark as filled? It will no longer receive applications.")} disabled={actionPending} className="gap-2 text-primary-700 hover:text-primary-700 hover:bg-primary-50 border-primary-500 dark:text-primary-300 dark:hover:text-primary-300 dark:hover:bg-primary-900/40">
+              <Button variant="outline" size="sm" onClick={() => handleStatusChange("FILLED", { title: "Mark this opening as filled?", message: "It will no longer receive applications.", confirmLabel: "Mark as filled" })} disabled={actionPending} className="gap-2 text-primary-700 hover:text-primary-700 hover:bg-primary-50 border-primary-500 dark:text-primary-300 dark:hover:text-primary-300 dark:hover:bg-primary-900/40">
                 <CheckCircle className="h-4 w-4" /> Mark Filled
               </Button>
             </>
           )}
 
           {canManage && (opening.status === "CLOSED" || opening.status === "FILLED") && (
-            <Button variant="delete" size="sm" onClick={() => handleStatusChange("ARCHIVED", "Archive this opening? It will be hidden from normal active lists.")} disabled={actionPending} className="gap-2">
+            <Button variant="delete" size="sm" onClick={() => handleStatusChange("ARCHIVED", { title: "Archive this opening?", message: "It will be hidden from the normal active lists.", confirmLabel: "Archive", danger: true })} disabled={actionPending} className="gap-2">
               <ArchiveIcon className="h-4 w-4" /> Archive
             </Button>
           )}
