@@ -381,6 +381,7 @@ const ENTRIES: Record<string, Entry> = {
   APPLICANT_DOCUMENT_PREVIEWED: E('RECORD_ACCESS', 'VIEW', 'previewed the applicant document {r} of {s}', 'Document previewed'),
   APPLICANT_DOCUMENT_ACCESSED: E('RECORD_ACCESS', 'VIEW', 'opened the applicant document {r} of {s}', 'Document opened'),
   AI_ASSISTANT_DATA_ACCESS: E('RECORD_ACCESS', 'VIEW', 'looked up the records of {s} through the AI assistant', 'AI data access'),
+  EMPLOYEE_PROFILE_EXPORTED: E('RECORD_ACCESS', 'VIEW', 'exported the profile of {s} as a PDF', 'Profile exported'),
 };
 
 /** Actions written with a variable suffix, e.g. `JOB_APPLICATION_STATUS_HIRED`. */

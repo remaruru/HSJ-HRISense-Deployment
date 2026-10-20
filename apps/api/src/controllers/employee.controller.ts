@@ -8,8 +8,37 @@ import { OrgHierarchyService } from '../services/org-hierarchy.service';
 import { AdditionalOversightService } from '../services/additional-oversight.service';
 import { auditSnapshotDiff } from '../services/audit-catalog';
 import { ProfileImageService, type ProfileImageKind } from '../services/profile-image.service';
+import { EmployeeProfileExportService } from '../services/employee-profile-export.service';
 
 export class EmployeeController {
+  /**
+   * GET /employees/:id/export/pdf — the profile as a PDF. HR may export anyone;
+   * every other user only their own record. Each export is written to the audit log.
+   */
+  static async exportProfilePdf(req: Request, res: Response, next: NextFunction) {
+    try {
+      const employeeId = req.params.id;
+      if (req.user!.permissionTier !== 'FULL' && req.user!.employeeId !== employeeId) {
+        throw new AppError('You can export only your own profile.', 403);
+      }
+      const { buffer, fileName } = await EmployeeProfileExportService.toPdf(employeeId);
+      await createAuditLog({
+        actorUserId: req.user!.userId,
+        targetEmployeeId: employeeId,
+        action: 'EMPLOYEE_PROFILE_EXPORTED',
+        entityType: 'EMPLOYEE',
+        entityId: employeeId,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.send(buffer);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   /**
    * GET /employees — list employees (HR: all, supervisor: direct reports, standard: own)
    */

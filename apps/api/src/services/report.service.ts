@@ -1,10 +1,9 @@
 import { Prisma } from '@prisma/client';
 import { formatPercent, ratio, share as sharedShare } from '../lib/percent';
-import ExcelJS from 'exceljs';
-import PDFDocument from 'pdfkit';
 import { prisma } from '../config/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { activeWorkforceWhere } from '../lib/workforceScope';
+import { reportToCsv, reportToExcel, reportToPdf } from './report-export';
 
 /**
  * Reports — built strictly from data HRISense actually holds.
@@ -148,6 +147,9 @@ export function share(part: number, whole: number): string {
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+/** "Cruz, Juan" — or just the part that exists, never ", Juan". */
+const personName = (p: { lastName?: string | null; firstName?: string | null }) =>
+  [p.lastName?.trim(), p.firstName?.trim()].filter(Boolean).join(', ');
 /** Subject-verb agreement, so a count of 1 does not read "1 requirement need". */
 const verb = (n: number, singular: string, pluralForm: string) => (n === 1 ? singular : pluralForm);
 
@@ -244,7 +246,7 @@ export class ReportService {
       ],
       rows: employees.map((e) => ({
         employeeNumber: e.employeeNumber,
-        name: `${e.lastName}, ${e.firstName}`,
+        name: personName(e),
         unit: e.unit?.name ?? '—',
         department: e.department?.name ?? '—',
         jobRole: e.jobRole?.title ?? '—',
@@ -346,7 +348,7 @@ export class ReportService {
       const bucket = byEmployee.get(e.id)!;
       return {
         employeeNumber: e.employeeNumber,
-        name: `${e.lastName}, ${e.firstName}`,
+        name: personName(e),
         unit: e.unit?.name ?? '—',
         present: bucket.counts['PRESENT'] ?? 0,
         late: bucket.counts['LATE'] ?? 0,
@@ -494,7 +496,7 @@ export class ReportService {
       ],
       rows: requests.map((r) => ({
         employeeNumber: r.employee.employeeNumber,
-        name: `${r.employee.lastName}, ${r.employee.firstName}`,
+        name: personName(r.employee),
         unit: r.employee.unit?.name ?? '—',
         leaveType: String(r.leaveType),
         startDate: r.startDate.toISOString().split('T')[0],
@@ -611,7 +613,7 @@ export class ReportService {
 
       return {
         employeeNumber: emp.employeeNumber,
-        name: `${emp.lastName}, ${emp.firstName}`,
+        name: personName(emp),
         unit: emp.unit?.name ?? '—',
         applicable: tally.applicable,
         valid: tally.valid,
@@ -876,10 +878,10 @@ export class ReportService {
       rows: assignments.map((a) => ({
         cycle: a.cycle.name,
         employeeNumber: a.employee.employeeNumber,
-        name: `${a.employee.lastName}, ${a.employee.firstName}`,
+        name: personName(a.employee),
         unit: a.employee.unit?.name ?? '—',
         rating: a.raterType === 'SELF' ? 'Self' : a.raterType === 'PEER' ? 'Peer' : 'Head / supervisor / coordinator',
-        evaluator: `${a.evaluator.lastName}, ${a.evaluator.firstName}`,
+        evaluator: personName(a.evaluator),
         dueDate: a.dueDate.toISOString().split('T')[0],
         status: String(a.status),
         overdue:
@@ -1036,106 +1038,15 @@ export class ReportService {
   }
 
   // ── Exports ────────────────────────────────────────────────────────────────
-  static async toExcel(report: ReportResult): Promise<Buffer> {
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'HRISense';
-    const sheet = workbook.addWorksheet(report.title.slice(0, 30));
-
-    sheet.addRow([`HRISense — ${report.title}`]).font = { bold: true, size: 14 };
-    sheet.addRow([report.description]);
-    if (report.period.from || report.period.to) {
-      sheet.addRow([
-        'Period',
-        `${report.period.from?.split('T')[0] ?? 'start'} to ${report.period.to?.split('T')[0] ?? 'today'}`,
-      ]);
-    }
-    sheet.addRow(['Generated', new Date().toLocaleString('en-PH')]);
-    sheet.addRow([]);
-
-    if (report.totals.length > 0) {
-      sheet.addRow(['Summary']).font = { bold: true };
-      for (const t of report.totals) sheet.addRow([t.label, t.value]);
-      sheet.addRow([]);
-    }
-
-    const header = sheet.addRow(report.columns.map((c) => c.label));
-    header.font = { bold: true };
-    sheet.columns.forEach((col) => { col.width = 20; });
-
-    for (const row of report.rows) {
-      sheet.addRow(report.columns.map((c) => row[c.key] ?? ''));
-    }
-
-    if (report.notes.length > 0) {
-      sheet.addRow([]);
-      sheet.addRow(['Notes']).font = { bold: true };
-      for (const note of report.notes) sheet.addRow([note]);
-    }
-
-    return Buffer.from(await workbook.xlsx.writeBuffer());
+  static toExcel(report: ReportResult): Promise<Buffer> {
+    return reportToExcel(report);
   }
 
   static toPdf(report: ReportResult): Promise<Buffer> {
-    return new Promise((resolve, reject) => {
-      try {
-        const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
-        const chunks: Buffer[] = [];
-        doc.on('data', (c) => chunks.push(c as Buffer));
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
-
-        doc.fontSize(16).text(`HRISense — ${report.title}`, { underline: false });
-        doc.moveDown(0.3);
-        doc.fontSize(9).fillColor('#555').text(report.description);
-        if (report.period.from || report.period.to) {
-          doc.text(
-            `Period: ${report.period.from?.split('T')[0] ?? 'start'} to ${report.period.to?.split('T')[0] ?? 'today'}`
-          );
-        }
-        doc.text(`Generated: ${new Date().toLocaleString('en-PH')}`);
-        doc.fillColor('#000').moveDown(0.8);
-
-        if (report.totals.length > 0) {
-          doc.fontSize(11).text('Summary');
-          doc.moveDown(0.2);
-          doc.fontSize(9);
-          for (const t of report.totals) doc.text(`${t.label}: ${t.value}`);
-          doc.moveDown(0.8);
-        }
-
-        doc.fontSize(9);
-        const headerLine = report.columns.map((c) => c.label).join(' | ');
-        doc.font('Helvetica-Bold').text(headerLine);
-        doc.font('Helvetica').moveDown(0.2);
-
-        const maxRows = 500;
-        report.rows.slice(0, maxRows).forEach((row) => {
-          doc.text(report.columns.map((c) => String(row[c.key] ?? '')).join(' | '));
-        });
-        if (report.rows.length > maxRows) {
-          doc.moveDown(0.5).text(`... ${report.rows.length - maxRows} more row(s). Use the Excel export for the full data set.`);
-        }
-
-        if (report.notes.length > 0) {
-          doc.moveDown(0.8).font('Helvetica-Bold').text('Notes').font('Helvetica');
-          for (const note of report.notes) doc.text(`• ${note}`);
-        }
-
-        doc.end();
-      } catch (err) {
-        reject(err);
-      }
-    });
+    return reportToPdf(report);
   }
 
   static toCsv(report: ReportResult): string {
-    const escape = (value: unknown) => {
-      const s = String(value ?? '');
-      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const lines = [
-      report.columns.map((c) => escape(c.label)).join(','),
-      ...report.rows.map((row) => report.columns.map((c) => escape(row[c.key])).join(',')),
-    ];
-    return lines.join('\n');
+    return reportToCsv(report);
   }
 }

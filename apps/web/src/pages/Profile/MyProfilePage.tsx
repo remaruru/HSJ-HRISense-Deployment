@@ -25,6 +25,7 @@ import { EmployeeEvaluationProfileTab } from '@/pages/Employees/components/Emplo
 import { EmployeeTrainingProfileTab } from '@/pages/Employees/components/EmployeeTrainingProfileTab';
 import { LeaveBalancePanel } from '@/pages/Leave/components/LeaveBalancePanel';
 import { ProfileHero } from './components/ProfileHero';
+import { ExportProfileButton } from '@/components/shared/ExportProfileButton';
 import { ProfileDocumentsSection } from './components/ProfileDocumentsSection';
 import { EditMyProfileDialog } from './components/EditMyProfileDialog';
 import { NOT_PROVIDED, formatDate, formatDateTime, formatEnumLabel, fullNameOf } from './profileFormat';
@@ -179,6 +180,9 @@ export default function MyProfilePage() {
 
   return (
     <motion.div initial="hidden" animate="visible" variants={staggerContainer} className="p-4 sm:p-6 space-y-5 sm:space-y-6 max-w-screen-xl mx-auto">
+      <div className="flex justify-end">
+        <ExportProfileButton employee={employee} />
+      </div>
       <motion.div variants={staggerItem}>
         <ProfileHero
           employee={employee}

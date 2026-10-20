@@ -81,6 +81,8 @@ router.delete('/:id/supervisor-override', authorize(['FULL']), EmployeeControlle
 
 // ─── Employee Timeline (audit history for this employee) ──────────────────────
 router.get('/:id/timeline', EmployeeController.getTimeline);
+// Profile as a PDF: HR for anyone, everyone else for their own record only.
+router.get('/:id/export/pdf', EmployeeController.exportProfilePdf);
 router.get('/:id/profile-completion', EmployeeController.getProfileCompletion);
 
 // ─── HR Account Management (single authoritative account surface) ─────────────

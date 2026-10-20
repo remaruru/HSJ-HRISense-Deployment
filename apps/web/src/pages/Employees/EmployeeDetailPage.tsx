@@ -29,6 +29,7 @@ import { DocumentDeleteDialog } from "./components/DocumentDeleteDialog";
 import { SupervisorAssignmentDialog } from "./components/SupervisorAssignmentDialog";
 import { AccountManagementPanel } from "./components/AccountManagementPanel";
 import { GovernmentInfoDialog } from "./components/GovernmentInfoDialog";
+import { ExportProfileButton } from "@/components/shared/ExportProfileButton";
 import { LeaveBalancePanel } from "@/pages/Leave/components/LeaveBalancePanel";
 import { useAuth } from "@/providers/AuthProvider";
 import { formatAge } from "@/lib/age";
@@ -446,7 +447,10 @@ export default function EmployeeDetailPage() {
         <Link to="/employees" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to Employee Directory
         </Link>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Employee Management</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Employee Management</span>
+          {isFullHR && <ExportProfileButton employee={employee} />}
+        </div>
       </div>
 
       {isSelf && isFullHR && (
