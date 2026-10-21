@@ -7,7 +7,7 @@ import {
  Clock, AlertCircle, RefreshCw, AlertTriangle,
  ChevronUp, ChevronDown, ChevronsUpDown, Archive, RotateCcw,
  CheckSquare, FileSpreadsheet, FileText, X, ChevronLeft,
- ChevronRight, Users, UserCheck, Shield, FileType
+ ChevronRight, Users, UserCheck, Shield, FileType, Columns3
 } from"lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -132,7 +132,7 @@ function CompletionMeter({ pct, onOpen }: { pct: number; onOpen: () => void }) {
  </div>
  <button
  type="button"
- onClick={(e) => { e.stopPropagation(); onOpen(); }}
+ onClick={onOpen}
  title="View how this percentage is calculated"
  aria-label={`Profile completion ${pct}% — view breakdown`}
  className="text-xs font-semibold text-foreground font-mono underline decoration-dotted underline-offset-2 hover:text-primary-700 dark:hover:text-primary-300"
@@ -701,34 +701,21 @@ export function EmployeesPage() {
  header:"Completion",
  cell: ({ row }) => <CompletionMeter pct={row.original.profileCompletion ?? 0} onOpen={() => openCompletion(row.original.id)} />,
  },
- // 12. Actions
+ // 12. Actions — one way into the record. Editing, archiving and the
+ // supervisor assignment all live on the profile itself, so the row
+ // needs no separate Edit or Review buttons that open the same page.
  {
  id:"actions",
  enableSorting: false,
  header: "",
- cell: ({ row }) => {
- const emp = row.original;
- return (
- <div className="flex items-center gap-1 justify-end">
- {emp.supervisorAssignmentStatus ==="PENDING" && isFullHR && (
- <Button size="sm" variant="review" className="text-[13px] h-8 px-3 font-semibold"
- onClick={(e) => { e.stopPropagation(); goToProfile(emp.id); }}>
- Review
- </Button>
- )}
+ cell: ({ row }) => (
+ <div className="flex justify-end">
  <Button size="sm" variant="review" className="h-8 px-3 text-[13px] font-semibold"
- onClick={() => goToProfile(emp.id)}>
+ onClick={() => goToProfile(row.original.id)}>
  View
  </Button>
- {isFullHR && (
- <Button size="sm" variant="update" className="h-8 px-3 text-[13px] font-semibold border-border"
- onClick={() => goToProfile(emp.id)}>
- Edit
- </Button>
- )}
  </div>
- );
- },
+ ),
  },
  ], [isFullHR, sorting, openCompletion]);
 
@@ -831,7 +818,7 @@ export function EmployeesPage() {
  aria-expanded={showColumnMenu}
  aria-haspopup="true"
  >
- <Filter className="h-4 w-4" />
+ <Columns3 className="h-4 w-4" />
  Columns
  </Button>
  {showColumnMenu && (
@@ -1037,7 +1024,7 @@ export function EmployeesPage() {
  type="date"
  value={hireDateTo}
  onChange={e => { setHireDateTo(e.target.value); setPagination(p => ({ ...p, pageIndex: 0 })); }}
- className="w-full text-sm border border-border rounded-lg px-2 py-1 bg-surface focus:outline-none focus:ring-1 focus:ring-primary-500"
+ className="hrisense-control w-full"
  />
  </div>
  {/* Active vs Archived Toggle */}
@@ -1046,7 +1033,7 @@ export function EmployeesPage() {
  <select
  value={isArchivedFilter}
  onChange={e => { setIsArchivedFilter(e.target.value); setPagination(p => ({ ...p, pageIndex: 0 })); }}
- className="w-full text-sm border border-border rounded-lg px-2 py-1.5 bg-surface focus:outline-none focus:ring-1 focus:ring-primary-500"
+ className="hrisense-control w-full"
  >
  <option value="false">Active Employees Only</option>
  <option value="true">Archived Employees Only</option>
@@ -1096,18 +1083,7 @@ export function EmployeesPage() {
  onClick={() => setConfirmState({ open: true, action:"deactivate" })}>
  <Shield className="h-3.5 w-3.5" /> Deactivate Accounts
  </Button>
- <Button
- size="sm" variant="outline" className="bg-surface"
- onClick={() => handleExport("SELECTED","excel")}
- >
- <FileSpreadsheet className="h-3.5 w-3.5 text-status-success-foreground" /> Export Excel
- </Button>
- <Button
- size="sm" variant="outline" className="bg-surface"
- onClick={() => handleExport("SELECTED","pdf")}
- >
- <FileType className="h-3.5 w-3.5 text-status-danger-foreground" /> Export PDF
- </Button>
+ {/* Exporting the selection is in Export Reports → "Selected", not repeated here. */}
  </div>
  </motion.div>
  )}
@@ -1245,12 +1221,7 @@ export function EmployeesPage() {
  </div>
  </dl>
 
- <div className="mt-3 flex gap-2">
- {emp.supervisorAssignmentStatus ==="PENDING" && isFullHR && (
- <Button size="sm" variant="review" className="h-10 px-4 font-semibold" onClick={() => goToProfile(emp.id)}>
- Review
- </Button>
- )}
+ <div className="mt-3 flex">
  <Button size="sm" variant="review" className="h-10 flex-1 font-semibold" onClick={() => goToProfile(emp.id)}>
  View Employee
  </Button>
@@ -1322,25 +1293,15 @@ export function EmployeesPage() {
  </td>
  </tr>
  ) : (
+ // The row itself is not a button: only the controls in it (View,
+ // the checkbox, the completion %) respond to the pointer.
  table.getRowModel().rows.map(row => (
  <tr
  key={row.id}
- className={cn(
-"hover:bg-muted/30 transition-colors cursor-pointer",
- row.getIsSelected() &&"bg-primary-50/60 dark:bg-primary-900/40"
- )}
- onClick={() => goToProfile(row.original.id)}
+ className={cn(row.getIsSelected() &&"bg-primary-50/60 dark:bg-primary-900/40")}
  >
  {row.getVisibleCells().map(cell => (
- <td
- key={cell.id}
- className="px-4 py-3 align-middle"
- onClick={
- cell.column.id ==="select" || cell.column.id ==="actions"
- ? e => e.stopPropagation()
- : undefined
- }
- >
+ <td key={cell.id} className="px-4 py-3 align-middle">
  {flexRender(cell.column.columnDef.cell, cell.getContext())}
  </td>
  ))}
