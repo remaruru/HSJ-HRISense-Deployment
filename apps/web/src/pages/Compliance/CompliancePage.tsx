@@ -209,6 +209,12 @@ export default function CompliancePage() {
   const [fulfillmentExpiresAt, setFulfillmentExpiresAt] = useState("");
   const [fulfillmentNotes, setFulfillmentNotes] = useState("");
 
+  // Review a submitted fulfillment record (HR only; the review endpoint is FULL-tier)
+  const isHr = user?.permissionTier === "FULL";
+  const [reviewTarget, setReviewTarget] = useState<{ recordId: string; title: string } | null>(null);
+  const [reviewDecision, setReviewDecision] = useState<"ACCEPTED" | "NEEDS_CORRECTION">("ACCEPTED");
+  const [reviewNote, setReviewNote] = useState("");
+
   // Create Requirement Form states
   const [formTitle, setFormTitle] = useState("");
   const [formCategory, setFormCategory] = useState<RequirementCategory>("CERTIFICATION");
@@ -528,6 +534,44 @@ export default function CompliancePage() {
       }
     } catch (err: any) {
       toast.error(getApiErrorMessage(err, "Failed to submit compliance record"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ── Review a Fulfillment Record ──
+  // A recorded fulfillment starts as Pending review and counts as Needs review until
+  // HR accepts it; this is where HR accepts it or asks for a correction.
+  const handleOpenReview = (item: EmployeeComplianceSummaryItem) => {
+    if (!item.recordId) return;
+    setReviewTarget({ recordId: item.recordId, title: item.requirement.title });
+    setReviewDecision("ACCEPTED");
+    setReviewNote("");
+  };
+
+  const handleSaveReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reviewTarget) return;
+    if (reviewDecision === "NEEDS_CORRECTION" && !reviewNote.trim()) {
+      toast.error("Say what needs to be corrected.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await ComplianceService.reviewRecord(reviewTarget.recordId, {
+        reviewStatus: reviewDecision,
+        reviewReason: reviewNote.trim() || undefined,
+      });
+
+      toast.success(reviewDecision === "ACCEPTED" ? "Record accepted" : "Record marked as needing correction");
+      setReviewTarget(null);
+      fetchAllData();
+      if (selectedEmployeeData) {
+        handleOpenEmployeeDetail(selectedEmployeeData);
+      }
+    } catch (err: any) {
+      toast.error(getApiErrorMessage(err, "Failed to save the review"));
     } finally {
       setIsSubmitting(false);
     }
@@ -1825,14 +1869,25 @@ export default function CompliancePage() {
                                 Open Psych
                               </Button>
                             ) : (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleOpenAddFulfillment(selectedEmployeeData, item)}
-                                className="h-7 text-xs"
-                              >
-                                + Record
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                {isHr && item.status === "NEEDS_REVIEW" && item.recordId && (
+                                  <Button
+                                    variant="review"
+                                    size="sm"
+                                    onClick={() => handleOpenReview(item)}
+                                    className="h-7 text-xs">
+                                    Review
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleOpenAddFulfillment(selectedEmployeeData, item)}
+                                  className="h-7 text-xs"
+                                >
+                                  + Record
+                                </Button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1926,6 +1981,81 @@ export default function CompliancePage() {
               </Button>
               <Button type="submit" disabled={isSubmitting} className="bg-teal-700 hover:bg-teal-800 text-white">
                 {isSubmitting ? "Saving..." : "Save Record"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── REVIEW FULFILLMENT RECORD MODAL ── */}
+      <Dialog open={Boolean(reviewTarget)} onOpenChange={(open) => !open && setReviewTarget(null)}>
+        <DialogContent className="max-w-md p-6 rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <BadgeCheck className="w-5 h-5 text-teal-600 dark:text-primary-300" />
+              Review Compliance Record
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveReview} className="space-y-4 mt-2">
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-xs">
+              <span className="text-muted-foreground">Requirement: </span>
+              <span className="font-semibold text-slate-900 dark:text-slate-100">{reviewTarget?.title}</span>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Review Decision *
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReviewDecision("ACCEPTED")}
+                  className={cn(
+                    "p-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all",
+                    reviewDecision === "ACCEPTED"
+                      ? "bg-status-success-surface border-status-success-foreground text-status-success-foreground"
+                      : "border-border-soft text-muted-foreground"
+                  )}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Accept
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReviewDecision("NEEDS_CORRECTION")}
+                  className={cn(
+                    "p-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all",
+                    reviewDecision === "NEEDS_CORRECTION"
+                      ? "bg-status-danger-surface border-status-danger-foreground text-status-danger-foreground"
+                      : "border-border-soft text-muted-foreground"
+                  )}
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  Needs Correction
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                {reviewDecision === "NEEDS_CORRECTION" ? "What needs to be corrected *" : "Notes (Optional)"}
+              </label>
+              <textarea
+                placeholder={reviewDecision === "NEEDS_CORRECTION" ? "Say what the employee needs to fix..." : "Optional notes about this review..."}
+                value={reviewNote}
+                onChange={(e) => setReviewNote(e.target.value)}
+                rows={3}
+                className="w-full p-2 text-xs bg-slate-50 dark:bg-slate-800 border border-input dark:border-slate-700 rounded-xl"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button type="button" variant="outline" onClick={() => setReviewTarget(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting} className="bg-teal-700 hover:bg-teal-800 text-white">
+                {isSubmitting ? "Saving..." : "Save Review"}
               </Button>
             </DialogFooter>
           </form>
