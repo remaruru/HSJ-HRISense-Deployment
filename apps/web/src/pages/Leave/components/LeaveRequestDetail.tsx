@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { STATUS_TONE_CHIP } from '@/components/ui/status-tone';
 import { LoadError } from '@/components/shared/LoadError';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { formatEmploymentDate } from '@/lib/employment';
 import { leaveApi } from '@/services/api/leave';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
@@ -27,6 +27,9 @@ import { toast } from 'sonner';
  */
 
 const day = (v?: string | null) => (v ? formatEmploymentDate(v) : '—');
+// createdAt is the moment of filing, not a calendar date: read in local time, or a request filed
+// before 8 AM in Manila shows the previous (UTC) day
+const filedOn = (v?: string | null) => (v ? formatDate(v) : '—');
 const period = (s?: string | null, e?: string | null) => (s && e && s.slice(0, 10) !== e.slice(0, 10) ? `${day(s)} – ${day(e)}` : day(s));
 
 function Section({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
@@ -264,7 +267,7 @@ export function LeaveRequestDetail({
                   <Field label="Reason for leave" value={leave.reason} span />
                   <Field label="Address during leave" value={leave.addressDuringLeave || 'Not given'} span />
                   <Field label="Contact number" value={leave.contactNumber || 'Not given'} />
-                  <Field label="Date filed" value={day(leave.createdAt)} />
+                  <Field label="Date filed" value={filedOn(leave.createdAt)} />
                 </div>
               </Section>
 

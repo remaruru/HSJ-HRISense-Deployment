@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { CalendarDays, Plus, Search, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
-import { cn } from '@/lib/utils';
+import { cn, formatDateShort } from '@/lib/utils';
 import { staggerContainer, staggerItem } from '@/lib/motion';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { HelpLink } from '@/components/common/HelpLink';
@@ -26,6 +26,7 @@ import { LeaveRequestDetail } from './components/LeaveRequestDetail';
  * The head recommends; HR makes the final decision. See LeaveRequestDetail.
  */
 
+/** A calendar date (the leave's start or end), read as written. The filing timestamp uses formatDateShort. */
 function formatDate(dateStr: string): string {
   const [y, m, d] = dateStr.split('T')[0].split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -317,7 +318,7 @@ export default function LeaveRequestsPage() {
                       <td className="px-4 py-3.5">
                         <span className="font-bold text-sm text-foreground">{r.totalDays}d</span>
                       </td>
-                      <td className="px-4 py-3.5 text-sm text-muted-foreground whitespace-nowrap">{formatDate(r.createdAt)}</td>
+                      <td className="px-4 py-3.5 text-sm text-muted-foreground whitespace-nowrap">{formatDateShort(r.createdAt)}</td>
                       <td className="px-4 py-3.5">
                         <span className={cn('inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border whitespace-nowrap', STATUS_TONE_CHIP[stage.tone])}>
                           {stage.label}

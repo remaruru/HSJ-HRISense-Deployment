@@ -3,6 +3,7 @@ import { formatPercent, ratio, share as sharedShare } from '../lib/percent';
 import { prisma } from '../config/prisma';
 import { AppError } from '../middleware/errorHandler';
 import { activeWorkforceWhere } from '../lib/workforceScope';
+import { businessDateKey, businessDayStartInstant, toBusinessDate } from '../lib/businessDate';
 import { reportToCsv, reportToExcel, reportToPdf } from './report-export';
 
 /**
@@ -443,11 +444,12 @@ export class ReportService {
   private static async leave(filters: ReportFilters): Promise<ReportResult> {
     const { from, to } = parseRange(filters);
 
+    // createdAt is the moment of filing, so the picked days are Manila days, not UTC ones
     const where: Prisma.LeaveRequestWhereInput = { deletedAt: null };
     if (from || to) {
       where.createdAt = {};
-      if (from) (where.createdAt as Prisma.DateTimeFilter).gte = from;
-      if (to) (where.createdAt as Prisma.DateTimeFilter).lte = to;
+      if (from) (where.createdAt as Prisma.DateTimeFilter).gte = businessDayStartInstant(filters.dateFrom!);
+      if (to) (where.createdAt as Prisma.DateTimeFilter).lt = businessDayStartInstant(new Date(toBusinessDate(filters.dateTo!).getTime() + 86_400_000));
     }
     if (filters.unitId || filters.departmentId || filters.jobRoleId) {
       where.employee = {
@@ -503,7 +505,7 @@ export class ReportService {
         endDate: r.endDate.toISOString().split('T')[0],
         totalDays: r.totalDays,
         status: String(r.status),
-        filedOn: r.createdAt.toISOString().split('T')[0],
+        filedOn: businessDateKey(r.createdAt),
       })),
       totals: [
         { label: 'Total requests', value: requests.length },

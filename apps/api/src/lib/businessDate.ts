@@ -138,6 +138,16 @@ export function instantToBusinessDate(instant: Date): Date {
   return truncateToUtcMidnight(shifted);
 }
 
+/**
+ * The instant a business day begins: midnight in Manila, i.e. 16:00 UTC the day
+ * before. The reverse of `instantToBusinessDate`, for filtering real timestamps
+ * (when something was filed) by the calendar days a person picked:
+ * `gte` the start of the first day, `lt` the start of the day after the last.
+ */
+export function businessDayStartInstant(input: Date | string): Date {
+  return new Date(toBusinessDate(input).getTime() - BUSINESS_UTC_OFFSET_MINUTES * 60_000);
+}
+
 /** Inclusive count of calendar days between two business dates. */
 export function businessDaysBetweenInclusive(from: Date | string, to: Date | string): number {
   const start = toBusinessDate(from).getTime();
