@@ -2,7 +2,7 @@
   "name": "hrisense",
   "version": "1.0.0",
   "private": true,
-  "description": "HSJ HRISense: An AI-Assisted Workforce Administration System with Compliance Decision for Hospicio de San Jose",
+  "description": "HSJ HRISense: An AI-Assisted Workforce Administration System with Compliance Decision Support for Hospicio de San Jose",
   "workspaces": [
     "apps/web",
     "apps/api",

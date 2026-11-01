@@ -231,7 +231,7 @@ export default function LoginPage() {
               HSJ HRISense
             </h1>
             <p className="text-lg xl:text-xl font-semibold text-primary-50 leading-snug max-w-md mb-3">
-              An AI-Assisted Workforce Administration System with Compliance Decision
+              An AI-Assisted Workforce Administration System with Compliance Decision Support for Hospicio de San Jose
             </p>
             <p className="text-primary-100 text-base leading-relaxed max-w-md">
               For the staff of Hospicio de San Jose — your records, schedule, attendance, leave and more, in one place.

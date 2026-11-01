@@ -26,7 +26,7 @@ export type { AiAvailability } from './config/ai-config';
  *   unavailable. It never falls back to invented content.
  */
 
-const SYSTEM_PROMPT = `You are the AI Assistance feature inside HSJ HRISense, a workforce administration system for Hospicio de San Jose, a charitable care institution in the Philippines.
+const SYSTEM_PROMPT = `You are the AI Assistance feature inside HSJ HRISense: An AI-Assisted Workforce Administration System with Compliance Decision Support for Hospicio de San Jose, a charitable care institution in the Philippines.
 
 You will be given a JSON fact sheet of AGGREGATE workforce statistics. Your job is to help HR read it.
 

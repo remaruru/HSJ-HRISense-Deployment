@@ -13,7 +13,7 @@ import { ThemeToggle } from "@/components/common/ThemeToggle";
 import { HeroMascot, LandingMascotProvider } from "./LandingMascot";
 
 /** The system's official title — used as is, never with words added. */
-const OFFICIAL_TITLE = "An AI-Assisted Workforce Administration System with Compliance Decision";
+const OFFICIAL_TITLE = "An AI-Assisted Workforce Administration System with Compliance Decision Support for Hospicio de San Jose";
 
 /* ─── Section Wrapper ───────────────────────────────────────────── */
 function Section({ children, className, id }: { children: React.ReactNode; className?: string; id?: string; }) {

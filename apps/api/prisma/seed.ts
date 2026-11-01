@@ -896,7 +896,7 @@ async function seedAnnouncements(employeeIds: Record<string, string>) {
     },
     {
       title: "Welcome to HRISense!",
-      content: "We are excited to officially launch HSJ HRISense: An AI-Assisted Workforce Administration System with Compliance Decision for Hospicio de San Jose. All employees now have access to their personal dashboard where you can view your attendance records, file leave requests, and access your training records. For assistance, please contact the HR Department.",
+      content: "We are excited to officially launch HSJ HRISense: An AI-Assisted Workforce Administration System with Compliance Decision Support for Hospicio de San Jose. All employees now have access to their personal dashboard where you can view your attendance records, file leave requests, and access your training records. For assistance, please contact the HR Department.",
       priority: "NORMAL" as AnnouncementPriority,
       audience: "ALL" as AnnouncementAudience,
       isPinned: false,

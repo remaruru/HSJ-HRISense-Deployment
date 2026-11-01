@@ -1,6 +1,6 @@
 # HRISense — Development Setup and Deployment
 
-**System:** *HSJ HRISense: An AI-Assisted Workforce Administration System with Compliance Decision*
+**System:** *HSJ HRISense: An AI-Assisted Workforce Administration System with Compliance Decision Support for Hospicio de San Jose*
 **Repository:** `https://github.com/remaruru/HSJ-HRISense-Deployment`
 **Last checked against the code:** 15 October 2026
 

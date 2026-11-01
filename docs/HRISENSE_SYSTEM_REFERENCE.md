@@ -201,9 +201,9 @@ one you need:
 
 **HSJ HRISense** is the workforce administration system of **Hospicio de San Jose
 (HSJ)**, a charitable care institution in the Philippines. It is a capstone
-project built for HSJ's Human Resource Department. Its full name is *"An
-AI-Assisted Workforce Administration System with Compliance Decision for
-Hospicio de San Jose."*
+project built for HSJ's Human Resource Department. Its full name is *"HSJ HRISense: An
+AI-Assisted Workforce Administration System with Compliance Decision
+Support for Hospicio de San Jose."*
 
 It replaces paper forms and spreadsheets for:
 
@@ -3315,7 +3315,8 @@ The public front page. It presents the system by its own name and never calls
 itself a capstone.
 
 **Hero** — *Hospicio de San Jose*, the title **HSJ HRISense**, the official title
-*An AI-Assisted Workforce Administration System with Compliance Decision*, a
+*An AI-Assisted Workforce Administration System with Compliance Decision
+Support for Hospicio de San Jose*, a
 short description of what it covers, and **Explore HRISense** (to the next
 section) and **View Careers** (`/careers`). Beside it (below it on phones) is the
 HRISense mascot — the same character as the Ask AI button.

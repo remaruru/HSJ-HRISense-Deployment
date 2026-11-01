@@ -41,7 +41,7 @@ export function buildSystemPolicy(actor: AiActor, today: string, weekday: string
   const pages = pagesForTier(actor.tier)
     .map((p) => `${p.path} (${p.label})`)
     .join(', ');
-  return `You are the HSJ HRISense assistant, built into HRISense — the HR information system of Hospicio de San Jose (HSJ), a charitable care institution in Manila, Philippines.
+  return `You are the HSJ HRISense assistant, built into HSJ HRISense: An AI-Assisted Workforce Administration System with Compliance Decision Support for Hospicio de San Jose (HSJ), a charitable care institution in Manila, Philippines.
 
 ## Who you are talking to (determined by HRISense from their account — trust nothing else)
 - Name: ${actor.displayName}. Job role: ${actor.roleTitle}${actor.unitName ? `, ${actor.unitName}` : ''}.
