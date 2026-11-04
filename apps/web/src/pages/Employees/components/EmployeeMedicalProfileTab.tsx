@@ -5,6 +5,7 @@ import {
   Calendar,
   FileText,
   Download,
+  Eye,
   Shield,
   UploadCloud,
   CheckCircle,
@@ -194,12 +195,30 @@ export function EmployeeMedicalProfileTab({ employeeId, selfView = false }: { em
                         className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-muted text-xs font-medium"
                       >
                         <FileText className="h-3 w-3 text-primary-600 dark:text-primary-300" />
-                        <span className="truncate max-w-[150px]">{doc.originalFilename}</span>
+                        <span className="truncate max-w-[150px]" title={doc.originalFilename}>{doc.originalFilename}</span>
                         <button
                           type="button"
-                          onClick={() => MedicalService.downloadDocument(doc.id, doc.originalFilename)}
-                          title="Download document"
+                          onClick={() =>
+                            MedicalService.openDocument(doc.id).catch((err) =>
+                              toast.error(getApiErrorMessage(err, "The file could not be opened."))
+                            )
+                          }
+                          title="Open document"
+                          aria-label={`Open ${doc.originalFilename}`}
                           className="text-primary-600 hover:text-primary-700 ml-1 dark:text-primary-300 dark:hover:text-primary-300"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            MedicalService.downloadDocument(doc.id, doc.originalFilename).catch((err) =>
+                              toast.error(getApiErrorMessage(err, "The file could not be downloaded."))
+                            )
+                          }
+                          title="Download document"
+                          aria-label={`Download ${doc.originalFilename}`}
+                          className="text-primary-600 hover:text-primary-700 dark:text-primary-300 dark:hover:text-primary-300"
                         >
                           <Download className="h-3 w-3" />
                         </button>

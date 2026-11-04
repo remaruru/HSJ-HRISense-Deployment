@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { staggerContainer, staggerItem } from '@/lib/motion';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useNotifications } from '@/hooks/useNotifications';
+import { notificationTarget } from '@/lib/notificationLink';
 
 const PAGE_SIZE = 20;
 
@@ -38,7 +39,7 @@ export default function NotificationsPage() {
 
   const openNotification = (notification: { id: string; isRead: boolean; link: string | null }) => {
     if (!notification.isRead) markRead(notification.id);
-    if (notification.link) navigate({ to: notification.link as any });
+    if (notification.link) navigate(notificationTarget(notification.link) as any);
   };
 
   return (

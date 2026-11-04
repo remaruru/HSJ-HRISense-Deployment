@@ -1,10 +1,11 @@
 ﻿import { prisma } from '../config/prisma';
 import { AppError } from '../middleware/errorHandler';
-import { RecordReviewStatus } from '@prisma/client';
+import { NotificationType, RecordReviewStatus } from '@prisma/client';
 import { createAuditLog } from '../lib/audit';
 import path from 'path';
 import fs from 'fs';
 import { cleanupUploadedFiles } from '../middleware/upload';
+import { NotificationService } from './notification.service';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'medical');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -428,16 +429,40 @@ export class MedicalService {
       userAgent,
     });
 
+    // Tell the employee their result is on file; they can open it on My Profile.
+    // Nobody is told about a file they attached to their own record themselves.
+    const employeeUserId = await NotificationService.userIdForEmployee(record.employeeId);
+    if (employeeUserId && employeeUserId !== actorUserId) {
+      const exam = record.examType.replace(/_/g, ' ').toLowerCase();
+      const date = record.examDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+      await NotificationService.notify({
+        userId: employeeUserId,
+        type: NotificationType.COMPLIANCE_ALERT,
+        title: 'Your medical record was uploaded',
+        message: `HR uploaded ${file.originalname} to your ${exam} record of ${date}. You can open it on My Profile, under Medical.`,
+        link: '/profile?section=medical',
+        eventId: `medical-document:${doc.id}`,
+      });
+    }
+
     return doc;
   }
 
+  /**
+   * HR opens any medical file; an employee opens the files of their OWN records
+   * (user, 2026-11-05). Supervisors never open a report's files, and someone
+   * else's file answers exactly like a missing one.
+   */
   static async streamDocument(documentId: string, currentUser: any) {
-    if (currentUser.permissionTier !== 'FULL') {
-      throw new AppError('Access denied. Medical documents require FULL tier access.', 403);
-    }
-
-    const doc = await prisma.medicalRecordDocument.findUnique({ where: { id: documentId } });
+    const doc = await prisma.medicalRecordDocument.findUnique({
+      where: { id: documentId },
+      include: { medicalRecord: { select: { employeeId: true, deletedAt: true } } },
+    });
     if (!doc) throw new AppError('Document not found', 404);
+    if (currentUser.permissionTier !== 'FULL') {
+      const own = !!currentUser.employeeId && doc.medicalRecord?.employeeId === currentUser.employeeId;
+      if (!own || doc.medicalRecord?.deletedAt) throw new AppError('Document not found', 404);
+    }
 
     const filePath = path.join(UPLOAD_DIR, doc.storedFilename);
     if (!fs.existsSync(filePath)) throw new AppError('File physically missing from storage', 404);

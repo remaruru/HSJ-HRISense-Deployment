@@ -919,10 +919,14 @@ read and follows its link.
 | `BIRTHDAY_REMINDER` | An employee's birthday is within the next **7 days** | HR and that person's supervisor |
 | `ANNOUNCEMENT` | Someone shares a calendar note with others | The recipients |
 | `SYSTEM` | An automatic recruitment email fails to send | HR |
+| `COMPLIANCE_ALERT` | HR uploads a file to an employee's medical record (*"Your medical record was uploaded"*, linking to **My Profile → Medical**) | The employee (not when they attached it themselves) |
+| `COMPLIANCE_ALERT` | An HR person's own medical, psychological or compliance record is accepted automatically or changed, or a compliance requirement's scope changes or it is archived | Sister |
+| `LEAVE_APPROVED` | An HR person's own leave is accepted automatically | Sister |
+| `TRAINING_REMINDER` | An HR person marks their own training result | Sister |
 
-`EVALUATION_ASSIGNED`, `EVALUATION_SUBMITTED`, `COMPLIANCE_ALERT`,
-`ATTENDANCE_ALERT`, `TRAINING_REMINDER`, `AI_INSIGHT` and `PAYSLIP_RELEASED`
-exist as types but **nothing in the system raises them yet** (Appendix E).
+`EVALUATION_ASSIGNED`, `EVALUATION_SUBMITTED`, `ATTENDANCE_ALERT`, `AI_INSIGHT`
+and `PAYSLIP_RELEASED` exist as types but **nothing in the system raises them
+yet** (Appendix E).
 Announcements have their own separate unread mechanism (§18).
 
 ### 4.7 The audit log
@@ -2791,7 +2795,7 @@ compliance requirements.
 |---|---|---|---|
 | Organisation-wide list | ✅ | — *"Only HR personnel can access organization-wide … records."* | — |
 | Medical record | Full, **including HR notes** | Read-only, **without HR notes** | **Not permitted** for subordinates |
-| Medical documents | ✅ | — *"Medical documents require FULL tier access."* | — |
+| Medical documents | ✅ | ✅ The files of their **own** records, opened or downloaded from **My Profile → Medical** | — |
 | Psychological record | Full, **including confidential notes** | Read-only: the **employee-visible summary** only | **Not permitted** for subordinates |
 | Psychological documents | All | Only those marked **Employee visible** | — |
 

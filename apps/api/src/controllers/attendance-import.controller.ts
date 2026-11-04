@@ -91,7 +91,10 @@ export class AttendanceImportController {
   }
 
   static async cancel(req: Request, res: Response) {
-    const data = await AttendanceImportService.cancel(req.params.id, req.user!.userId);
+    const data = await AttendanceImportService.cancel(req.params.id, {
+      userId: req.user!.userId,
+      employeeId: req.user!.employeeId,
+    });
     res.json({ success: true, data });
   }
 

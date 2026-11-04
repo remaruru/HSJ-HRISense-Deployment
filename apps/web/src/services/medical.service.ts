@@ -1,5 +1,5 @@
 import { api } from './api';
-import { downloadProtectedFile } from '@/lib/downloadProtectedFile';
+import { downloadProtectedFile, openProtectedFile } from '@/lib/downloadProtectedFile';
 
 export interface MedicalRecordDocument {
   id: string;
@@ -163,5 +163,10 @@ export const MedicalService = {
    */
   async downloadDocument(documentId: string, filename: string) {
     await downloadProtectedFile(`/medical/documents/${documentId}/stream`, filename);
+  },
+
+  /** Opens a medical document in a new tab. HR, and the employee for their own records. */
+  async openDocument(documentId: string) {
+    await openProtectedFile(`/medical/documents/${documentId}/stream`);
   },
 };

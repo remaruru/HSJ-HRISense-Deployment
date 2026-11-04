@@ -41,6 +41,8 @@ export interface ImportBatch {
   countFailed: number;
   normalizerVersion: string | null;
   failureReason: string | null;
+  /** Only this person, or Sister, may cancel the import. */
+  uploadedByUserId?: string;
   uploadedByUser?: { email: string } | null;
   confirmedByUser?: { email: string } | null;
 }

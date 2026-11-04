@@ -12,6 +12,7 @@ import {
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { createAuditLog } from '../../lib/audit';
+import { OrgHierarchyService } from '../org-hierarchy.service';
 import {
   AttendanceImportClassificationService,
   type ExistingRecordState,
@@ -891,7 +892,21 @@ export class AttendanceImportService {
 
   // ── 6. Cancel and history ──────────────────────────────────────────────────
 
-  static async cancel(batchId: string, userId: string) {
+  /**
+   * Cancels an import that has not been applied. Only the person who uploaded
+   * it, or Sister, may cancel it: another HR person can't throw away a
+   * colleague's upload (user, 2026-11-05).
+   */
+  static async cancel(batchId: string, actor: { userId: string; employeeId?: string }) {
+    const userId = actor.userId;
+    const batch = await prisma.attendanceImportBatch.findUnique({
+      where: { id: batchId },
+      select: { uploadedByUserId: true },
+    });
+    if (!batch) throw new AppError('Import not found.', 404);
+    if (batch.uploadedByUserId !== userId && !(await OrgHierarchyService.isSister(actor.employeeId))) {
+      throw new AppError('Only the person who uploaded this import, or Sister, can cancel it.', 403, undefined, 'FORBIDDEN');
+    }
     const claimed = await prisma.attendanceImportBatch.updateMany({
       where: { id: batchId, status: { in: [AttendanceImportStatus.UPLOADED, AttendanceImportStatus.VALIDATED, AttendanceImportStatus.FAILED] } },
       data: { status: AttendanceImportStatus.CANCELLED },
@@ -921,6 +936,7 @@ export class AttendanceImportService {
           countUnknownEmployee: true, countInvalid: true,
           countApplied: true, countSkipped: true, countFailed: true,
           normalizerVersion: true, failureReason: true,
+          uploadedByUserId: true,
           uploadedByUser: { select: { email: true } },
           confirmedByUser: { select: { email: true } },
         },

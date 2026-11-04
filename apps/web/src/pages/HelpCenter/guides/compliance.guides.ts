@@ -258,7 +258,7 @@ export const COMPLIANCE_GUIDES: HelpGuideDefinition[] = [
           stepNumber: 1,
           title: 'Add the record',
           instruction: 'Open **Medical Records** and select **Add Medical Record**. Choose the employee, enter the exam type, date and clinician or clinic, then add the record information — an optional compliance link, the valid-until date, notes and the report — and review it.',
-          warning: 'HR notes are for HR only. Never put clinical detail anywhere a supervisor could read it.',
+          warning: 'HR notes are for HR only. Never put clinical detail anywhere a supervisor could read it. The attached report is the employee\'s own result: they can open it on My Profile.',
           expectedResult: 'The record is saved as **Pending review**.',
           uiPath: 'Medical Records -> Add Medical Record',
         },
@@ -274,11 +274,11 @@ export const COMPLIANCE_GUIDES: HelpGuideDefinition[] = [
           stepNumber: 3,
           title: 'Manage documents',
           instruction: 'Upload, download or delete the record\'s documents. Edit or delete the record if it was entered wrongly.',
-          expectedResult: 'Documents stay with the record and are visible to HR only.',
+          expectedResult: 'Documents stay with the record. HR and the employee can open them; supervisors cannot. The employee is notified when you upload one.',
           uiPath: 'Medical record -> documents',
         },
       ],
-      whatHappensNext: 'The employee can read their own record on **My Profile** (without HR notes). Supervisors cannot see it.',
+      whatHappensNext: 'The employee can read their own record on **My Profile → Medical** (without HR notes) and open or download its files. Supervisors cannot see it.',
       troubleshooting: [
         {
           problem: 'A supervisor asks to see a medical result.',

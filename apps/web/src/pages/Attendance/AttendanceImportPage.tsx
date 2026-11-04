@@ -21,6 +21,8 @@ import {
   type ImportBatch, type ImportCandidate, type ImportClassification, type ImportPreview,
 } from '@/services/attendance-import.service';
 import { LoadError } from '@/components/shared/LoadError';
+import { useAuth } from '@/hooks/useAuth';
+import { useHrAuthority } from '@/hooks/useHrAuthority';
 
 /**
  * Attendance import.
@@ -65,6 +67,10 @@ export default function AttendanceImportPage() {
 }
 
 export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean }) {
+  // Only the uploader, or Sister, may cancel an import (the API enforces it).
+  const { user } = useAuth();
+  const hr = useHrAuthority();
+  const mayCancel = (b: { uploadedByUserId?: string }) => hr.isSister || (!!user?.id && b.uploadedByUserId === user.id);
   const [batches, setBatches] = useState<ImportBatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -277,7 +283,7 @@ export function AttendanceImportPanel({ embedded = false }: { embedded?: boolean
                         <Button variant="review" size="xs" onClick={() => { setActiveId(b.id); setFilter(''); setPage(1); }}>
                           Review
                         </Button>
-                        {(b.status === 'VALIDATED' || b.status === 'UPLOADED' || b.status === 'FAILED') && (
+                        {(b.status === 'VALIDATED' || b.status === 'UPLOADED' || b.status === 'FAILED') && mayCancel(b) && (
                           <Button
                             variant="delete"
                             size="xs"

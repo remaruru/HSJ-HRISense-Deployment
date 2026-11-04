@@ -17,6 +17,7 @@ import { useNotifications, formatUnreadCount } from "@/hooks/useNotifications";
 import { GlobalSearch } from "./GlobalSearch";
 import { QuickActionsMenu } from "./QuickActionsMenu";
 import { api } from "@/services/api";
+import { notificationTarget } from "@/lib/notificationLink";
 
 export function TopNav() {
   const navigate = useNavigate();
@@ -82,7 +83,7 @@ export function TopNav() {
   const handleNotificationClick = (notification: { id: string; isRead: boolean; link: string | null }) => {
     if (!notification.isRead) markRead(notification.id);
     setShowNotifications(false);
-    if (notification.link) navigate({ to: notification.link as any });
+    if (notification.link) navigate(notificationTarget(notification.link) as any);
   };
 
   return (

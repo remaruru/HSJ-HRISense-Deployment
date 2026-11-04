@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
 import {
   Edit2, LayoutGrid, User, Phone, Briefcase, Landmark, Siren, FileText, CalendarClock, Clock, CalendarDays,
@@ -114,7 +114,13 @@ export default function MyProfilePage() {
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [section, setSection] = useState('overview');
+  // `/profile?section=medical` (for example, from a notification) opens that section.
+  const search = useSearch({ strict: false }) as { section?: string };
+  const linkedSection = SECTIONS.some((g) => g.items.some((i) => i.id === search.section)) ? search.section! : null;
+  const [section, setSection] = useState(linkedSection ?? 'overview');
+  useEffect(() => {
+    if (linkedSection) setSection(linkedSection);
+  }, [linkedSection]);
   const [editOpen, setEditOpen] = useState(false);
   const [governmentOpen, setGovernmentOpen] = useState(false);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
