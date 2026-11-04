@@ -1,6 +1,7 @@
 ﻿import { Request, Response, NextFunction } from 'express';
 import { MedicalService } from '../services/medical.service';
 import { AppError } from '../middleware/errorHandler';
+import { OwnRecordService } from '../services/own-record.service';
 
 export class MedicalController {
 
@@ -46,9 +47,9 @@ export class MedicalController {
           ...req.body,
           examDate: new Date(req.body.examDate),
           expiresAt: req.body.expiresAt ? new Date(req.body.expiresAt) : undefined,
-          createdById: user.id,
+          createdById: user.userId,
         },
-        user.id, req.ip, req.headers['user-agent']
+        user.userId, req.ip, req.headers['user-agent']
       );
       res.status(201).json({ success: true, data });
     } catch (err) { next(err); }
@@ -60,7 +61,8 @@ export class MedicalController {
       const body = { ...req.body };
       if (body.examDate) body.examDate = new Date(body.examDate);
       if (body.expiresAt) body.expiresAt = new Date(body.expiresAt);
-      const data = await MedicalService.updateRecord(req.params.recordId, body, user.id, req.ip, req.headers['user-agent']);
+      const data = await MedicalService.updateRecord(req.params.recordId, body, user.userId, req.ip, req.headers['user-agent']);
+      await OwnRecordService.noteOwnChange('medical', req.params.recordId, user);
       res.json({ success: true, data });
     } catch (err) { next(err); }
   }
@@ -68,7 +70,7 @@ export class MedicalController {
   static async reviewRecord(req: Request, res: Response, next: NextFunction) {
     try {
       const user = (req as any).user;
-      const data = await MedicalService.reviewRecord(req.params.recordId, req.body, user.id, req.ip, req.headers['user-agent']);
+      const data = await MedicalService.reviewRecord(req.params.recordId, req.body, user.userId, req.ip, req.headers['user-agent']);
       res.json({ success: true, data });
     } catch (err) { next(err); }
   }
@@ -76,7 +78,7 @@ export class MedicalController {
   static async deleteRecord(req: Request, res: Response, next: NextFunction) {
     try {
       const user = (req as any).user;
-      await MedicalService.softDeleteRecord(req.params.recordId, user.id, req.ip, req.headers['user-agent']);
+      await MedicalService.softDeleteRecord(req.params.recordId, user.userId, req.ip, req.headers['user-agent']);
       res.json({ success: true, message: 'Record deleted.' });
     } catch (err) { next(err); }
   }
@@ -92,10 +94,12 @@ export class MedicalController {
       }
       const data = await MedicalService.uploadDocument(
         req.params.recordId, file,
-        { notes: req.body.notes, uploadedById: user.id },
-        user.id, req.ip, req.headers['user-agent']
+        { notes: req.body.notes, uploadedById: user.userId },
+        user.userId, req.ip, req.headers['user-agent']
       );
-      res.status(201).json({ success: true, data });
+      // HR's own record is accepted automatically once it carries proof.
+      const autoAccepted = await OwnRecordService.acceptWithProof('medical', req.params.recordId, user, file.originalname);
+      res.status(201).json({ success: true, data, autoAccepted });
     } catch (err) { next(err); }
   }
 
@@ -112,7 +116,7 @@ export class MedicalController {
   static async deleteDocument(req: Request, res: Response, next: NextFunction) {
     try {
       const user = (req as any).user;
-      await MedicalService.deleteDocument(req.params.documentId, user.id, req.ip, req.headers['user-agent']);
+      await MedicalService.deleteDocument(req.params.documentId, user.userId, req.ip, req.headers['user-agent']);
       res.json({ success: true, message: 'Document deleted.' });
     } catch (err) { next(err); }
   }

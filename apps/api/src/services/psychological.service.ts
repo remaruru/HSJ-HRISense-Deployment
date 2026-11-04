@@ -5,6 +5,7 @@ import { createAuditLog } from '../lib/audit';
 import path from 'path';
 import fs from 'fs';
 import { cleanupUploadedFiles } from '../middleware/upload';
+import { OrgHierarchyService } from './org-hierarchy.service';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'psychological');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -18,7 +19,39 @@ if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 //   - EMPLOYEE_VISIBLE : employee can download their own
 //   - HR_ONLY          : FULL tier only
 
+// HR people's private notes (the user's rule, 2026-11-04): on an HR person's or
+// Sister's record the HR-confidential notes are for Sister only — not for the
+// person themselves, and not for their HR colleagues. Only Sister writes them.
+
+const PRIVATE_NOTES_REFUSED =
+  "Private notes can't be added to an HR person's or Sister's psychological record. Only Sister can add them.";
+
 export class PsychologicalService {
+
+  /** Whether this viewer may read and write the HR-confidential notes on this employee's records. */
+  static async canSeeConfidentialNotes(currentUser: any, employeeId: string): Promise<boolean> {
+    if (currentUser?.permissionTier !== 'FULL') return false;
+    if (!(await OrgHierarchyService.isFullTier(employeeId))) return true;
+    return OrgHierarchyService.isSister(currentUser.employeeId);
+  }
+
+  /** Drops the notes the viewer may not see; marks that they were held back. */
+  private static withoutNotes<T extends Record<string, any>>(r: T) {
+    const { hrConfidentialNotes, ...rest } = r;
+    return { ...rest, confidentialNotesHidden: true as const };
+  }
+
+  /** Refuses private notes from a writer who may not write them; otherwise passes them on. */
+  private static async notesFor(value: unknown, employeeId: string, actor: any): Promise<string | undefined> {
+    if (!actor || (await PsychologicalService.canSeeConfidentialNotes(actor, employeeId))) {
+      return value as string | undefined;
+    }
+    if (typeof value === 'string' && value.trim()) {
+      throw new AppError(PRIVATE_NOTES_REFUSED, 403, undefined, 'FORBIDDEN');
+    }
+    // Never written: an empty field must not wipe notes Sister wrote.
+    return undefined;
+  }
 
   // ── Global Organization List (HR FULL Tier Only) ──────────────────────────────
 
@@ -231,6 +264,10 @@ export class PsychologicalService {
       });
     }
 
+    if (!(await PsychologicalService.canSeeConfidentialNotes(currentUser, employeeId))) {
+      return records.map((r) => PsychologicalService.withoutNotes(r as any));
+    }
+
     return records;
   }
 
@@ -288,6 +325,10 @@ export class PsychologicalService {
       return { ...rest, history };
     }
 
+    if (!(await PsychologicalService.canSeeConfidentialNotes(currentUser, record.employeeId))) {
+      return { ...PsychologicalService.withoutNotes(record as any), history };
+    }
+
     return { ...record, history };
   }
 
@@ -303,9 +344,10 @@ export class PsychologicalService {
     hrConfidentialNotes?: string;
     expiresAt?: Date;
     createdById: string;
-  }, actorUserId: string, ipAddress?: string, userAgent?: string) {
+  }, actorUserId: string, ipAddress?: string, userAgent?: string, actor?: any) {
     const employee = await prisma.employee.findUnique({ where: { id: data.employeeId } });
     if (!employee) throw new AppError('Employee not found', 404);
+    const hrConfidentialNotes = await PsychologicalService.notesFor(data.hrConfidentialNotes, data.employeeId, actor);
 
     const record = await prisma.psychologicalRecord.create({
       data: {
@@ -315,7 +357,7 @@ export class PsychologicalService {
         assessmentDate: data.assessmentDate,
         conductedBy: data.conductedBy,
         employeeVisibleSummary: data.employeeVisibleSummary,
-        hrConfidentialNotes: data.hrConfidentialNotes,
+        hrConfidentialNotes,
         expiresAt: data.expiresAt,
         createdById: data.createdById,
         reviewStatus: 'PENDING_REVIEW',
@@ -343,9 +385,10 @@ export class PsychologicalService {
     employeeVisibleSummary?: string;
     hrConfidentialNotes?: string;
     expiresAt?: Date;
-  }, actorUserId: string, ipAddress?: string, userAgent?: string) {
+  }, actorUserId: string, ipAddress?: string, userAgent?: string, actor?: any) {
     const record = await prisma.psychologicalRecord.findUnique({ where: { id: recordId } });
     if (!record || record.deletedAt) throw new AppError('Psychological record not found', 404);
+    const hrConfidentialNotes = await PsychologicalService.notesFor(data.hrConfidentialNotes, record.employeeId, actor);
 
     const updated = await prisma.psychologicalRecord.update({
       where: { id: recordId },
@@ -354,7 +397,7 @@ export class PsychologicalService {
         assessmentDate: data.assessmentDate,
         conductedBy: data.conductedBy,
         employeeVisibleSummary: data.employeeVisibleSummary,
-        hrConfidentialNotes: data.hrConfidentialNotes,
+        hrConfidentialNotes,
         expiresAt: data.expiresAt,
       },
     });
@@ -369,6 +412,9 @@ export class PsychologicalService {
       userAgent,
     });
 
+    if (actor && !(await PsychologicalService.canSeeConfidentialNotes(actor, record.employeeId))) {
+      return PsychologicalService.withoutNotes(updated as any);
+    }
     return updated;
   }
 

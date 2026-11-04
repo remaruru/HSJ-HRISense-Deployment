@@ -1,6 +1,7 @@
 ﻿import { Request, Response, NextFunction } from 'express';
 import { PsychologicalService } from '../services/psychological.service';
 import { AppError } from '../middleware/errorHandler';
+import { OwnRecordService } from '../services/own-record.service';
 
 export class PsychologicalController {
 
@@ -46,9 +47,9 @@ export class PsychologicalController {
           ...req.body,
           assessmentDate: new Date(req.body.assessmentDate),
           expiresAt: req.body.expiresAt ? new Date(req.body.expiresAt) : undefined,
-          createdById: user.id,
+          createdById: user.userId,
         },
-        user.id, req.ip, req.headers['user-agent']
+        user.userId, req.ip, req.headers['user-agent'], user
       );
       res.status(201).json({ success: true, data });
     } catch (err) { next(err); }
@@ -60,7 +61,8 @@ export class PsychologicalController {
       const body = { ...req.body };
       if (body.assessmentDate) body.assessmentDate = new Date(body.assessmentDate);
       if (body.expiresAt) body.expiresAt = new Date(body.expiresAt);
-      const data = await PsychologicalService.updateRecord(req.params.recordId, body, user.id, req.ip, req.headers['user-agent']);
+      const data = await PsychologicalService.updateRecord(req.params.recordId, body, user.userId, req.ip, req.headers['user-agent'], user);
+      await OwnRecordService.noteOwnChange('psychological', req.params.recordId, user);
       res.json({ success: true, data });
     } catch (err) { next(err); }
   }
@@ -68,7 +70,7 @@ export class PsychologicalController {
   static async reviewRecord(req: Request, res: Response, next: NextFunction) {
     try {
       const user = (req as any).user;
-      const data = await PsychologicalService.reviewRecord(req.params.recordId, req.body, user.id, req.ip, req.headers['user-agent']);
+      const data = await PsychologicalService.reviewRecord(req.params.recordId, req.body, user.userId, req.ip, req.headers['user-agent']);
       res.json({ success: true, data });
     } catch (err) { next(err); }
   }
@@ -76,7 +78,7 @@ export class PsychologicalController {
   static async deleteRecord(req: Request, res: Response, next: NextFunction) {
     try {
       const user = (req as any).user;
-      await PsychologicalService.softDeleteRecord(req.params.recordId, user.id, req.ip, req.headers['user-agent']);
+      await PsychologicalService.softDeleteRecord(req.params.recordId, user.userId, req.ip, req.headers['user-agent']);
       res.json({ success: true, message: 'Record deleted.' });
     } catch (err) { next(err); }
   }
@@ -95,11 +97,13 @@ export class PsychologicalController {
         {
           visibility: req.body.visibility || 'HR_ONLY',
           notes: req.body.notes,
-          uploadedById: user.id
+          uploadedById: user.userId
         },
-        user.id, req.ip, req.headers['user-agent']
+        user.userId, req.ip, req.headers['user-agent']
       );
-      res.status(201).json({ success: true, data });
+      // HR's own record is accepted automatically once it carries proof.
+      const autoAccepted = await OwnRecordService.acceptWithProof('psychological', req.params.recordId, user, file.originalname);
+      res.status(201).json({ success: true, data, autoAccepted });
     } catch (err) { next(err); }
   }
 
@@ -116,7 +120,7 @@ export class PsychologicalController {
   static async deleteDocument(req: Request, res: Response, next: NextFunction) {
     try {
       const user = (req as any).user;
-      await PsychologicalService.deleteDocument(req.params.documentId, user.id, req.ip, req.headers['user-agent']);
+      await PsychologicalService.deleteDocument(req.params.documentId, user.userId, req.ip, req.headers['user-agent']);
       res.json({ success: true, message: 'Document deleted.' });
     } catch (err) { next(err); }
   }

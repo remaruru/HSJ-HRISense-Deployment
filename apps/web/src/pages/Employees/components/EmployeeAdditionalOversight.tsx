@@ -36,7 +36,12 @@ interface Summary {
  * line). Nothing else changes: branch, unit, role, department and every
  * module's access stay as they are.
  */
-export function EmployeeAdditionalOversight({ employeeId, immediateSupervisorName }: { employeeId: string; immediateSupervisorName: string | null }) {
+export function EmployeeAdditionalOversight({ employeeId, immediateSupervisorName, readOnly = false }: {
+  employeeId: string;
+  immediateSupervisorName: string | null;
+  /** HR viewing another HR person or Sister: shown, not changed (only Sister may). */
+  readOnly?: boolean;
+}) {
   const [data, setData] = useState<Summary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -63,11 +68,11 @@ export function EmployeeAdditionalOversight({ employeeId, immediateSupervisorNam
   return (
     <InfoSection
       title="Additional Overseers (Sub-Supervisors)"
-      action={
+      action={readOnly ? undefined : (
         <Button size="sm" variant="update" onClick={() => setAdding(true)} className="gap-1" disabled={!data}>
           <Plus className="h-4 w-4" /> Add additional overseer
         </Button>
-      }
+      )}
     >
       <p className="mb-3 text-xs text-muted-foreground">
         Someone who also oversees this employee — another Head, Sister, Supervisor or Coordinator. The Immediate Supervisor above does not change, nor does the employee's branch, unit or job role, and no extra leave, evaluation or attendance access comes with it.
@@ -97,7 +102,7 @@ export function EmployeeAdditionalOversight({ employeeId, immediateSupervisorNam
                       </span>
                       {o.viaJobRoleTitle ? (
                         <span className="text-[11px] text-muted-foreground">Manage on the Org Chart</span>
-                      ) : (
+                      ) : readOnly ? null : (
                         <Button size="xs" variant="ghost" className="text-status-danger-foreground" aria-label={`Remove ${o.overseer?.fullName}`} onClick={() => remove(o.relationshipId, `${o.overseer?.fullName} as additional overseer`)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -119,9 +124,11 @@ export function EmployeeAdditionalOversight({ employeeId, immediateSupervisorNam
                       {o.target.kind === "EMPLOYEE" ? o.target.employee.fullName : `Everyone in ${o.target.jobRole?.title ?? "a job role"}`}
                       {o.target.kind === "JOB_ROLE" && <span className="text-xs text-muted-foreground"> ({o.covers.map((c) => c.fullName).join(", ") || "nobody holds it now"})</span>}
                     </span>
-                    <Button size="xs" variant="ghost" className="text-status-danger-foreground" aria-label="Remove" onClick={() => remove(o.relationshipId, "this additional oversight")}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    {!readOnly && (
+                      <Button size="xs" variant="ghost" className="text-status-danger-foreground" aria-label="Remove" onClick={() => remove(o.relationshipId, "this additional oversight")}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
                   </li>
                 ))}
               </ul>

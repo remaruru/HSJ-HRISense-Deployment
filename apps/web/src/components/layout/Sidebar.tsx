@@ -319,6 +319,19 @@ export function Sidebar() {
           href: "/profile",
           icon: <CircleUserRound className="h-4.5 w-4.5" strokeWidth={2.5} />,
         },
+        {
+          // At the top so every notice from HR is one click from anywhere.
+          label: "Announcements",
+          href: "/announcements",
+          icon: <Megaphone className="h-4.5 w-4.5" strokeWidth={2.5} />,
+          badge:
+            announcementUnreadCount > 0
+              ? announcementUnreadCount > 99
+                ? "99+"
+                : announcementUnreadCount
+              : undefined,
+          badgeVariant: "danger",
+        },
       ],
     },
     {
@@ -443,18 +456,6 @@ export function Sidebar() {
     {
       label: "Communication",
       items: [
-        {
-          label: "Announcements",
-          href: "/announcements",
-          icon: <Megaphone className="h-4.5 w-4.5" strokeWidth={2.5} />,
-          badge:
-            announcementUnreadCount > 0
-              ? announcementUnreadCount > 99
-                ? "99+"
-                : announcementUnreadCount
-              : undefined,
-          badgeVariant: "danger",
-        },
         {
           label: "Notifications",
           href: "/notifications",

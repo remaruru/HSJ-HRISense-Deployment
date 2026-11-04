@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { MedicalService, MedicalRecord } from "@/services/medical.service";
 import { useAuth } from "@/providers/AuthProvider";
+import { useHrAuthority } from "@/hooks/useHrAuthority";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from '@/utils/error-handler.util';
@@ -54,7 +55,10 @@ const STATUS_BADGES: Record<string, { label: string; class: string }> = {
 /** `selfView`: My Profile — the person's own records, without HR's recording controls. */
 export function EmployeeMedicalProfileTab({ employeeId, selfView = false }: { employeeId: string; selfView?: boolean }) {
   const { user } = useAuth();
-  const isFullHR = user?.permissionTier === "FULL" && !selfView;
+  const hr = useHrAuthority();
+  // HR adds records for anyone below HR and themselves; another HR person's
+  // or Sister's records only Sister changes (the HR rule).
+  const isFullHR = user?.permissionTier === "FULL" && !selfView && hr.canManage(employeeId);
 
   const [records, setRecords] = useState<MedicalRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);

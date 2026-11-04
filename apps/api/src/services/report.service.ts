@@ -479,6 +479,7 @@ export class ReportService {
       acc[String(r.status)] = (acc[String(r.status)] ?? 0) + 1;
       return acc;
     }, {});
+    const endedWithoutLeave = (byStatus['CANCELLED'] ?? 0) + (byStatus['REJECTED'] ?? 0);
 
     return {
       key: 'leave',
@@ -509,7 +510,11 @@ export class ReportService {
       })),
       totals: [
         { label: 'Total requests', value: requests.length },
-        ...Object.entries(byStatus).map(([status, count]) => ({ label: status, value: count, tone: statusTone(status) })),
+        // Cancelled and rejected requests both end without leave, so they share one figure.
+        ...Object.entries(byStatus)
+          .filter(([status]) => status !== 'CANCELLED' && status !== 'REJECTED')
+          .map(([status, count]) => ({ label: status, value: count, tone: statusTone(status) })),
+        ...(endedWithoutLeave > 0 ? [{ label: 'Cancelled/Rejected', value: endedWithoutLeave, tone: 'critical' as const }] : []),
       ],
       summary: (() => {
         const lines = [`${plural(requests.length, 'leave request')} filed in this period.`];
@@ -533,8 +538,7 @@ export class ReportService {
             { label: 'Approved', value: byStatus['APPROVED'] ?? 0, tone: 'good' as const },
             { label: 'Pending', value: byStatus['PENDING'] ?? 0, tone: 'warning' as const },
             { label: 'For review', value: byStatus['FOR_REVIEW'] ?? 0, tone: 'review' as const },
-            { label: 'Rejected', value: byStatus['REJECTED'] ?? 0, tone: 'critical' as const },
-            { label: 'Cancelled', value: byStatus['CANCELLED'] ?? 0, tone: 'neutral' as const },
+            { label: 'Cancelled/Rejected', value: endedWithoutLeave, tone: 'critical' as const },
           ].filter((x) => x.value > 0),
           total: requests.length,
           emptyMessage: 'No leave was filed in this period.',
@@ -650,8 +654,8 @@ export class ReportService {
         { label: 'Employees', value: rows.length },
         { label: 'Active requirements', value: requirements.length },
         { label: 'Missing', value: sum('missing'), tone: 'critical' as const },
-        { label: 'Expired', value: sum('expired'), tone: 'critical' as const },
-        { label: 'Expiring soon', value: sum('expiringSoon'), tone: 'warning' as const },
+        // Both are about the expiry date, so they share one figure; the table keeps them apart.
+        { label: 'Expired/Expiring soon', value: sum('expired') + sum('expiringSoon'), tone: 'warning' as const },
         { label: 'Needs review', value: sum('needsReview'), tone: 'review' as const },
       ],
       summary: (() => {
@@ -682,9 +686,8 @@ export class ReportService {
           kind: 'share',
           slices: [
             { label: 'Valid', value: sum('valid'), tone: 'good' as const },
-            { label: 'Expiring soon', value: sum('expiringSoon'), tone: 'warning' as const },
+            { label: 'Expired/Expiring soon', value: sum('expired') + sum('expiringSoon'), tone: 'warning' as const },
             { label: 'Needs review', value: sum('needsReview'), tone: 'review' as const },
-            { label: 'Expired', value: sum('expired'), tone: 'critical' as const },
             { label: 'Missing', value: sum('missing'), tone: 'critical' as const },
           ].filter((x) => x.value > 0),
           total: rows.reduce((n, r) => n + r.applicable, 0),

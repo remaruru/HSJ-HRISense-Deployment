@@ -81,7 +81,10 @@ export class LeaveController {
 
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const leave = await LeaveService.create((req.user!.employeeId || ''), req.body);
+      const leave: any = await LeaveService.create((req.user!.employeeId || ''), req.body, {
+        permissionTier: req.user!.permissionTier,
+        userId: req.user!.userId,
+      });
 
       await createAuditLog({
         userId: req.user!.userId,
@@ -92,8 +95,24 @@ export class LeaveController {
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
       });
+      // HR's own leave: accepted on filing (enough days left, not in the past).
+      if (leave.autoAccepted) {
+        await createAuditLog({
+          userId: req.user!.userId,
+          action: 'LEAVE_AUTO_APPROVED',
+          resource: 'LeaveRequest',
+          resourceId: leave.id,
+          newValue: { status: 'APPROVED', totalDays: leave.totalDays, detail: "HR's own leave is accepted automatically." },
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+        });
+      }
 
-      res.status(201).json({ success: true, data: leave });
+      res.status(201).json({
+        success: true,
+        data: leave,
+        ...(leave.autoAccepted ? { message: 'Your leave was accepted automatically.' } : {}),
+      });
     } catch (err) {
       next(err);
     }

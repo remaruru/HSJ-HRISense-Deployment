@@ -40,6 +40,7 @@ import {
 import { MedicalService, MedicalRecord, MedicalSummaryMetrics } from "@/services/medical.service";
 import { api } from "@/services/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { useHrAuthority, HR_READ_ONLY_NOTE } from "@/hooks/useHrAuthority";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -104,6 +105,7 @@ const REVIEW_STATUS_STYLES: Record<string, { label: string; class: string }> = {
 
 export default function MedicalPage() {
   const { user } = useAuth();
+  const hr = useHrAuthority();
   const isFullHR = user?.permissionTier === "FULL";
 
   // Data states
@@ -1079,31 +1081,54 @@ export default function MedicalPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="update"
-                    size="sm"
-                    onClick={() => handleOpenEdit(detailRecord)}
-                    className="h-8 text-xs">
-                    <Edit2 className="w-3.5 h-3.5" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="review"
-                    size="sm"
-                    onClick={() => handleOpenReview(detailRecord)}
-                    className="h-8 text-xs">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    Review
-                  </Button>
-                  <Button
-                    variant="delete"
-                    size="sm"
-                    onClick={() => handleDeleteRecord(detailRecord)}
-                    className="h-8 text-xs">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  {hr.canManage(detailRecord.employeeId) && (
+                    <Button
+                      variant="update"
+                      size="sm"
+                      onClick={() => handleOpenEdit(detailRecord)}
+                      className="h-8 text-xs">
+                      <Edit2 className="w-3.5 h-3.5" />
+                      Edit
+                    </Button>
+                  )}
+                  {hr.canDecide(detailRecord.employeeId) && (
+                    <>
+                      <Button
+                        variant="review"
+                        size="sm"
+                        onClick={() => handleOpenReview(detailRecord)}
+                        className="h-8 text-xs">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Review
+                      </Button>
+                      <Button
+                        variant="delete"
+                        size="sm"
+                        onClick={() => handleDeleteRecord(detailRecord)}
+                        className="h-8 text-xs">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
+
+              {/* The HR rule: another HR person's or Sister's record is read-only; your own is accepted automatically with proof. */}
+              {hr.isLocked(detailRecord.employeeId) && (
+                <div className="flex items-start gap-2 p-3 rounded-xl border border-border-soft bg-surface-2 text-xs text-muted-foreground">
+                  <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>{HR_READ_ONLY_NOTE}</span>
+                </div>
+              )}
+              {hr.isOwn(detailRecord.employeeId) && (
+                <div className="flex items-start gap-2 p-3 rounded-xl border border-border-soft bg-surface-2 text-xs text-muted-foreground">
+                  <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    This is your own record. It is accepted automatically once a document is attached as proof, and Sister is
+                    told. You can correct it, but not review or delete it.
+                  </span>
+                </div>
+              )}
 
               {/* Employee Information Card */}
               <div className="bg-surface-2 p-4 rounded-xl border border-border-soft flex items-center justify-between">
@@ -1209,14 +1234,16 @@ export default function MedicalPage() {
                       Protected Documents ({detailRecord.documents?.length || 0})
                     </h4>
                   </div>
-                  <Button
-                    variant="create"
-                    size="sm"
-                    onClick={() => handleOpenUploadDoc(detailRecord)}
-                    className="h-7 text-xs">
-                    <UploadCloud className="w-3.5 h-3.5" />
-                    Upload Document
-                  </Button>
+                  {hr.canManage(detailRecord.employeeId) && (
+                    <Button
+                      variant="create"
+                      size="sm"
+                      onClick={() => handleOpenUploadDoc(detailRecord)}
+                      className="h-7 text-xs">
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      Upload Document
+                    </Button>
+                  )}
                 </div>
 
                 {!detailRecord.documents || detailRecord.documents.length === 0 ? (
@@ -1252,13 +1279,15 @@ export default function MedicalPage() {
                           >
                             <Download className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDeleteDocument(doc.id)}
-                            title="Delete document"
-                            className="p-1.5 rounded text-status-danger-foreground hover:bg-status-danger-surface transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {hr.canDecide(detailRecord.employeeId) && (
+                            <button
+                              onClick={() => handleDeleteDocument(doc.id)}
+                              title="Delete document"
+                              className="p-1.5 rounded text-status-danger-foreground hover:bg-status-danger-surface transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}

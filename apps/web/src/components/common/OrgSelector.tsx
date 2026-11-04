@@ -11,6 +11,13 @@ interface OrgSelectorProps {
  roleRequired?: boolean;
  isFilter?: boolean; // If true, includes"All Units" /"All Job Roles" options
  layout?:"grid" |"vertical";
+ /**
+  * False hides HR and Sister job roles (FULL tier): only Sister gives one, and the
+  * API refuses anyone else. `currentJobRoleId` stays listed so a person's own
+  * role is never blanked out of the form.
+  */
+ hrRolesAllowed?: boolean;
+ currentJobRoleId?: string | null;
 }
 
 export function OrgSelector({
@@ -23,6 +30,8 @@ export function OrgSelector({
  roleRequired = true,
  isFilter = false,
  layout ="grid",
+ hrRolesAllowed = true,
+ currentJobRoleId = null,
 }: OrgSelectorProps) {
  const [units, setUnits] = useState<any[]>([]);
  const [departments, setDepartments] = useState<any[]>([]);
@@ -177,7 +186,9 @@ export function OrgSelector({
  ) : (
  <>
  <option value="">{isFilter ? "All job roles" : "Select job role…"}</option>
- {jobRoles.map((r) => (
+ {jobRoles
+ .filter((r) => hrRolesAllowed || r.permissionTier !=="FULL" || r.id === currentJobRoleId)
+ .map((r) => (
  <option key={r.id} value={r.id}>
  {r.title}
  </option>

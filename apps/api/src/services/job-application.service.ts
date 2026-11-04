@@ -267,7 +267,24 @@ export class JobApplicationService {
     });
 
     if (!application) throw new AppError('Job Application not found', 404);
-    return application;
+
+    // Notes and status changes store only the HR user's id; give the screen the
+    // name to show. A status change made by the applicant (their own id) gets none.
+    const userIds = [
+      ...new Set([...application.notes.map((n) => n.createdById), ...application.statusHistory.map((h) => h.changedById)]),
+    ];
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, email: true, employee: { select: { firstName: true, lastName: true } } },
+    });
+    const nameOf = new Map(
+      users.map((u) => [u.id, { firstName: u.employee?.firstName ?? u.email, lastName: u.employee?.lastName ?? '' }])
+    );
+    return {
+      ...application,
+      notes: application.notes.map((n) => ({ ...n, createdByUser: nameOf.get(n.createdById) ?? null })),
+      statusHistory: application.statusHistory.map((h) => ({ ...h, changedByUser: nameOf.get(h.changedById) ?? null })),
+    };
   }
 
   static async changeStatus(id: string, newStatus: JobApplicationStatus, reason?: string, userId?: string) {

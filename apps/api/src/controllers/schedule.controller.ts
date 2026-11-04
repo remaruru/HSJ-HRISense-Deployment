@@ -141,6 +141,15 @@ export class ScheduleController {
       }
     }
 
+    // HR assigns schedules below HR and their own; another HR person's and
+    // Sister's only Sister assigns.
+    if (actorUser.permissionTier === PermissionTier.FULL && Array.isArray(employeeIds)) {
+      await OrgHierarchyService.assertCanManageEmployees(
+        { employeeId: actorUser.employeeId, permissionTier: actorUser.permissionTier },
+        employeeIds.map(String)
+      );
+    }
+
     const result = await ScheduleService.assignSchedule(employeeIds, templateId, effectiveDate, actorUser.userId);
       res.json(result);
     } catch (err) {

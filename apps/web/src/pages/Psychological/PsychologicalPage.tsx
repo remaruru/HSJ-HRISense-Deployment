@@ -44,6 +44,7 @@ import {
 } from "@/services/psychological.service";
 import { api } from "@/services/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { useHrAuthority, HR_READ_ONLY_NOTE } from "@/hooks/useHrAuthority";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -106,6 +107,11 @@ const REVIEW_STATUS_STYLES: Record<string, { label: string; class: string }> = {
 
 export default function PsychologicalPage() {
   const { user } = useAuth();
+  const hr = useHrAuthority();
+  // Private notes on an HR person's or Sister's record are Sister's alone
+  // (the HR rule): not the person's own, not their HR colleagues'.
+  const notesAllowedFor = (employeeId?: string | null) =>
+    !employeeId || hr.isSister || (!hr.isLocked(employeeId) && !hr.isOwn(employeeId));
   const isFullHR = user?.permissionTier === "FULL";
   const userEmployeeId = user?.employee?.id;
 
@@ -363,7 +369,7 @@ export default function PsychologicalPage() {
         assessmentDate: formAssessmentDate,
         conductedBy: formConductedBy.trim() || undefined,
         employeeVisibleSummary: formEmployeeSummary.trim() || undefined,
-        hrConfidentialNotes: formHrNotes.trim() || undefined,
+        hrConfidentialNotes: notesAllowedFor(formSelectedEmployee.id) ? formHrNotes.trim() || undefined : undefined,
         expiresAt: formExpiresAt || undefined,
       });
 
@@ -453,7 +459,7 @@ export default function PsychologicalPage() {
         assessmentDate: formAssessmentDate,
         conductedBy: formConductedBy.trim() || undefined,
         employeeVisibleSummary: formEmployeeSummary.trim() || undefined,
-        hrConfidentialNotes: formHrNotes.trim() || undefined,
+        hrConfidentialNotes: notesAllowedFor(selectedRecord.employeeId) ? formHrNotes.trim() || undefined : undefined,
         expiresAt: formExpiresAt || undefined,
       });
 
@@ -1175,31 +1181,54 @@ export default function PsychologicalPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="update"
-                    size="sm"
-                    onClick={() => handleOpenEdit(detailRecord)}
-                    className="h-8 text-xs">
-                    <Edit2 className="w-3.5 h-3.5" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="review"
-                    size="sm"
-                    onClick={() => handleOpenReview(detailRecord)}
-                    className="h-8 text-xs">
-                    <CheckCircle className="w-3.5 h-3.5" />
-                    Review
-                  </Button>
-                  <Button
-                    variant="delete"
-                    size="sm"
-                    onClick={() => handleDeleteRecord(detailRecord)}
-                    className="h-8 text-xs">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  {hr.canManage(detailRecord.employeeId) && (
+                    <Button
+                      variant="update"
+                      size="sm"
+                      onClick={() => handleOpenEdit(detailRecord)}
+                      className="h-8 text-xs">
+                      <Edit2 className="w-3.5 h-3.5" />
+                      Edit
+                    </Button>
+                  )}
+                  {hr.canDecide(detailRecord.employeeId) && (
+                    <>
+                      <Button
+                        variant="review"
+                        size="sm"
+                        onClick={() => handleOpenReview(detailRecord)}
+                        className="h-8 text-xs">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Review
+                      </Button>
+                      <Button
+                        variant="delete"
+                        size="sm"
+                        onClick={() => handleDeleteRecord(detailRecord)}
+                        className="h-8 text-xs">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
+
+              {/* The HR rule: another HR person's or Sister's record is read-only; your own is accepted automatically with proof. */}
+              {hr.isLocked(detailRecord.employeeId) && (
+                <div className="flex items-start gap-2 p-3 rounded-xl border border-border-soft bg-surface-2 text-xs text-muted-foreground">
+                  <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>{HR_READ_ONLY_NOTE}</span>
+                </div>
+              )}
+              {hr.isOwn(detailRecord.employeeId) && (
+                <div className="flex items-start gap-2 p-3 rounded-xl border border-border-soft bg-surface-2 text-xs text-muted-foreground">
+                  <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>
+                    This is your own record. It is accepted automatically once a document is attached as proof, and Sister is
+                    told. You can correct it, but not review or delete it.
+                  </span>
+                </div>
+              )}
 
               {/* Employee Information Card */}
               <div className="bg-surface-2 p-4 rounded-xl border border-border-soft flex items-center justify-between">
@@ -1318,7 +1347,9 @@ export default function PsychologicalPage() {
                     Only authorized HR personnel can view this information.
                   </p>
                   <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed pt-1">
-                    {detailRecord.hrConfidentialNotes || "No confidential notes recorded for this assessment."}
+                    {detailRecord.confidentialNotesHidden
+                      ? "Private notes on an HR person's or Sister's record are for Sister only."
+                      : detailRecord.hrConfidentialNotes || "No confidential notes recorded for this assessment."}
                   </p>
                 </div>
               </div>
@@ -1332,14 +1363,16 @@ export default function PsychologicalPage() {
                       Protected Documents ({detailRecord.documents?.length || 0})
                     </h4>
                   </div>
-                  <Button
-                    variant="create"
-                    size="sm"
-                    onClick={() => handleOpenUploadDoc(detailRecord)}
-                    className="h-7 text-xs">
-                    <UploadCloud className="w-3.5 h-3.5" />
-                    Upload Document
-                  </Button>
+                  {hr.canManage(detailRecord.employeeId) && (
+                    <Button
+                      variant="create"
+                      size="sm"
+                      onClick={() => handleOpenUploadDoc(detailRecord)}
+                      className="h-7 text-xs">
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      Upload Document
+                    </Button>
+                  )}
                 </div>
 
                 {!detailRecord.documents || detailRecord.documents.length === 0 ? (
@@ -1388,13 +1421,15 @@ export default function PsychologicalPage() {
                           >
                             <Download className="w-4 h-4" />
                           </button>
-                          <button
-                            onClick={() => handleDeleteDocument(doc.id)}
-                            title="Delete document"
-                            className="p-1.5 rounded text-status-danger-foreground hover:bg-status-danger-surface transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {hr.canDecide(detailRecord.employeeId) && (
+                            <button
+                              onClick={() => handleDeleteDocument(doc.id)}
+                              title="Delete document"
+                              className="p-1.5 rounded text-status-danger-foreground hover:bg-status-danger-surface transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -1663,7 +1698,8 @@ export default function PsychologicalPage() {
                         />
                       </div>
 
-                      {/* Card 2: HR Confidential Notes */}
+                      {/* Card 2: HR Confidential Notes — not on an HR person's or Sister's record (Sister's alone) */}
+                      {notesAllowedFor(formSelectedEmployee?.id) ? (
                       <div className="p-4 rounded-xl bg-status-warning-surface/60 border border-status-warning-border space-y-2">
                         <div className="flex items-center gap-2 text-sm font-bold text-status-warning-foreground">
                           <Lock className="w-4 h-4 text-status-warning-foreground" />
@@ -1680,6 +1716,15 @@ export default function PsychologicalPage() {
                           className="w-full p-3 text-sm sm:text-base font-medium bg-surface border border-status-warning-border rounded-xl text-foreground focus:outline-none focus:ring-2 focus:ring-warning"
                         />
                       </div>
+                      ) : (
+                      <div className="p-4 rounded-xl bg-surface-2 border border-border-soft space-y-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                          <Lock className="w-4 h-4" />
+                          <span>HR Confidential Notes</span>
+                        </div>
+                        <p>Private notes on an HR person&apos;s or Sister&apos;s record are for Sister only, so this record has none.</p>
+                      </div>
+                      )}
                     </div>
 
                     {/* Below: Assessment Document & Privacy */}
@@ -1941,6 +1986,7 @@ export default function PsychologicalPage() {
               />
             </div>
 
+            {notesAllowedFor(selectedRecord?.employeeId) && (
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-status-warning-foreground flex items-center gap-1.5">
                 <Lock className="w-3 h-3 text-status-warning-foreground" />
@@ -1953,6 +1999,7 @@ export default function PsychologicalPage() {
                 className="w-full p-2.5 text-xs bg-slate-50 border border-input rounded-xl dark:bg-surface-2"
               />
             </div>
+            )}
 
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)}>

@@ -7,6 +7,7 @@ import { PermissionTier, LeaveStatus, LeaveType, NotificationType, Prisma } from
 import { createAuditLog } from '../lib/audit';
 import { OrgHierarchyService } from './org-hierarchy.service';
 import { NotificationService } from './notification.service';
+import { instantToBusinessDate } from '../lib/businessDate';
 import * as crypto from 'crypto';
 
 export class LeaveService {
@@ -366,6 +367,7 @@ export class LeaveService {
     LEAVE_REVISION_PROPOSED: 'Endorsed to HR with a proposed change',
     LEAVE_APPROVED: 'Approved by HR',
     LEAVE_APPROVED_WITH_REVISION: 'Approved by HR with changes',
+    LEAVE_AUTO_APPROVED: 'Accepted automatically (HR leave)',
     LEAVE_REJECTED: 'Declined',
     LEAVE_CANCELLED: 'Cancelled by the employee',
   };
@@ -481,7 +483,9 @@ export class LeaveService {
       addressDuringLeave?: string;
       /** Hospicio form: contact number during the leave. */
       contactNumber?: string;
-    }
+    },
+    /** Who is filing. HR (FULL tier, Sister included) has their own leave accepted automatically. */
+    actor?: { permissionTier?: PermissionTier | string; userId?: string }
   ) {
     if (!requestingEmployeeId) throw new AppError('No employee profile linked to this account', 400);
     if (!(Object.values(LeaveType) as string[]).includes(String(data.leaveType))) {
@@ -519,8 +523,26 @@ export class LeaveService {
       throw new AppError('You already have a leave request overlapping these dates', 409);
     }
 
+    // HR's own leave needs no second person (the user's rule, 2026-11-04): it is
+    // accepted automatically, but only from today on and only within the days
+    // the balance still has. Sister is told; nothing waits on her.
+    const autoAccept = actor?.permissionTier === PermissionTier.FULL;
+    if (autoAccept && start < instantToBusinessDate(new Date())) {
+      throw new AppError(
+        "As HR, your leave is accepted automatically, so it has to start today or later. Past dates can't be filed.",
+        400, undefined, 'VALIDATION_ERROR'
+      );
+    }
+
     // Make sure this year's automatic balance exists before the days are reserved.
     await LeaveEntitlementService.syncEmployee(requestingEmployeeId);
+
+    if (autoAccept) {
+      return LeaveService.createAutoAccepted(requestingEmployeeId, {
+        leaveType: data.leaveType as LeaveType, start, end, totalDays,
+        reason: data.reason.trim(), supportingDocUrl: data.supportingDocUrl, addressDuringLeave, contactNumber,
+      }, actor?.userId ?? null);
+    }
 
     const leave = await prisma.$transaction(async (tx) => {
       const created = await tx.leaveRequest.create({
@@ -555,6 +577,82 @@ export class LeaveService {
     await LeaveService.notifyLeaveFiled(leave);
 
     return leave;
+  }
+
+  /** "vacation", "solo parent" — a leave type in message words. */
+  private static typeWords(type: string): string {
+    return type.toLowerCase().replace(/_/g, ' ');
+  }
+
+  /**
+   * HR's own leave, accepted on filing. The balance for the leave's year must
+   * exist and still hold enough days — the check a human approver used to make
+   * — and the days are charged straight to `used`.
+   */
+  private static async createAutoAccepted(
+    employeeId: string,
+    d: {
+      leaveType: LeaveType; start: Date; end: Date; totalDays: number; reason: string;
+      supportingDocUrl?: string; addressDuringLeave: string | null; contactNumber: string | null;
+    },
+    actorUserId: string | null
+  ) {
+    const year = d.start.getFullYear();
+    const words = LeaveService.typeWords(d.leaveType);
+    const days = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
+
+    const leave = await prisma.$transaction(async (tx) => {
+      const balance = await tx.leaveBalance.findUnique({
+        where: { employeeId_year_leaveType: { employeeId, year, leaveType: d.leaveType } },
+      });
+      if (!balance) {
+        throw new AppError(
+          `You have no ${words} leave balance for ${year}, so this leave can't be accepted automatically. Sister can set one.`,
+          400, undefined, 'VALIDATION_ERROR'
+        );
+      }
+      const { available } = leaveBalanceFigures(balance);
+      if (available < d.totalDays) {
+        throw new AppError(
+          `You have ${days(Math.max(0, available))} of ${words} leave left for ${year}, and this leave needs ${days(d.totalDays)}.`,
+          400, undefined, 'VALIDATION_ERROR'
+        );
+      }
+
+      const created = await tx.leaveRequest.create({
+        data: {
+          employeeId,
+          leaveType: d.leaveType,
+          startDate: d.start,
+          endDate: d.end,
+          totalDays: d.totalDays,
+          reason: d.reason,
+          supportingDocUrl: d.supportingDocUrl,
+          addressDuringLeave: d.addressDuringLeave,
+          contactNumber: d.contactNumber,
+          status: LeaveStatus.APPROVED,
+          approvedAt: new Date(),
+          approvedById: employeeId,
+          hrNotes: "Accepted automatically: HR's own leave needs no approval.",
+        },
+        include: {
+          employee: { select: { firstName: true, lastName: true, jobRole: { select: { title: true } } } },
+        },
+      });
+      await tx.leaveBalance.update({ where: { id: balance.id }, data: { used: { increment: d.totalDays } } });
+      return created;
+    });
+
+    const name = `${leave.employee.firstName} ${leave.employee.lastName}`.trim();
+    await NotificationService.notifySister({
+      type: NotificationType.LEAVE_APPROVED,
+      eventId: `leave-auto-approved-sister:${leave.id}`,
+      title: 'HR leave accepted automatically',
+      message: `${name}${leave.employee.jobRole?.title ? ` (${leave.employee.jobRole.title})` : ''} filed ${words} leave for ${LeaveService.periodText(d.start, d.end)} (${days(d.totalDays)}). HR's own leave is accepted automatically; this is for your information only.`,
+      link: '/leave/requests',
+    }, actorUserId);
+
+    return { ...leave, autoAccepted: true as const };
   }
 
   /**
@@ -786,6 +884,13 @@ export class LeaveService {
       authorizedSubordinateIds = new Set(subordinateIds);
     }
 
+    // HR files for anyone below HR; another HR person and Sister file their own.
+    const lockedIds = new Set(
+      permissionTier === PermissionTier.FULL
+        ? await OrgHierarchyService.lockedEmployeeIds({ employeeId: actorEmployeeId, permissionTier })
+        : []
+    );
+
     // Cache active employee check for FULL
     const existingActiveIds = new Set<string>();
     if (permissionTier === PermissionTier.FULL && data.targetMode === 'employees') {
@@ -797,6 +902,31 @@ export class LeaveService {
     }
 
     for (const empId of targetIds) {
+      // HR's own leave goes through the normal filing, which accepts it
+      // automatically (with the balance and date checks).
+      if (permissionTier === PermissionTier.FULL && empId === actorEmployeeId) {
+        try {
+          const own: any = await LeaveService.create(actorEmployeeId, {
+            leaveType: data.leaveType, startDate: data.startDate, endDate: data.endDate,
+            reason: data.reason, supportingDocUrl: data.supportingDocUrl,
+          }, { permissionTier, userId: actorUserId });
+          for (const action of ['LEAVE_FILED', 'LEAVE_AUTO_APPROVED']) {
+            await createAuditLog({
+              actorUserId, targetEmployeeId: empId, action, entityType: 'LeaveRequest', entityId: own.id,
+              metadata: { batchReference, leaveType: data.leaveType, startDate: data.startDate, endDate: data.endDate },
+            });
+          }
+          created.push(own);
+        } catch (err: any) {
+          failed.push({ employeeId: empId, reason: err?.message || 'Could not file your own leave.' });
+        }
+        continue;
+      }
+      if (lockedIds.has(empId)) {
+        failed.push({ employeeId: empId, reason: 'An HR person or Sister: they file their own leave.' });
+        continue;
+      }
+
       // 1. Authorization
       if (permissionTier === PermissionTier.SUPERVISOR) {
         if (empId !== actorEmployeeId && !authorizedSubordinateIds.has(empId)) {
@@ -827,22 +957,28 @@ export class LeaveService {
         continue;
       }
 
-      // 3. Create
+      // 3. Create — and reserve the days, as filing one's own request does
+      // (batch requests used to reserve nothing, so approving one later
+      // released days that were never held).
       try {
-        const leave = await prisma.leaveRequest.create({
-          data: {
-            employeeId: empId,
-            leaveType: data.leaveType as any,
-            startDate: start,
-            endDate: end,
-            totalDays,
-            reason: data.reason,
-            supportingDocUrl: data.supportingDocUrl,
-            status: LeaveStatus.PENDING,
-          },
-          include: {
-            employee: { select: { firstName: true, lastName: true } },
-          },
+        const leave = await prisma.$transaction(async (tx) => {
+          const row = await tx.leaveRequest.create({
+            data: {
+              employeeId: empId,
+              leaveType: data.leaveType as any,
+              startDate: start,
+              endDate: end,
+              totalDays,
+              reason: data.reason,
+              supportingDocUrl: data.supportingDocUrl,
+              status: LeaveStatus.PENDING,
+            },
+            include: {
+              employee: { select: { firstName: true, lastName: true } },
+            },
+          });
+          await LeaveService.reservePendingDays(tx, row);
+          return row;
         });
 
         await createAuditLog({
@@ -1237,6 +1373,13 @@ export class LeaveService {
 
     if (!leave) throw new AppError('Leave request not found', 404);
     if (leave.employeeId !== requestingEmployeeId) throw new AppError("You can only cancel your own leave requests.", 403);
+
+    // HR's own leave skips review, so a mistake is caught by nobody: it may be
+    // cancelled until the day it starts, and its days go back to the balance.
+    if (leave.status === LeaveStatus.APPROVED && leave.approvedById === leave.employeeId) {
+      return LeaveService.cancelAutoAccepted(leave);
+    }
+
     if (leave.status !== LeaveStatus.PENDING && leave.status !== LeaveStatus.FOR_REVIEW) {
       throw new AppError('Only requests still awaiting a decision can be cancelled', 400);
     }
@@ -1267,6 +1410,28 @@ export class LeaveService {
 
     const updated = await prisma.leaveRequest.findUniqueOrThrow({ where: { id } });
     return outcome.anomaly ? { ...updated, balanceWarning: outcome.anomaly } : updated;
+  }
+
+  /** Cancels HR's own automatically accepted leave before it starts. */
+  private static async cancelAutoAccepted(leave: { id: string; employeeId: string; startDate: Date; leaveType: LeaveType; totalDays: number }) {
+    if (leave.startDate <= instantToBusinessDate(new Date())) {
+      throw new AppError('This leave has already started, so it can no longer be cancelled.', 400);
+    }
+    const year = leave.startDate.getFullYear();
+    const moved = await prisma.$transaction(async (tx) => {
+      const ok = await LeaveService.transitionStatus(tx, leave.id, [LeaveStatus.APPROVED], { status: LeaveStatus.CANCELLED });
+      if (!ok) return false;
+      // The days charged on filing go back (guarded: never below zero).
+      await tx.leaveBalance.updateMany({
+        where: { employeeId: leave.employeeId, year, leaveType: leave.leaveType, used: { gte: leave.totalDays } },
+        data: { used: { decrement: leave.totalDays } },
+      });
+      return true;
+    });
+    if (!moved) {
+      throw new AppError('This request has already been acted on. Refresh to see its current status.', 409);
+    }
+    return prisma.leaveRequest.findUniqueOrThrow({ where: { id: leave.id } });
   }
 
   // ── Leave balance administration (HR) ───────────────────────────────────────

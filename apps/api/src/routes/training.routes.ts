@@ -6,6 +6,7 @@ import { TrainingController } from '../controllers/training.controller';
 import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
 import { AppError } from '../middleware/errorHandler';
+import { requireHrAuthorityOver, targetFromParam, targetFromBody } from '../middleware/hr-authority';
 
 const router = Router();
 
@@ -64,11 +65,13 @@ router.get('/:id/documents/:documentId', authorize(['FULL']), TrainingController
 
 // ── Participants ─────────────────────────────────────────────────────────────
 router.post('/:id/participants', authorize(['FULL']), TrainingController.addParticipants);
-router.put('/:id/participants/:employeeId', authorize(['FULL']), TrainingController.updateParticipantStatus);
-router.post('/:id/participants/bulk-status', authorize(['FULL']), TrainingController.bulkUpdateParticipantStatus);
+// HR may invite anyone, other HR included; a result (completed, did not attend,
+// certificate) is marked by HR only for people below HR and themselves.
+router.put('/:id/participants/:employeeId', authorize(['FULL']), requireHrAuthorityOver(targetFromParam('employeeId')), TrainingController.updateParticipantStatus);
+router.post('/:id/participants/bulk-status', authorize(['FULL']), requireHrAuthorityOver(targetFromBody('employeeIds')), TrainingController.bulkUpdateParticipantStatus);
 
 // ── Participant Certificates ─────────────────────────────────────────────────
-router.post('/:id/participants/:employeeId/certificate', authorize(['FULL']), upload.single('file'), TrainingController.uploadParticipantCertificate);
+router.post('/:id/participants/:employeeId/certificate', authorize(['FULL']), requireHrAuthorityOver(targetFromParam('employeeId')), upload.single('file'), TrainingController.uploadParticipantCertificate);
 router.get('/:id/participants/:employeeId/certificate', TrainingController.streamParticipantCertificate);
 
 // ── Employee Training History ────────────────────────────────────────────────

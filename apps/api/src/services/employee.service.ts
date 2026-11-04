@@ -983,6 +983,12 @@ export class EmployeeService {
         if (key in data) filtered[key] = (data as any)[key];
       });
       data = filtered;
+    } else {
+      // HR authority: Sister changes anyone; other HR their own record and
+      // anyone below HR. Only Sister gives an HR or Sister job role.
+      const actor = { employeeId: requestingEmployeeId, permissionTier };
+      await OrgHierarchyService.assertCanManageEmployees(actor, [id]);
+      await OrgHierarchyService.assertCanAssignJobRole(actor, data.jobRoleId, employee.jobRoleId);
     }
 
     // End date / reason rules, judged on the merged result so a partial edit is
@@ -1067,6 +1073,15 @@ export class EmployeeService {
       (data.soloParentLeaveEligible !== undefined && data.soloParentLeaveEligible !== employee.soloParentLeaveEligible);
     const hireDateChanged =
       data.hireDate !== undefined && data.hireDate && new Date(data.hireDate).getTime() !== new Date(employee.hireDate).getTime();
+    // The HR rule: nobody changes their own leave balance, and the automatic
+    // entitlement follows the hire date and these eligibility flags — so nobody
+    // changes those on their own record either, or the rule could be stepped around.
+    if (id === requestingEmployeeId && (hireDateChanged || eligibilityChanged)) {
+      throw new AppError(
+        "You can't change your own hire date or leave eligibility: they decide your automatic leave entitlement. Sister can change them.",
+        403, undefined, 'FORBIDDEN'
+      );
+    }
 
     // Personal email = login email. HR changing it changes the login too.
     let newLoginEmail: string | null = null;

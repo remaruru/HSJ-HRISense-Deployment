@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CalendarDays, Loader2, Plus, Wallet } from 'lucide-react';
+import { CalendarDays, Loader2, Lock, Plus, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { leaveApi } from '@/services/api/leave';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
 import { toast } from 'sonner';
 import { LEAVE_TYPE_LABELS } from '@/lib/leaveTypes';
+import { useHrAuthority, HR_READ_ONLY_NOTE } from '@/hooks/useHrAuthority';
 
 /** Types HR can hold credits for. Leave Without Pay and Other use none. */
 const LEAVE_TYPES = [
@@ -61,12 +62,21 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
  */
 export function LeaveBalancePanel({
   employeeId,
-  canManage,
+  canManage: hrScreen,
 }: {
   employeeId: string;
   /** HR Personnel only. Everyone else sees a read-only view. */
   canManage: boolean;
 }) {
+  // The HR rule: nobody changes their own balance, and only Sister changes an
+  // HR person's or Sister's. The API refuses both; the screen says why.
+  const hr = useHrAuthority();
+  const canManage = hrScreen && hr.canDecide(employeeId);
+  const readOnlyNote = !hrScreen || canManage
+    ? null
+    : hr.isOwn(employeeId)
+      ? "This is your own balance. It follows the automatic yearly entitlement, and nobody changes their own; Sister can adjust it."
+      : HR_READ_ONLY_NOTE;
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
@@ -165,6 +175,13 @@ export function LeaveBalancePanel({
           </Button>
         )}
       </div>
+
+      {readOnlyNote && (
+        <div className="flex items-start gap-2 px-5 py-3 border-b-2 border-border bg-muted/10 text-xs text-muted-foreground">
+          <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>{readOnlyNote}</span>
+        </div>
+      )}
 
       {showForm && canManage && (
         <form onSubmit={handleSave} className="px-5 py-4 border-b-2 border-border bg-muted/10 space-y-3">

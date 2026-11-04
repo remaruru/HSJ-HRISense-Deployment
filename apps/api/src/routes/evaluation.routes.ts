@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { EvaluationController } from '../controllers/evaluation.controller';
 import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
+import { requireHrAuthorityOver, targetFromParam, targetOfEvaluationAssignment } from '../middleware/hr-authority';
 
 const router = Router();
 
@@ -29,9 +30,11 @@ router.post('/cycles/:id/close', authorize(['FULL']), EvaluationController.close
 
 // ── Participants per employee (HR controls who evaluates) ─────────────────────
 router.get('/cycles/:cycleId/employees/:employeeId/candidates', authorize(['FULL']), EvaluationController.evaluatorCandidates);
-router.put('/cycles/:cycleId/employees/:employeeId/head', authorize(['FULL']), EvaluationController.setHeadEvaluator);
-router.post('/cycles/:cycleId/employees/:employeeId/peers', authorize(['FULL']), EvaluationController.addPeers);
-router.delete('/assignments/:id/peer', authorize(['FULL']), EvaluationController.removePeer);
+// HR and Sister are no longer evaluated, but a cycle made before that rule may
+// still hold them: HR never changes another HR person's or Sister's evaluation.
+router.put('/cycles/:cycleId/employees/:employeeId/head', authorize(['FULL']), requireHrAuthorityOver(targetFromParam('employeeId')), EvaluationController.setHeadEvaluator);
+router.post('/cycles/:cycleId/employees/:employeeId/peers', authorize(['FULL']), requireHrAuthorityOver(targetFromParam('employeeId')), EvaluationController.addPeers);
+router.delete('/assignments/:id/peer', authorize(['FULL']), requireHrAuthorityOver(targetOfEvaluationAssignment), EvaluationController.removePeer);
 
 // ── Assignments / Evaluator Workspace (HR, Supervisors, Employees) ───────────
 router.get('/assignments', EvaluationController.listAssignments);
@@ -40,7 +43,7 @@ router.post('/assignments/:id/draft', EvaluationController.saveDraft);
 router.post('/assignments/:id/submit', EvaluationController.submitEvaluation);
 // The assigned head / supervisor / coordinator records the discussion.
 router.post('/assignments/:id/discussion', EvaluationController.recordDiscussion);
-router.post('/assignments/:id/finalize', authorize(['FULL']), EvaluationController.finalizeEvaluation);
+router.post('/assignments/:id/finalize', authorize(['FULL']), requireHrAuthorityOver(targetOfEvaluationAssignment), EvaluationController.finalizeEvaluation);
 
 // ── Employee History (Profile Tab & Self-View) ───────────────────────────────
 router.get('/employees/:employeeId/history', EvaluationController.listEmployeeHistory);

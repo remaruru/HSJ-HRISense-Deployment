@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { InfoEmpty, InfoSection } from '@/components/ui/info-section';
+import { InfoEmpty, InfoField, InfoList, InfoSection } from '@/components/ui/info-section';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
 import { downloadProtectedFile, openProtectedFile } from '@/lib/downloadProtectedFile';
@@ -32,8 +32,22 @@ function fileSize(bytes?: number | null): string {
  * own documents marked visible to them; a supervisor sees a direct report's
  * documents marked visible to the supervisor (never medical clearances). Uploading, editing and deleting stay in
  * Employee Management.
+ *
+ * `missingItems` are the profile-completion items of this section still to be
+ * met (from the API's `missingFieldIds`), listed above the files so the count
+ * on the section says what it is counting.
  */
-export function ProfileDocumentsSection({ employeeId, description }: { employeeId: string; description: string }) {
+export function ProfileDocumentsSection({
+  employeeId,
+  description,
+  missingCount,
+  missingItems = [],
+}: {
+  employeeId: string;
+  description: string;
+  missingCount?: number;
+  missingItems?: Array<{ label: string; value: string }>;
+}) {
   const [docs, setDocs] = useState<ProfileDocument[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,7 +87,14 @@ export function ProfileDocumentsSection({ employeeId, description }: { employeeI
   };
 
   return (
-    <InfoSection title="Documents" description={description}>
+    <InfoSection title="Documents" description={description} missingCount={missingCount}>
+      {missingItems.length > 0 && (
+        <InfoList className="mb-4">
+          {missingItems.map((item) => (
+            <InfoField key={item.label} label={item.label} value={item.value} missing />
+          ))}
+        </InfoList>
+      )}
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading documents…</p>
       ) : error ? (

@@ -4,6 +4,14 @@ import { AccountController } from '../controllers/account.controller';
 import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
 import { createDiskUpload, DOCUMENT_MIME_ALLOWLIST, IMAGE_MIME_ALLOWLIST } from '../middleware/upload';
+import { requireHrAuthorityOver, targetFromParam, targetOfOversight } from '../middleware/hr-authority';
+
+/**
+ * Changing one person (record, oversight, supervisor, archive, account): Sister
+ * may change anyone, other HR their own record and anyone below HR. The PUT
+ * /:id rule (with the self-service whitelist) lives in EmployeeService.update.
+ */
+const hrOverParam = requireHrAuthorityOver(targetFromParam('id'));
 
 const router = Router();
 
@@ -34,13 +42,13 @@ router.use(authenticate);
 router.get('/org-chart', EmployeeController.getOrgChart);
 // Additional (secondary) oversight on the Org Chart — managed by HR; grants no access.
 router.get('/additional-oversight', authorize(['FULL']), EmployeeController.listAdditionalOversight);
-router.post('/additional-oversight', authorize(['FULL']), EmployeeController.addAdditionalOversight);
-router.delete('/additional-oversight/:oversightId', authorize(['FULL']), EmployeeController.removeAdditionalOversight);
+router.post('/additional-oversight', authorize(['FULL']), requireHrAuthorityOver((req) => [req.body?.overseenEmployeeId]), EmployeeController.addAdditionalOversight);
+router.delete('/additional-oversight/:oversightId', authorize(['FULL']), requireHrAuthorityOver(targetOfOversight), EmployeeController.removeAdditionalOversight);
 router.get('/units', EmployeeController.getUnits);
 router.get('/job-roles', EmployeeController.getJobRoles);
 router.get('/eligible-supervisors', authorize(['FULL']), EmployeeController.getEligibleSupervisors);
 router.post('/resolve-supervisor', authorize(['FULL']), EmployeeController.resolveSupervisor);
-router.post('/bulk-restore', authorize(['FULL']), EmployeeController.bulkRestore);
+router.post('/bulk-restore', authorize(['FULL']), requireHrAuthorityOver((req) => (Array.isArray(req.body?.ids) ? req.body.ids : [])), EmployeeController.bulkRestore);
 
 // ─── Export Routes ────────────────────────────────────────────────────────────
 router.get('/export/excel', authorize(['FULL', 'SUPERVISOR']), EmployeeController.exportExcel);
@@ -50,6 +58,8 @@ router.post('/export/pdf', authorize(['FULL', 'SUPERVISOR']), EmployeeController
 
 // ─── Own Profile / Subordinates ───────────────────────────────────────────────
 router.get('/me', EmployeeController.getMe);
+// Whose records the caller may read but not change (another HR person's, Sister's).
+router.get('/hr-authority', authorize(['FULL']), EmployeeController.getHrAuthority);
 
 // The person's own profile photo and banner (any signed-in person, own record only).
 const profileImageUpload = createDiskUpload({
@@ -68,16 +78,16 @@ router.post('/', authorize(['FULL']), onboardingUpload, EmployeeController.creat
 
 // ─── Single Employee (wildcard :id routes) ────────────────────────────────────
 router.get('/:id/additional-oversight', authorize(['FULL']), EmployeeController.employeeAdditionalOversight);
-router.post('/:id/additional-oversight', authorize(['FULL']), EmployeeController.addEmployeeAdditionalOversight);
+router.post('/:id/additional-oversight', authorize(['FULL']), hrOverParam, EmployeeController.addEmployeeAdditionalOversight);
 router.get('/:id', EmployeeController.getById);
 router.put('/:id', EmployeeController.update);
-router.delete('/:id', authorize(['FULL']), EmployeeController.remove);
-router.patch('/:id/archive', authorize(['FULL']), EmployeeController.remove);
-router.patch('/:id/restore', authorize(['FULL']), EmployeeController.bulkRestore);
+router.delete('/:id', authorize(['FULL']), hrOverParam, EmployeeController.remove);
+router.patch('/:id/archive', authorize(['FULL']), hrOverParam, EmployeeController.remove);
+router.patch('/:id/restore', authorize(['FULL']), hrOverParam, EmployeeController.bulkRestore);
 
 // ─── Supervisor Override Operations ───────────────────────────────────────────
-router.post('/:id/supervisor-override', authorize(['FULL']), EmployeeController.overrideSupervisor);
-router.delete('/:id/supervisor-override', authorize(['FULL']), EmployeeController.removeSupervisorOverride);
+router.post('/:id/supervisor-override', authorize(['FULL']), hrOverParam, EmployeeController.overrideSupervisor);
+router.delete('/:id/supervisor-override', authorize(['FULL']), hrOverParam, EmployeeController.removeSupervisorOverride);
 
 // ─── Employee Timeline (audit history for this employee) ──────────────────────
 router.get('/:id/timeline', EmployeeController.getTimeline);
@@ -87,12 +97,12 @@ router.get('/:id/profile-completion', EmployeeController.getProfileCompletion);
 
 // ─── HR Account Management (single authoritative account surface) ─────────────
 router.get('/:id/account', authorize(['FULL']), AccountController.getAccount);
-router.post('/:id/account/activate', authorize(['FULL']), AccountController.activate);
-router.post('/:id/account/use-personal-email', authorize(['FULL']), AccountController.usePersonalEmail);
-router.post('/:id/account/deactivate', authorize(['FULL']), AccountController.deactivate);
-router.post('/:id/account/lock', authorize(['FULL']), AccountController.lock);
-router.post('/:id/account/unlock', authorize(['FULL']), AccountController.unlock);
-router.post('/:id/account/force-password-change', authorize(['FULL']), AccountController.forcePasswordChange);
-router.post('/:id/account/reset-password', authorize(['FULL']), AccountController.resetPassword);
+router.post('/:id/account/activate', authorize(['FULL']), hrOverParam, AccountController.activate);
+router.post('/:id/account/use-personal-email', authorize(['FULL']), hrOverParam, AccountController.usePersonalEmail);
+router.post('/:id/account/deactivate', authorize(['FULL']), hrOverParam, AccountController.deactivate);
+router.post('/:id/account/lock', authorize(['FULL']), hrOverParam, AccountController.lock);
+router.post('/:id/account/unlock', authorize(['FULL']), hrOverParam, AccountController.unlock);
+router.post('/:id/account/force-password-change', authorize(['FULL']), hrOverParam, AccountController.forcePasswordChange);
+router.post('/:id/account/reset-password', authorize(['FULL']), hrOverParam, AccountController.resetPassword);
 
 export default router;

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
+import { refuseOwn, targetFromBody, targetOfAwardResult, OWN_AWARD } from '../middleware/hr-authority';
 import { AwardController } from '../controllers/award.controller';
 
 /**
@@ -23,10 +24,11 @@ router.post('/groups', authorize(['FULL']), AwardController.saveGroup);
 router.put('/groups/:groupId', authorize(['FULL']), AwardController.saveGroup);
 router.delete('/groups/:groupId', authorize(['FULL']), AwardController.deleteGroup);
 router.get('/hall-of-fame', authorize(['FULL']), AwardController.hallOfFame);
-router.post('/hall-of-fame', authorize(['FULL']), AwardController.recordHallOfFame);
+// Nobody records or decides their own award (HR could otherwise award themselves).
+router.post('/hall-of-fame', authorize(['FULL']), refuseOwn(targetFromBody('employeeId'), OWN_AWARD), AwardController.recordHallOfFame);
 router.delete('/hall-of-fame/:recordId', authorize(['FULL']), AwardController.removeHallOfFame);
 router.post('/recognition-year', authorize(['FULL']), AwardController.createRecognitionYear);
-router.patch('/results/:resultId', authorize(['FULL']), AwardController.decide);
+router.patch('/results/:resultId', authorize(['FULL']), refuseOwn(targetOfAwardResult, OWN_AWARD), AwardController.decide);
 
 router.get('/', authorize(['FULL']), AwardController.list);
 router.post('/', authorize(['FULL']), AwardController.create);

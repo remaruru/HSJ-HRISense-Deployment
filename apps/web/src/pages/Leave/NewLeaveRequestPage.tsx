@@ -70,6 +70,10 @@ export default function NewLeaveRequestPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  // HR's own leave is accepted on filing (the HR rule, 2026-11-04).
+  const [acceptedAutomatically, setAcceptedAutomatically] = useState(false);
+  const hrFilingOwn = isHR && requestFor === 'self';
+  const todayYmd = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
   const [balances, setBalances] = useState<any[]>([]);
   // Balances are shown for guidance; the server checks the real balance on submit.
   const [balancesError, setBalancesError] = useState<string | null>(null);
@@ -124,13 +128,15 @@ export default function NewLeaveRequestPage() {
   const executeSubmission = async () => {
     setIsSubmitting(true);
     setError(null);
+    setAcceptedAutomatically(false);
     try {
       if (requestFor === 'self') {
-        await leaveApi.create({
+        const res = await leaveApi.create({
           leaveType, startDate, endDate, reason: reason.trim(),
           addressDuringLeave: addressDuringLeave.trim() || undefined,
           contactNumber: contactNumber.trim() || undefined,
         });
+        setAcceptedAutomatically(!!res?.data?.autoAccepted);
         setSuccess(true);
       } else {
         const payload: any = { leaveType, startDate, endDate, reason: reason.trim() };
@@ -256,9 +262,13 @@ export default function NewLeaveRequestPage() {
       <motion.div initial="hidden" animate="visible" variants={staggerContainer} className="p-6 max-w-screen-md mx-auto">
         <motion.div variants={staggerItem} className="rounded-2xl border-2 border-success/30 bg-success-light p-12 text-center">
           <CheckCircle2 className="h-12 w-12 text-success-600 mx-auto mb-4" aria-hidden="true" />
-          <p className="font-bold text-success-dark text-lg mb-2">Leave Request{requestFor === 'self' || requestFor === 'one' ? '' : 's'} Submitted</p>
+          <p className="font-bold text-success-dark text-lg mb-2">
+            {acceptedAutomatically ? 'Leave Accepted' : `Leave Request${requestFor === 'self' || requestFor === 'one' ? '' : 's'} Submitted`}
+          </p>
           <p className="text-sm text-success-dark/80 mb-6">
-            {requestFor === 'self'
+            {acceptedAutomatically
+              ? "Your leave was accepted automatically: HR's own leave needs no approval. Its days are already taken from your balance, and you can cancel it under My Requests until the day it starts."
+              : requestFor === 'self'
               ? me && !me.immediateSupervisorId
                 ? 'It goes to HR for the decision (you have no assigned head). You can follow it under My Requests.'
                 : 'It goes to your head for endorsement first, then to HR for the final decision. You can follow it under My Requests.'
@@ -367,6 +377,12 @@ export default function NewLeaveRequestPage() {
               </div>
               <div><dt className="text-xs text-muted-foreground">Unit / Department</dt><dd className="font-semibold text-foreground">{me ? [me.unit?.name, me.department?.name].filter(Boolean).join(' · ') || '—' : '…'}</dd></div>
             </dl>
+            {hrFilingOwn && (
+              <p className="mt-3 rounded-xl border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                As HR, your own leave is accepted automatically when you file it, with no approval step. It must start today or
+                later and fit within the days you have left. Sister is notified.
+              </p>
+            )}
           </div>
         )}
 
@@ -377,7 +393,8 @@ export default function NewLeaveRequestPage() {
               <div>
                 <p className="font-bold text-primary-900 dark:text-primary-300">All Eligible Active Employees</p>
                 <p className="text-sm text-primary-700/80 mt-1 dark:text-primary-300/80">
-                  This request will dynamically target all active organization members.
+                  This request will dynamically target all active organization members. Other HR people and Sister are
+                  skipped: they file their own leave.
                 </p>
               </div>
             </div>
@@ -470,6 +487,7 @@ export default function NewLeaveRequestPage() {
                 id="startDate"
                 type="date"
                 value={startDate}
+                min={hrFilingOwn ? todayYmd : undefined}
                 onChange={(e) => {
                   setStartDate(e.target.value);
                   if (endDate && e.target.value > endDate) setEndDate(e.target.value);

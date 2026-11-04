@@ -137,6 +137,28 @@ export class NotificationService {
       .map((u) => u.id);
   }
 
+  /** Every active Sister user id (the top of the hierarchy). */
+  static async sisterUserIds(): Promise<string[]> {
+    const employees = await prisma.employee.findMany({
+      where: { deletedAt: null, jobRole: { code: 'SISTER' }, user: { isNot: null } },
+      select: { user: { select: { id: true, isActive: true } } },
+    });
+    return employees
+      .map((e) => e.user)
+      .filter((u): u is { id: string; isActive: boolean } => !!u && u.isActive)
+      .map((u) => u.id);
+  }
+
+  /**
+   * A heads-up for Sister, who oversees HR but is never asked to act: HR's own
+   * leave and records are accepted automatically, and Sister is told. Sister is
+   * not notified of her own actions.
+   */
+  static async notifySister(input: Omit<CreateNotificationInput, 'userId'>, actorUserId?: string | null): Promise<void> {
+    const ids = (await NotificationService.sisterUserIds()).filter((id) => id !== actorUserId);
+    if (ids.length) await NotificationService.notifyMany(ids, input);
+  }
+
   /**
    * Calls `listener` whenever this user's notifications change (a new one, or
    * one marked read — in any tab). Returns the unsubscribe function.

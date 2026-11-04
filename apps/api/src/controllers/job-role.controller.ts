@@ -4,6 +4,23 @@ import { z } from 'zod';
 import { PermissionTier } from '@prisma/client';
 import { AppError } from '../middleware/errorHandler';
 import { createAuditLog } from '../lib/audit';
+import { prisma } from '../config/prisma';
+import { OrgHierarchyService } from '../services/org-hierarchy.service';
+
+/**
+ * HR and Sister roles (FULL tier) decide who has HR authority, so only Sister
+ * changes or deletes one, or turns a role into one. Otherwise any HR could step
+ * around "HR cannot change another HR person" by editing the role itself.
+ */
+async function assertMayChangeRole(req: Request, roleId: string | null, newTier?: PermissionTier): Promise<void> {
+  const existing = roleId
+    ? await prisma.jobRole.findUnique({ where: { id: roleId }, select: { permissionTier: true } })
+    : null;
+  const touchesHr = existing?.permissionTier === PermissionTier.FULL || newTier === PermissionTier.FULL;
+  if (touchesHr && !(await OrgHierarchyService.isSister(req.user?.employeeId))) {
+    throw new AppError('Only Sister can change an HR or Sister job role, or make a role one.', 403, undefined, 'FORBIDDEN');
+  }
+}
 
 const createJobRoleSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -70,6 +87,7 @@ export class JobRoleController {
     try {
       const { id } = req.params;
       const data = updateJobRoleSchema.parse(req.body);
+      await assertMayChangeRole(req, id, data.permissionTier);
       const updateData: any = { ...data };
       if (data.unitId) {
         updateData.unit = { connect: { id: data.unitId } };
@@ -85,6 +103,7 @@ export class JobRoleController {
   static async deleteJobRole(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
+      await assertMayChangeRole(req, id);
       await JobRoleService.deleteJobRole(id);
       res.status(200).json({ success: true, message: 'Job Role deleted successfully' });
     } catch (error) {

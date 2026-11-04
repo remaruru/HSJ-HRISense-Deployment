@@ -659,6 +659,8 @@ export interface CreateCycleDto {
 /** Who a cycle would cover and with which template (API: previewCycle). */
 export interface CyclePreview {
   total: number;
+  /** HR people and Sister in the chosen scope, left out: they are not evaluated in the system. */
+  leftOutHr?: number;
   byTemplate: Array<{ templateId: string; name: string; isOfficial: boolean; count: number }>;
   employees: Array<{
     id: string;

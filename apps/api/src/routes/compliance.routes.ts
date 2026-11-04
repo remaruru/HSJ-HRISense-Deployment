@@ -2,6 +2,10 @@ import { Router } from 'express';
 import { ComplianceController } from '../controllers/compliance.controller';
 import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
+import {
+  requireHrAuthorityOver, refuseOwn, targetFromParamOrBody, targetOfComplianceRecord,
+  OWN_RECORD_REVIEW, OWN_RECORD_DELETE,
+} from '../middleware/hr-authority';
 
 const router = Router();
 
@@ -26,9 +30,14 @@ router.delete('/scopes/:scopeId', authorize(['FULL']), ComplianceController.dele
 
 // ── Employee Fulfillment Records ──────────────────────────────────────────────
 router.get('/employees/:employeeId/records', ComplianceController.listEmployeeRecords);
-router.post('/employees/:employeeId/records', authorize(['FULL']), ComplianceController.createEmployeeRecord);
-router.post('/records', authorize(['FULL']), ComplianceController.createEmployeeRecord);
-router.patch('/records/:recordId/review', authorize(['FULL']), ComplianceController.reviewRecord);
-router.delete('/records/:recordId', authorize(['FULL']), ComplianceController.deleteRecord);
+// The HR rule, as for medical and psychological records. HR's own compliance
+// record is accepted automatically when it carries a reference number.
+const hrOverNewRecord = requireHrAuthorityOver(targetFromParamOrBody('employeeId'));
+router.post('/employees/:employeeId/records', authorize(['FULL']), hrOverNewRecord, ComplianceController.createEmployeeRecord);
+router.post('/records', authorize(['FULL']), hrOverNewRecord, ComplianceController.createEmployeeRecord);
+router.patch('/records/:recordId/review', authorize(['FULL']), requireHrAuthorityOver(targetOfComplianceRecord),
+  refuseOwn(targetOfComplianceRecord, OWN_RECORD_REVIEW), ComplianceController.reviewRecord);
+router.delete('/records/:recordId', authorize(['FULL']), requireHrAuthorityOver(targetOfComplianceRecord),
+  refuseOwn(targetOfComplianceRecord, OWN_RECORD_DELETE), ComplianceController.deleteRecord);
 
 export default router;

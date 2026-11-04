@@ -888,50 +888,101 @@ export class AttendanceService {
     const reportPeriodLabel = isSingleDate ? 'Report Date' : 'Report Period';
 
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
+      const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape', bufferPages: true });
       const buffers: Buffer[] = [];
       doc.on('data', (chunk) => buffers.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', (err) => reject(err));
 
-      doc.fontSize(16).fillColor('#148281').text('HRISense Attendance Report', { align: 'center' });
-      doc.fontSize(12).fillColor('#333333').text('Attendance Tally Summary', { align: 'center' });
+      doc.font('Helvetica-Bold').fontSize(16).fillColor('#148281').text('HRISense Attendance Report', { align: 'center' });
+      doc.font('Helvetica').fontSize(12).fillColor('#333333').text('Attendance Tally Summary', { align: 'center' });
       doc.moveDown(0.5);
       doc.fontSize(10).fillColor('#444444').text(`${reportPeriodLabel}: ${reportPeriodText}`, { align: 'center' });
       doc.fontSize(9).fillColor('#666666').text(`Generated At: ${new Date().toLocaleString('en-PH')} | Total Records: ${tallyResult.data.length}`, { align: 'center' });
-      doc.moveDown(1.5);
+      doc.fontSize(8).text('With Record = days with an imported attendance record. No Record = days without one, which are never counted as absent.', { align: 'center' });
+      doc.moveDown(1);
 
-      const startY = doc.y;
-      const colX = [30, 90, 200, 300, 420, 470, 520, 570, 620, 680, 740];
-      const headers = ['Emp No', 'Name', 'Unit', 'Job Role', 'Pres', 'Late', 'Abs', 'Leave', 'Half', 'Import', 'No Rec'];
+      // Every row is as tall as its longest cell, so a name, unit or job role that
+      // wraps onto a second line never runs into the next row.
+      const left = 30;
+      const bottom = doc.page.height - 40;
+      const pad = 4;
+      const cols: Array<{ label: string; width: number; align: 'left' | 'center' }> = [
+        { label: 'Employee No.', width: 78, align: 'left' },
+        { label: 'Name', width: 140, align: 'left' },
+        { label: 'Unit', width: 130, align: 'left' },
+        { label: 'Job Role', width: 140, align: 'left' },
+        { label: 'Present', width: 40, align: 'center' },
+        { label: 'Late', width: 36, align: 'center' },
+        { label: 'Absent', width: 40, align: 'center' },
+        { label: 'On Leave', width: 42, align: 'center' },
+        { label: 'Half Day', width: 42, align: 'center' },
+        { label: 'With Record', width: 46, align: 'center' },
+        { label: 'No Record', width: 46, align: 'center' },
+      ];
+      const tableWidth = cols.reduce((n, c) => n + c.width, 0);
 
-      doc.fontSize(9).fillColor('#000000').font('Helvetica-Bold');
-      headers.forEach((h, i) => doc.text(h, colX[i], startY, { width: colX[i+1] ? colX[i+1]-colX[i]-5 : 80 }));
-      
-      let currentY = startY + 15;
-      doc.moveTo(30, currentY).lineTo(810, currentY).stroke('#cccccc');
-      currentY += 5;
+      const rowHeight = (cells: string[]) =>
+        Math.max(...cells.map((t, i) => doc.heightOfString(t, { width: cols[i].width - pad * 2 }))) + pad * 2;
 
-      doc.font('Helvetica');
-      tallyResult.data.forEach((r: any) => {
-        if (currentY > 550) {
+      const drawRow = (cells: string[], y: number) => {
+        let x = left;
+        cells.forEach((t, i) => {
+          doc.text(t, x + pad, y + pad, { width: cols[i].width - pad * 2, align: cols[i].align });
+          x += cols[i].width;
+        });
+      };
+
+      let y = doc.y;
+      const drawHeader = () => {
+        doc.font('Helvetica-Bold').fontSize(8.5);
+        const labels = cols.map((c) => c.label);
+        const h = rowHeight(labels);
+        doc.rect(left, y, tableWidth, h).fill('#e1f2f1');
+        doc.fillColor('#0d4f4e');
+        drawRow(labels, y);
+        y += h;
+        doc.moveTo(left, y).lineTo(left + tableWidth, y).lineWidth(0.8).stroke('#148281');
+        doc.font('Helvetica').fontSize(8);
+      };
+      drawHeader();
+
+      tallyResult.data.forEach((r: any, index: number) => {
+        const cells = [
+          r.employee.employeeNumber || '—',
+          [r.employee.lastName, r.employee.firstName].filter(Boolean).join(', ') || '—',
+          r.employee.unit?.name || '—',
+          r.employee.jobRole?.title || '—',
+          String(r.present),
+          String(r.late),
+          String(r.absent),
+          String(r.onLeave),
+          String(r.halfDay),
+          String(r.importedRecords),
+          String(r.noImportedRecord),
+        ];
+        const h = rowHeight(cells);
+        if (y + h > bottom) {
           doc.addPage();
-          currentY = 30;
+          y = 30;
+          drawHeader();
         }
-        doc.fontSize(8).fillColor('#333333');
-        doc.text(r.employee.employeeNumber || '—', colX[0], currentY, { width: colX[1]-colX[0]-5 });
-        doc.text(`${r.employee.lastName}, ${r.employee.firstName}`, colX[1], currentY, { width: colX[2]-colX[1]-5 });
-        doc.text(r.employee.unit?.name || '—', colX[2], currentY, { width: colX[3]-colX[2]-5 });
-        doc.text(r.employee.jobRole?.title || '—', colX[3], currentY, { width: colX[4]-colX[3]-5 });
-        doc.text(String(r.present), colX[4], currentY);
-        doc.text(String(r.late), colX[5], currentY);
-        doc.text(String(r.absent), colX[6], currentY);
-        doc.text(String(r.onLeave), colX[7], currentY);
-        doc.text(String(r.halfDay), colX[8], currentY);
-        doc.text(String(r.importedRecords), colX[9], currentY);
-        doc.text(String(r.noImportedRecord), colX[10], currentY);
-        currentY += 15;
+        if (index % 2 === 1) doc.rect(left, y, tableWidth, h).fill('#f6f8f9');
+        doc.fillColor('#333333');
+        drawRow(cells, y);
+        y += h;
+        doc.moveTo(left, y).lineTo(left + tableWidth, y).lineWidth(0.4).stroke('#dddddd');
       });
+
+      // Page numbers, once every page exists.
+      const range = doc.bufferedPageRange();
+      for (let i = 0; i < range.count; i++) {
+        doc.switchToPage(range.start + i);
+        // The footer sits in the bottom margin; without this PDFKit would start a new page for it.
+        doc.page.margins.bottom = 0;
+        doc.font('Helvetica').fontSize(8).fillColor('#888888')
+          .text(`Page ${i + 1} of ${range.count}`, left, doc.page.height - 28, { width: tableWidth, align: 'right', lineBreak: false });
+      }
 
       doc.end();
     });

@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma';
 import { PermissionTier } from '@prisma/client';
+import { AppError } from '../middleware/errorHandler';
 
 /**
  * Canonical supervisor / subordinate resolution for HRISense.
@@ -182,4 +183,109 @@ export class OrgHierarchyService {
     }
     return [actor.employeeId];
   }
+
+  // ── Who may change whom (HR authority) ────────────────────────────────────
+  //
+  // The user's rule (2026-11-04): Sister may change anyone's record. HR — every
+  // other FULL role, HR Officer and HR Assistant alike — may change their own
+  // record and anyone below HR (supervisors, heads, coordinators, employees),
+  // but not another HR person and not Sister. Only Sister gives someone an HR
+  // or Sister job role, so the rule cannot be stepped around by promotion.
+  //
+  // "Change" covers Employee Management (the record, government IDs, documents,
+  // supervisor override, additional oversight, archive / restore, the sign-in
+  // account) and, since the second pass the same day, leave decisions and
+  // balances, attendance, work schedules, medical, psychological and compliance
+  // records, and training results. Reading is unchanged, except that HR never
+  // sees the private psychological notes on an HR person's or Sister's record.
+  //
+  // HR's OWN items need no second person and nothing waits on Sister, who only
+  // oversees: HR's own leave and records are accepted automatically (with
+  // limits: enough leave days, no past dates, proof attached) and Sister is
+  // notified. Nobody approves, reviews or deletes their own items, changes their
+  // own leave balance or attendance. HR and Sister are not evaluated.
+
+  /** True when the employee holds the Sister role (the top of the hierarchy). */
+  static async isSister(employeeId: string | undefined | null): Promise<boolean> {
+    if (!employeeId) return false;
+    const row = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { jobRole: { select: { code: true } } },
+    });
+    return row?.jobRole?.code === SISTER_ROLE_CODE;
+  }
+
+  /** True when the employee holds an HR or Sister role (FULL tier). */
+  static async isFullTier(employeeId: string | undefined | null): Promise<boolean> {
+    if (!employeeId) return false;
+    const row = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { jobRole: { select: { permissionTier: true } } },
+    });
+    return row?.jobRole?.permissionTier === PermissionTier.FULL;
+  }
+
+  /**
+   * The people whose records this viewer may read but not change: for HR, every
+   * other HR person and Sister; nobody for Sister. Screens use it to show those
+   * records read-only (the API refuses the change either way).
+   */
+  static async lockedEmployeeIds(actor: { employeeId?: string; permissionTier: PermissionTier }): Promise<string[]> {
+    if (actor.permissionTier !== PermissionTier.FULL) return [];
+    if (await OrgHierarchyService.isSister(actor.employeeId)) return [];
+    const rows = await prisma.employee.findMany({
+      where: { jobRole: { permissionTier: PermissionTier.FULL }, ...(actor.employeeId ? { id: { not: actor.employeeId } } : {}) },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
+
+  /** Whether the actor may change this employee's record and account. */
+  static async canManageEmployee(
+    actor: { employeeId?: string; permissionTier: PermissionTier },
+    targetEmployeeId: string
+  ): Promise<boolean> {
+    if (actor.permissionTier !== PermissionTier.FULL) return false;
+    if (actor.employeeId && actor.employeeId === targetEmployeeId) return true;
+    if (await OrgHierarchyService.isSister(actor.employeeId)) return true;
+    const target = await prisma.employee.findUnique({
+      where: { id: targetEmployeeId },
+      select: { jobRole: { select: { permissionTier: true } } },
+    });
+    // An unknown id is left to the action's own "not found".
+    return !target || target.jobRole?.permissionTier !== PermissionTier.FULL;
+  }
+
+  /** Throws 403 unless the actor may change every one of these employees. */
+  static async assertCanManageEmployees(
+    actor: { employeeId?: string; permissionTier: PermissionTier },
+    targetEmployeeIds: string[]
+  ): Promise<void> {
+    for (const id of targetEmployeeIds) {
+      if (!(await OrgHierarchyService.canManageEmployee(actor, id))) {
+        throw new AppError(HR_AUTHORITY_MESSAGE, 403, undefined, 'FORBIDDEN');
+      }
+    }
+  }
+
+  /**
+   * Only Sister gives someone an HR or Sister job role (a FULL-tier role).
+   * Keeping one's current role is never refused.
+   */
+  static async assertCanAssignJobRole(
+    actor: { employeeId?: string; permissionTier: PermissionTier },
+    jobRoleId: string | undefined | null,
+    currentJobRoleId?: string | null
+  ): Promise<void> {
+    if (!jobRoleId || jobRoleId === currentJobRoleId) return;
+    const role = await prisma.jobRole.findUnique({ where: { id: jobRoleId }, select: { permissionTier: true } });
+    if (role?.permissionTier !== PermissionTier.FULL) return;
+    if (await OrgHierarchyService.isSister(actor.employeeId)) return;
+    throw new AppError('Only Sister can give someone an HR or Sister job role.', 403, undefined, 'FORBIDDEN');
+  }
 }
+
+export const SISTER_ROLE_CODE = 'SISTER';
+
+export const HR_AUTHORITY_MESSAGE =
+  "Only Sister can change another HR person's or Sister's record. HR can change their own record and anyone below HR.";

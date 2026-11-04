@@ -43,6 +43,7 @@ import {
 } from "@/services/compliance.service";
 import { api } from "@/services/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { useHrAuthority, HR_READ_ONLY_NOTE } from "@/hooks/useHrAuthority";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -152,6 +153,7 @@ const COMPLIANCE_STATUS_STYLES: Record<string, { label: string; class: string; i
 
 export default function CompliancePage() {
   const { user } = useAuth();
+  const hr = useHrAuthority();
   const navigate = useNavigate();
 
   // Navigation tab
@@ -1802,6 +1804,10 @@ export default function CompliancePage() {
                 </div>
               </div>
 
+              {hr.isLocked(selectedEmployeeData.id) && (
+                <p className="text-xs text-muted-foreground px-1">{HR_READ_ONLY_NOTE}</p>
+              )}
+
               {/* Requirements Breakdown grouped by category */}
               {isEmpDetailLoading ? (
                 <div className="p-8 text-center text-xs text-muted-foreground">Loading compliance breakdown...</div>
@@ -1870,7 +1876,8 @@ export default function CompliancePage() {
                               </Button>
                             ) : (
                               <div className="flex items-center gap-2">
-                                {isHr && item.status === "NEEDS_REVIEW" && item.recordId && (
+                                {/* Nobody reviews their own record; another HR person's or Sister's only Sister changes. */}
+                                {isHr && item.status === "NEEDS_REVIEW" && item.recordId && hr.canDecide(selectedEmployeeData?.id) && (
                                   <Button
                                     variant="review"
                                     size="sm"
@@ -1879,14 +1886,16 @@ export default function CompliancePage() {
                                     Review
                                   </Button>
                                 )}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleOpenAddFulfillment(selectedEmployeeData, item)}
-                                  className="h-7 text-xs"
-                                >
-                                  + Record
-                                </Button>
+                                {hr.canManage(selectedEmployeeData?.id) && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleOpenAddFulfillment(selectedEmployeeData, item)}
+                                    className="h-7 text-xs"
+                                  >
+                                    + Record
+                                  </Button>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1954,14 +1963,21 @@ export default function CompliancePage() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Reference / License Number (Optional)
+                {hr.isOwn(selectedEmployeeData?.id) ? "Reference / License Number" : "Reference / License Number (Optional)"}
               </label>
               <Input
                 placeholder="e.g. CERT-2026-981"
                 value={fulfillmentRefNo}
                 onChange={(e) => setFulfillmentRefNo(e.target.value)}
+                required={hr.isOwn(selectedEmployeeData?.id)}
                 className="text-xs"
               />
+              {hr.isOwn(selectedEmployeeData?.id) && (
+                <p className="text-[11px] text-muted-foreground">
+                  This is your own record. It is accepted automatically, so the certificate or reference number is
+                  required as proof, and Sister is told.
+                </p>
+              )}
             </div>
 
             <div className="space-y-1.5">

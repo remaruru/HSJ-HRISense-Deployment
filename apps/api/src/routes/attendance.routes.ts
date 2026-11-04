@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/authenticate';
 import { authorize } from '../middleware/authorize';
 import { validate } from '../middleware/validate';
 import { asyncHandler } from '../utils/asyncHandler';
+import { requireHrAuthorityOver, refuseOwn, targetOfAttendance, OWN_ATTENDANCE } from '../middleware/hr-authority';
 
 const router = Router();
 
@@ -76,9 +77,12 @@ router.get('/logs', authorize(['FULL', 'SUPERVISOR']), asyncHandler(AttendanceCo
 router.get('/', asyncHandler(AttendanceController.list));
 
 // HR can update records
+// Not another HR person's or Sister's attendance, and nobody corrects their own.
 router.put(
   '/:id',
   authorize(['FULL']),
+  requireHrAuthorityOver(targetOfAttendance),
+  refuseOwn(targetOfAttendance, OWN_ATTENDANCE),
   validate(updateAttendanceSchema),
   asyncHandler(AttendanceController.update)
 );

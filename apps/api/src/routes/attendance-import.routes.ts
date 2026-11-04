@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, RequestHandler } from 'express';
 import { z } from 'zod';
 import { AttendanceImportController } from '../controllers/attendance-import.controller';
 import { authenticate } from '../middleware/authenticate';
@@ -6,6 +6,9 @@ import { authorize } from '../middleware/authorize';
 import { validate } from '../middleware/validate';
 import { asyncHandler } from '../utils/asyncHandler';
 import { createDiskUpload } from '../middleware/upload';
+import {
+  requireHrAuthorityOver, refuseOwn, targetFromBody, targetOfImportCandidate, targetsOfImportCandidates, OWN_ATTENDANCE,
+} from '../middleware/hr-authority';
 import { ATTENDANCE_IMPORT_MAX_BYTES } from '../services/attendance-import/attendance-import.service';
 
 const router = Router();
@@ -73,11 +76,24 @@ const mapCodeSchema = z.object({
 router.get('/', asyncHandler(AttendanceImportController.list));
 router.post('/', upload.single('file'), asyncHandler(AttendanceImportController.upload));
 router.get('/:id/preview', asyncHandler(AttendanceImportController.preview));
-router.post('/:id/decisions', validate(decideSchema), asyncHandler(AttendanceImportController.decide));
-router.post('/:id/candidates/:candidateId/correct', validate(correctSchema), asyncHandler(AttendanceImportController.correct));
+// Skipping a day, keeping the old version or correcting it changes that
+// person's attendance: not another HR person's or Sister's, and never your own.
+// Confirming the device's own data (USE_UPLOADED) stays open for everyone, or an
+// import that includes HR could never be applied.
+const unlessUsingUploaded = (guard: RequestHandler): RequestHandler => (req, res, next) =>
+  req.body?.decision === 'USE_UPLOADED' ? next() : guard(req, res, next);
+router.post('/:id/decisions', validate(decideSchema),
+  unlessUsingUploaded(requireHrAuthorityOver(targetsOfImportCandidates)),
+  unlessUsingUploaded(refuseOwn(targetsOfImportCandidates, OWN_ATTENDANCE)),
+  asyncHandler(AttendanceImportController.decide));
+router.post('/:id/candidates/:candidateId/correct', validate(correctSchema), requireHrAuthorityOver(targetOfImportCandidate),
+  refuseOwn(targetOfImportCandidate, OWN_ATTENDANCE), asyncHandler(AttendanceImportController.correct));
 router.post('/:id/apply', asyncHandler(AttendanceImportController.apply));
 router.get('/:id/progress', asyncHandler(AttendanceImportController.progress));
 router.post('/:id/cancel', asyncHandler(AttendanceImportController.cancel));
-router.post('/map-code', validate(mapCodeSchema), asyncHandler(AttendanceImportController.mapCode));
+// A timekeeping code decides whose punches are whose: the same rule.
+router.post('/map-code', validate(mapCodeSchema), requireHrAuthorityOver(targetFromBody('employeeId')),
+  refuseOwn(targetFromBody('employeeId'), "You can't change your own timekeeping code. Sister can."),
+  asyncHandler(AttendanceImportController.mapCode));
 
 export default router;

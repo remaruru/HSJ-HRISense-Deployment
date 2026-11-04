@@ -1,6 +1,28 @@
 import { Request, Response, NextFunction } from 'express';
 import { TrainingService } from '../services/training.service';
 import { AppError } from '../middleware/errorHandler';
+import { NotificationService } from '../services/notification.service';
+import { prisma } from '../config/prisma';
+import { NotificationType } from '@prisma/client';
+
+/** Sister's heads-up when HR marks their OWN training result (nobody else may). */
+async function tellSisterAboutOwnResult(req: Request, activityId: string, employeeIds: string[], status: unknown) {
+  const self = req.user?.employeeId;
+  if (req.user?.permissionTier !== 'FULL' || !self || !employeeIds.includes(self) || !status) return;
+  const [activity, me] = await Promise.all([
+    prisma.trainingActivity.findUnique({ where: { id: activityId }, select: { title: true } }),
+    prisma.employee.findUnique({ where: { id: self }, select: { firstName: true, lastName: true } }),
+  ]);
+  const name = me ? `${me.firstName} ${me.lastName}`.trim() : 'An HR person';
+  const words = String(status).toLowerCase().replace(/_/g, ' ');
+  await NotificationService.notifySister({
+    type: NotificationType.TRAINING_REMINDER,
+    eventId: `own-training-result-sister:${activityId}:${self}:${status}`,
+    title: 'HR marked their own training result',
+    message: `${name} marked their own result for "${activity?.title ?? 'a training'}" as ${words}. This is for your information only.`,
+    link: '/training',
+  }, req.user?.userId);
+}
 
 export class TrainingController {
   // ── Activities ──────────────────────────────────────────────────────────────
@@ -85,6 +107,7 @@ export class TrainingController {
     try {
       const { id, employeeId } = req.params;
       const participant = await TrainingService.updateParticipantStatus(id, employeeId, req.body, req.user?.userId);
+      await tellSisterAboutOwnResult(req, id, [employeeId], req.body?.participationStatus ?? req.body?.status);
       res.json({ success: true, data: participant, message: 'Participant status updated' });
     } catch (err) {
       next(err);
@@ -101,6 +124,7 @@ export class TrainingController {
         { status, completedAt, validUntil, notes },
         req.user?.userId
       );
+      await tellSisterAboutOwnResult(req, id, Array.isArray(employeeIds) ? employeeIds.map(String) : [], status);
       res.json({ success: true, data: activity, message: 'Participants status updated successfully' });
     } catch (err) {
       next(err);

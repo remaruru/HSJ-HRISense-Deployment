@@ -40,9 +40,12 @@ interface ConfirmState {
 export function AccountManagementPanel({
   employee,
   onUpdate,
+  readOnly = false,
 }: {
   employee: any;
   onUpdate: () => void;
+  /** HR viewing another HR person's or Sister's account: shown, not changed (only Sister may). */
+  readOnly?: boolean;
 }) {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -65,6 +68,27 @@ export function AccountManagementPanel({
   const account = employee.user;
   const isLocked = account?.lockedUntil && new Date(account.lockedUntil) > new Date();
   const isSelf = user?.employee?.id === employee.id;
+
+  if (readOnly) {
+    return (
+      <div className="bg-surface border rounded-xl p-6 space-y-3">
+        <h3 className="text-lg font-bold text-foreground">System Account</h3>
+        <div className="space-y-1 text-sm text-muted-foreground">
+          <p><span className="font-semibold text-foreground">Login ID:</span> {account?.email ?? 'No login account'}</p>
+          {account && (
+            <p>
+              <span className="font-semibold text-foreground">Status:</span>{' '}
+              {isArchived ? 'Archived' : !account.isActive ? 'Deactivated' : isLocked ? 'Locked' : 'Active'}
+            </p>
+          )}
+        </div>
+        <p className="flex items-start gap-2 rounded-lg border border-border-soft bg-muted/30 p-3 text-sm text-muted-foreground">
+          <Lock className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+          Only Sister can manage the account of an HR person or Sister — activate, lock, reset the password, archive or restore.
+        </p>
+      </div>
+    );
+  }
 
   const runAccountAction = async (
     endpoint: string,

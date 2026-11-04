@@ -2,9 +2,10 @@ import { confirmAction, type ConfirmOptions } from "@/components/shared/ConfirmP
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, Edit, Globe, XCircle, CheckCircle, Archive as ArchiveIcon, Briefcase, FileText, CalendarDays, Users } from "lucide-react";
+import { ArrowLeft, Edit, Globe, XCircle, CheckCircle, Archive as ArchiveIcon, Briefcase, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { InfoSection, InfoGrid, InfoField } from "@/components/ui/info-section";
 import { toast } from "sonner";
 import { RecruitmentService, JobOpening, JobOpeningStatus } from "@/services/recruitment.service";
 import { usePermission } from "@/hooks/usePermission";
@@ -129,108 +130,50 @@ export default function JobOpeningDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-surface border border-border rounded-xl shadow-sm p-6 space-y-6">
-            <div>
-              <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <FileText className="h-5 w-5 text-muted-foreground" /> Description
-              </h2>
-              <div className="text-sm text-foreground whitespace-pre-wrap">{opening.description}</div>
-            </div>
+      {/* One column, read top to bottom: what the job is, what it involves, when it runs. */}
+      <div className="space-y-5">
+        <InfoSection title="Job Details">
+          <InfoGrid columns={3}>
+            <InfoField label="Unit" value={opening.unit?.name} />
+            <InfoField label="Department" value={opening.department?.name} />
+            <InfoField label="Job Role" value={opening.jobRole?.title} />
+            <InfoField label="Employment Type" value={opening.employmentType.replace(/_/g, ' ')} />
+            <InfoField label="Vacancies" value={opening.vacancies || 'Open'} />
+            <InfoField label="Applications" value={String(opening._count?.applications || 0)} />
+          </InfoGrid>
+        </InfoSection>
 
-            <div>
-              <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-muted-foreground" /> Responsibilities
-              </h2>
-              <div className="text-sm text-foreground whitespace-pre-wrap">{opening.responsibilities}</div>
-            </div>
-
-            <div>
-              <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-muted-foreground" /> Qualifications
-              </h2>
-              <div className="text-sm text-foreground whitespace-pre-wrap">{opening.qualifications}</div>
-            </div>
-
+        <InfoSection title="Description">
+          <div className="space-y-5">
+            <DetailText icon={<FileText />} title="Overview" text={opening.description} />
+            <DetailText icon={<Briefcase />} title="Responsibilities" text={opening.responsibilities} />
+            <DetailText icon={<CheckCircle />} title="Qualifications" text={opening.qualifications} />
             {opening.requiredDocuments && (
-              <div>
-                <h2 className="text-lg font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-muted-foreground" /> Required Documents
-                </h2>
-                <div className="text-sm text-foreground whitespace-pre-wrap">{opening.requiredDocuments}</div>
-              </div>
+              <DetailText icon={<FileText />} title="Required Documents" text={opening.requiredDocuments} />
             )}
           </div>
-        </div>
+        </InfoSection>
 
-        <div className="space-y-6">
-          <div className="bg-surface border border-border rounded-xl shadow-sm p-6">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Job Details</h2>
-            <div className="space-y-4">
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Unit</div>
-                <div className="text-sm font-medium text-foreground">{opening.unit?.name || "—"}</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Department</div>
-                <div className="text-sm font-medium text-foreground">{opening.department?.name || "—"}</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Job Role</div>
-                <div className="text-sm font-medium text-foreground">{opening.jobRole?.title || "—"}</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Employment Type</div>
-                <div className="text-sm font-medium text-foreground">{opening.employmentType.replace('_', ' ')}</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground mb-1">Vacancies</div>
-                <div className="text-sm font-medium text-foreground">{opening.vacancies || "Open"}</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-surface border border-border rounded-xl shadow-sm p-6">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Timeline</h2>
-            <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <CalendarDays className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                <div>
-                  <div className="text-xs text-muted-foreground">Opening Date</div>
-                  <div className="text-sm font-medium text-foreground">{formatDate(opening.openingDate)}</div>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <CalendarDays className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                <div>
-                  <div className="text-xs text-muted-foreground">Closing Date</div>
-                  <div className="text-sm font-medium text-foreground">{formatDate(opening.closingDate)}</div>
-                </div>
-              </div>
-              {opening.publishedAt && (
-                <div className="flex items-start gap-3">
-                  <Globe className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-                  <div>
-                    <div className="text-xs text-muted-foreground">Published</div>
-                    <div className="text-sm font-medium text-foreground">{formatDate(opening.publishedAt)}</div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-surface border border-border rounded-xl shadow-sm p-6 flex items-center justify-between">
-            <div>
-              <div className="text-sm font-semibold text-foreground flex items-center gap-2">
-                <Users className="h-5 w-5 text-muted-foreground" /> Applications
-              </div>
-              <div className="text-2xl font-bold text-foreground mt-2">{opening._count?.applications || 0}</div>
-            </div>
-            {/* View applicants button can go here in Phase 4 */}
-          </div>
-        </div>
+        <InfoSection title="Timeline">
+          <InfoGrid columns={3}>
+            <InfoField label="Opening Date" value={formatDate(opening.openingDate)} />
+            <InfoField label="Closing Date" value={formatDate(opening.closingDate)} />
+            <InfoField label="Published" value={opening.publishedAt ? formatDate(opening.publishedAt) : 'Not published yet'} />
+          </InfoGrid>
+        </InfoSection>
       </div>
+    </div>
+  );
+}
+
+/** One block of the posting's own text, kept as HR wrote it (line breaks included). */
+function DetailText({ icon, title, text }: { icon: React.ReactNode; title: string; text?: string | null }) {
+  return (
+    <div>
+      <h3 className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-foreground [&_svg]:h-4 [&_svg]:w-4 [&_svg]:text-muted-foreground">
+        {icon} {title}
+      </h3>
+      <p className="whitespace-pre-wrap text-sm text-foreground">{text?.trim() || '—'}</p>
     </div>
   );
 }

@@ -82,6 +82,25 @@ export function InfoGrid({
   );
 }
 
+/**
+ * A short set of items (government numbers, missing requirements) as equal
+ * cards, two to a row, filled left to right — every card the same size, and
+ * the row uses the panel's full width. One column on phones.
+ */
+export function InfoList({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <dl className={cn("grid grid-cols-1 gap-3 sm:grid-cols-2", className)}>
+      {children}
+    </dl>
+  );
+}
+
 export function InfoField({
   label,
   value,

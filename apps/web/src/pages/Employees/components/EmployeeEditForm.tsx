@@ -20,6 +20,7 @@ import { getApiErrorMessage } from "@/utils/error-handler.util";
 import { toast } from "sonner";
 import { contactProblems, contactsFromEmployee, filledContacts, type EmergencyContactRow } from "@/lib/employeeContacts";
 import { EmergencyContactsEditor } from "./EmergencyContactsEditor";
+import { useAuth } from "@/providers/AuthProvider";
 
 /**
  * Edit Profile.
@@ -212,6 +213,9 @@ export function EmployeeEditForm({
 }) {
   const original = initialState(employee);
   const [formData, setFormData] = useState<FormState>(original);
+  // Only Sister gives an HR or Sister job role (the API refuses anyone else).
+  const { user } = useAuth();
+  const isSister = user?.employee?.jobRole?.code === "SISTER";
   // Emergency contacts (up to three) and HR-managed leave eligibility live
   // outside the flat text fields.
   const originalContacts = contactsFromEmployee(employee);
@@ -522,6 +526,8 @@ export function EmployeeEditForm({
                 unitRequired={true}
                 roleRequired={true}
                 layout="grid"
+                hrRolesAllowed={isSister}
+                currentJobRoleId={employee.jobRoleId}
               />
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

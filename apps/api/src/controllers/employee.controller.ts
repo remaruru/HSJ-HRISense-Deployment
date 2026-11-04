@@ -174,10 +174,12 @@ export class EmployeeController {
       const employee = await EmployeeService.getById(req.params.id);
       // HR and the employee get the whole record; a supervisor opening a direct
       // report gets the work profile (My Team), not the personal record.
+      // `viewerCanManage` tells Employee Management whether to offer the change
+      // controls (HR may read every record but change only those below HR).
       res.json({
         success: true,
         data: OrgHierarchyService.canViewFullEmployeeRecord(actor, req.params.id)
-          ? employee
+          ? { ...employee, viewerCanManage: await OrgHierarchyService.canManageEmployee(actor, req.params.id) }
           : EmployeeService.toTeamMemberView(employee),
       });
     } catch (err) {
@@ -232,6 +234,24 @@ export class EmployeeController {
   }
 
   /**
+   * GET /employees/hr-authority — for HR screens: whether the caller is Sister,
+   * and the people whose records they may read but not change (every other HR
+   * person and Sister; nobody for Sister). The API enforces the rule either way.
+   */
+  static async getHrAuthority(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actor = { employeeId: req.user!.employeeId, permissionTier: req.user!.permissionTier };
+      const [isSister, lockedEmployeeIds] = await Promise.all([
+        OrgHierarchyService.isSister(actor.employeeId),
+        OrgHierarchyService.lockedEmployeeIds(actor),
+      ]);
+      res.json({ success: true, data: { isSister, selfEmployeeId: actor.employeeId ?? null, lockedEmployeeIds } });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /employees/me — shortcut for own profile
    */
   static async getMe(req: Request, res: Response, next: NextFunction) {
@@ -281,6 +301,11 @@ export class EmployeeController {
 
     let result: Awaited<ReturnType<typeof EmployeeService.create>>;
     try {
+      // Only Sister adds someone in an HR or Sister job role.
+      await OrgHierarchyService.assertCanAssignJobRole(
+        { employeeId: req.user!.employeeId, permissionTier: req.user!.permissionTier },
+        req.body?.jobRoleId
+      );
       result = await EmployeeService.create(req.body, req.user!.userId, uploaded);
     } catch (err) {
       // The transaction rolled back — do not leave uploaded files orphaned on disk.

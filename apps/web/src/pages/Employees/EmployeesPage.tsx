@@ -387,12 +387,24 @@ export function EmployeesPage() {
  const selectedIds = selectedIndices.map(idx => data[parseInt(idx)]?.id).filter(Boolean);
  const selectedEmployees = data.filter((_, i) => rowSelection[i]);
 
+ /** "3 archived." plus, when some were refused, how many and the API's reason. */
+ const reportBulk = (results: PromiseSettledResult<unknown>[], done: string, note?: string) => {
+ const ok = results.filter(r => r.status ==="fulfilled").length;
+ const refused = results.filter((r): r is PromiseRejectedResult => r.status ==="rejected");
+ if (ok > 0) toast.success(`${ok} ${done}.${note ? ` ${note}` : ""}`);
+ if (refused.length > 0) {
+ toast.error(`${refused.length} not changed: ${getApiErrorMessage(refused[0].reason, "the action was refused.")}`);
+ }
+ };
+
  const executeBulkAction = async (action:"archive" |"restore" |"activate" |"deactivate") => {
  setConfirmState({ open: false, action: null });
  try {
  if (action ==="archive") {
- await Promise.all(selectedIds.map(id => api.delete(`/employees/${id}`)));
- toast.success(`${selectedIds.length} employee(s) archived.`);
+ // One by one, so a refused record (e.g. an HR person — only Sister changes
+ // those) is reported instead of hiding which ones went through.
+ const results = await Promise.allSettled(selectedIds.map(id => api.delete(`/employees/${id}`)));
+ reportBulk(results, "archived");
  } else if (action ==="restore") {
  await api.post("/employees/bulk-restore", { ids: selectedIds });
  toast.success(`${selectedIds.length} employee(s) restored.`);
@@ -401,17 +413,14 @@ export function EmployeesPage() {
  const withAccounts = selectedEmployees.filter(emp => emp.user?.id);
  const skipped = selectedEmployees.length - withAccounts.length;
 
- await Promise.all(
- withAccounts.map(emp => api.post(`/employees/${emp.id}/account/${action}`))
- );
-
  const verb = action ==="activate" ?"activated" :"deactivated";
  if (withAccounts.length === 0) {
  toast.error("None of the selected employees have a HRISense login account.");
- } else if (skipped > 0) {
- toast.success(`${withAccounts.length} account(s) ${verb}. ${skipped} employee(s) skipped — no login account.`);
  } else {
- toast.success(`${withAccounts.length} account(s) ${verb}.`);
+ const results = await Promise.allSettled(
+ withAccounts.map(emp => api.post(`/employees/${emp.id}/account/${action}`))
+ );
+ reportBulk(results, `account(s) ${verb}`, skipped > 0 ? `${skipped} employee(s) skipped — no login account.` : undefined);
  }
  }
  setRowSelection({});

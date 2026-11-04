@@ -6,7 +6,7 @@ import {
   ClipboardCheck, GraduationCap, BookOpen, ShieldCheck, Stethoscope, Brain, KeyRound, History, ChevronRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { InfoSection, InfoGrid, InfoField, InfoEmpty } from '@/components/ui/info-section';
+import { InfoSection, InfoGrid, InfoList, InfoField, InfoEmpty } from '@/components/ui/info-section';
 import { SectionNav, type SectionNavGroup } from '@/components/ui/section-nav';
 import { MetricBreakdownDialog } from '@/components/shared/MetricBreakdown';
 import { profileCompletionSpec } from '@/components/shared/profileCompletionSpec';
@@ -28,6 +28,8 @@ import { ProfileHero } from './components/ProfileHero';
 import { ExportProfileButton } from '@/components/shared/ExportProfileButton';
 import { ProfileDocumentsSection } from './components/ProfileDocumentsSection';
 import { EditMyProfileDialog } from './components/EditMyProfileDialog';
+import { EmployeeEditForm } from '@/pages/Employees/components/EmployeeEditForm';
+import { GovernmentInfoDialog } from '@/pages/Employees/components/GovernmentInfoDialog';
 import { NOT_PROVIDED, formatDate, formatDateTime, formatEnumLabel, fullNameOf } from './profileFormat';
 import { PersonalRecordFields, ResidenceFields, EducationLicensesSections } from '@/pages/Employees/components/EmployeeRecordSections';
 
@@ -41,9 +43,12 @@ import { PersonalRecordFields, ResidenceFields, EducationLicensesSections } from
  * psychological records keep their confidentiality — the employee sees what
  * those modules show an employee).
  *
- * There are no administrative actions here — not even for HR or Sister on their
- * own record. Archive, account, organisation and HR-managed fields belong to
- * Employee Management.
+ * Editing follows what the API allows on your own record (`PUT /employees/:id`):
+ * an employee or supervisor gets Edit My Profile's self-service fields; HR (FULL)
+ * may change every field of any record, their own included, so HR gets the same
+ * full editor and Government IDs editor here as in Employee Management. Archive
+ * and account controls stay in Employee Management — and never on your own
+ * record (the API refuses archiving, locking or deactivating yourself).
  */
 
 const SECTIONS: Array<{ label: string; items: Array<{ id: string; label: string; icon: React.ReactNode }> }> = [
@@ -111,7 +116,10 @@ export default function MyProfilePage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [section, setSection] = useState('overview');
   const [editOpen, setEditOpen] = useState(false);
+  const [governmentOpen, setGovernmentOpen] = useState(false);
   const [breakdownOpen, setBreakdownOpen] = useState(false);
+  // HR edits every field of their own record, as the API allows.
+  const isHR = user?.permissionTier === 'FULL';
   const [timeline, setTimeline] = useState<any[] | null>(null);
   const [timelineError, setTimelineError] = useState<string | null>(null);
 
@@ -172,8 +180,9 @@ export default function MyProfilePage() {
   const stateLabel = EMPLOYMENT_STATE_LABELS[employee.employmentState as EmploymentState] ?? formatEnumLabel(employee.employmentState);
   const supervisorText = employee.immediateSupervisor
     ? `${employee.immediateSupervisor.firstName} ${employee.immediateSupervisor.lastName}${employee.immediateSupervisor.jobRole?.title ? ` · ${employee.immediateSupervisor.jobRole.title}` : ''}`
-    : employee.noSupervisorRequired && employee.supervisorAssignmentStatus !== 'PENDING'
-      ? `Not required — ${employee.jobRole?.title ?? 'this'} is a top-level role`
+    : // A top-level role has nobody above it — never "being reviewed".
+      employee.noSupervisorRequired
+      ? `None needed — ${employee.jobRole?.title ?? 'this'} is a top-level role`
       : employee.supervisorAssignmentStatus === 'PENDING'
         ? 'Being reviewed by HR'
         : 'None assigned';
@@ -224,6 +233,20 @@ export default function MyProfilePage() {
                   <InfoField label="Mobile Number" value={employee.mobilePhone} />
                 </InfoGrid>
               </InfoSection>
+              {isHR ? (
+              <InfoSection title="Keeping your profile current" description="As HR, you keep your own record too.">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-xl border border-border-soft bg-muted/20 p-3.5">
+                    <p className="font-semibold text-foreground">You can update</p>
+                    <p className="mt-1 text-muted-foreground">Every detail of your record — name, personal email (your sign-in), birth details, contact, employment, job role, unit, education and emergency contacts — with <span className="font-semibold text-foreground">Edit My Profile</span>. Government IDs with <span className="font-semibold text-foreground">Edit</span> in Government. Your photo and banner with the camera button on each.</p>
+                  </div>
+                  <div className="rounded-xl border border-border-soft bg-muted/20 p-3.5">
+                    <p className="font-semibold text-foreground">Another HR administrator handles</p>
+                    <p className="mt-1 text-muted-foreground">Archiving your record and locking or deactivating your account — doing it yourself would sign you out of HRISense.</p>
+                  </div>
+                </div>
+              </InfoSection>
+              ) : (
               <InfoSection title="Keeping your profile current" description="What you can change yourself, and what HR keeps.">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                   <div className="rounded-xl border border-border-soft bg-muted/20 p-3.5">
@@ -236,6 +259,7 @@ export default function MyProfilePage() {
                   </div>
                 </div>
               </InfoSection>
+              )}
             </>
           )}
 
@@ -278,7 +302,7 @@ export default function MyProfilePage() {
 
           {section === 'employment' && (
             <>
-              <InfoSection title="Employment" description="Kept by HR." missingCount={missingBySection.employment}>
+              <InfoSection title="Employment" description={isHR ? 'Change these with Edit My Profile.' : 'Kept by HR.'} missingCount={missingBySection.employment}>
                 <InfoGrid columns={3}>
                   <InfoField label="Employment Type" value={formatEnumLabel(employee.employmentStatus)} />
                   <InfoField label="Employee Status" value={stateLabel} />
@@ -317,15 +341,24 @@ export default function MyProfilePage() {
           )}
 
           {section === 'government' && (
-            <InfoSection title="Government Information" description="Kept by HR." missingCount={missingBySection.government}>
-              <InfoGrid>
+            <InfoSection
+              title="Government Information"
+              description={isHR ? 'Statutory numbers on your record.' : 'Kept by HR.'}
+              missingCount={missingBySection.government}
+              action={isHR ? (
+                <Button size="sm" variant="update" leftIcon={<Edit2 />} onClick={() => setGovernmentOpen(true)}>
+                  Edit
+                </Button>
+              ) : undefined}
+            >
+              <InfoList>
                 <InfoField label="SSS Number" value={employee.sssNumber} missing={isMissing('sssNumber')} />
+                <InfoField label="TIN" value={employee.tinNumber} missing={isMissing('tinNumber')} />
                 <InfoField label="PhilHealth Number" value={employee.philhealthNumber} missing={isMissing('philhealthNumber')} />
                 <InfoField label="Pag-IBIG Number" value={employee.pagibigNumber} missing={isMissing('pagibigNumber')} />
-                <InfoField label="TIN" value={employee.tinNumber} missing={isMissing('tinNumber')} />
                 <InfoField
                   label="Other Government IDs"
-                  span
+                  className="sm:col-span-2"
                   value={
                     employee.governmentIds?.length ? (
                       <ul className="space-y-0.5">
@@ -340,7 +373,7 @@ export default function MyProfilePage() {
                     )
                   }
                 />
-              </InfoGrid>
+              </InfoList>
             </InfoSection>
           )}
 
@@ -377,7 +410,20 @@ export default function MyProfilePage() {
           )}
 
           {section === 'documents' && (
-            <ProfileDocumentsSection employeeId={employee.id} description="Your documents on file that HR has made visible to you." />
+            <ProfileDocumentsSection
+              employeeId={employee.id}
+              description="Your documents on file that HR has made visible to you."
+              missingCount={missingBySection.documents}
+              missingItems={[
+                ...(isMissing('photoUrl')
+                  ? [{ label: 'Profile Photo', value: 'Add one with the camera button on your profile card' }]
+                  : []),
+                // Every document on the record counts, including any HR has not made visible to you.
+                ...(isMissing('documents')
+                  ? [{ label: 'Uploaded Documents', value: `${employee.documents?.length ?? 0} of 2 on file — HR adds them` }]
+                  : []),
+              ]}
+            />
           )}
 
           {section === 'schedule' && (
@@ -458,7 +504,14 @@ export default function MyProfilePage() {
         </motion.div>
       </div>
 
-      <EditMyProfileDialog isOpen={editOpen} onClose={() => setEditOpen(false)} employee={employee} onSaved={load} />
+      {isHR ? (
+        <>
+          <EmployeeEditForm isOpen={editOpen} onClose={() => setEditOpen(false)} employee={employee} onSaveSuccess={load} canEditAll />
+          <GovernmentInfoDialog isOpen={governmentOpen} onClose={() => setGovernmentOpen(false)} employee={employee} onSaveSuccess={load} />
+        </>
+      ) : (
+        <EditMyProfileDialog isOpen={editOpen} onClose={() => setEditOpen(false)} employee={employee} onSaved={load} />
+      )}
     </motion.div>
   );
 }

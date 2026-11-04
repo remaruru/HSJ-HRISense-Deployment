@@ -904,6 +904,12 @@ export function EvaluationCycleModal({
                               </li>
                             ))}
                           </ul>
+                          {(preview.leftOutHr ?? 0) > 0 && (
+                            <p className="text-muted-foreground">
+                              {preview.leftOutHr} HR {preview.leftOutHr === 1 ? 'person is' : 'people are'} left out: HR and Sister
+                              are not evaluated in the system.
+                            </p>
+                          )}
                           {preview.employees.length > 0 && (
                             <button type="button" onClick={() => setShowPreviewList((v) => !v)} className="font-semibold text-primary-700 dark:text-primary-300 hover:underline">
                               {showPreviewList ? 'Hide' : 'Show'} each employee's template

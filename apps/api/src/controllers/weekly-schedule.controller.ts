@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { WeeklyScheduleService } from '../services/weekly-schedule.service';
 import { AppError } from '../middleware/errorHandler';
 import { PermissionTier } from '@prisma/client';
-import { OrgHierarchyService } from '../services/org-hierarchy.service';
+import { OrgHierarchyService, HR_AUTHORITY_MESSAGE } from '../services/org-hierarchy.service';
 
 export class WeeklyScheduleController {
   // ─────────────────────────────────────────────────────────────────────────────
@@ -58,7 +58,14 @@ export class WeeklyScheduleController {
   ): Promise<void> {
     const { permissionTier, employeeId: actorEmployeeId } = req.user!;
 
-    if (permissionTier === PermissionTier.FULL) return;
+    if (permissionTier === PermissionTier.FULL) {
+      // HR sets anyone's schedule below HR, and their own; another HR person's
+      // and Sister's only Sister sets.
+      if (mode === 'write' && !(await OrgHierarchyService.canManageEmployee({ employeeId: actorEmployeeId, permissionTier }, employeeId))) {
+        throw new AppError(HR_AUTHORITY_MESSAGE, 403, undefined, 'FORBIDDEN');
+      }
+      return;
+    }
 
     if (permissionTier === PermissionTier.STANDARD) {
       if (mode === 'write') {

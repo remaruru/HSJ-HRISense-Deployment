@@ -7,10 +7,15 @@
  * its password, e.g. {"name@tip.edu.ph": "…"} — checked against the HRISense
  * password rules and stored only as bcrypt hashes.
  *
- * Safe to rerun: an email that already has an account is left exactly as it is
- * (its password is never reset), so this only ever creates missing accounts.
- * Without the variable it does nothing. Called by seed-demo.js after the demo
- * accounts.
+ * Safe to rerun: an email that already has an account keeps it (its password is
+ * never reset), so this only ever creates missing accounts. Without the variable
+ * it creates nothing. Called by seed-demo.js after the demo accounts.
+ *
+ * HR Officer is a top-level role: nobody sits above it, so its supervisor
+ * status is ASSIGNED with no supervisor (the rule in supervisor-resolver.service).
+ * Accounts made by an earlier version of this file were stored as PENDING, which
+ * showed "Being reviewed by HR" / "Pending HR Review" on the person's own
+ * record; each run puts those right, touching nothing else on the record.
  */
 'use strict';
 
@@ -52,7 +57,23 @@ async function freeTeamNumber(prisma, unitCode) {
   }
 }
 
+/** Earlier team accounts were stored as supervisor PENDING; a top-level role is ASSIGNED. */
+async function repairTopLevelStatus(prisma) {
+  const fixed = await prisma.employee.updateMany({
+    where: {
+      personalEmail: { in: TEAM_HR_ACCOUNTS.map((p) => p.email.toLowerCase()) },
+      jobRole: { code: ROLE_CODE },
+      immediateSupervisorId: null,
+      supervisorAssignmentStatus: 'PENDING',
+    },
+    data: { supervisorAssignmentStatus: 'ASSIGNED', supervisorPendingReason: null },
+  });
+  if (fixed.count) console.log(`
+Team HR accounts: ${fixed.count} marked as top-level (no supervisor needed).`);
+}
+
 async function seedTeamAccounts({ prisma }) {
+  await repairTopLevelStatus(prisma);
   const passwords = readPasswords();
   if (!passwords) {
     console.log(`\nTeam HR accounts: skipped (${PASSWORDS_ENV} is not set).`);
@@ -112,7 +133,8 @@ async function seedTeamAccounts({ prisma }) {
           employmentStatus: 'REGULAR',
           employmentState: 'ACTIVE',
           hireDate: new Date('2026-01-01'),
-          supervisorAssignmentStatus: 'PENDING',
+          // Top-level role: assigned, with nobody above it.
+          supervisorAssignmentStatus: 'ASSIGNED',
         },
       });
       await tx.employeeEmergencyContact.create({

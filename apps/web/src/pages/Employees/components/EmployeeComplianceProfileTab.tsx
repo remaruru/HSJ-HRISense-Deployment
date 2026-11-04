@@ -26,6 +26,7 @@ import {
   EmployeeComplianceRecord,
 } from "@/services/compliance.service";
 import { useAuth } from "@/providers/AuthProvider";
+import { useHrAuthority } from "@/hooks/useHrAuthority";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getApiErrorMessage } from '@/utils/error-handler.util';
@@ -62,7 +63,10 @@ const STATUS_BADGES: Record<string, { label: string; class: string; icon: any }>
 /** `selfView`: My Profile — the person's own compliance, without HR's recording controls. */
 export function EmployeeComplianceProfileTab({ employeeId, selfView = false }: { employeeId: string; selfView?: boolean }) {
   const { user } = useAuth();
-  const isFullHR = user?.permissionTier === "FULL" && !selfView;
+  const hr = useHrAuthority();
+  // HR adds records for anyone below HR and themselves; another HR person's
+  // or Sister's records only Sister changes (the HR rule).
+  const isFullHR = user?.permissionTier === "FULL" && !selfView && hr.canManage(employeeId);
 
   const [summary, setSummary] = useState<EmployeeComplianceSummaryItem[]>([]);
   const [records, setRecords] = useState<EmployeeComplianceRecord[]>([]);
@@ -313,8 +317,15 @@ export function EmployeeComplianceProfileTab({ employeeId, selfView = false }: {
                 placeholder="e.g. CERT-2026-981"
                 value={fulfillRef}
                 onChange={(e) => setFulfillRef(e.target.value)}
+                required={hr.isOwn(employeeId)}
                 className="mt-1"
               />
+              {hr.isOwn(employeeId) && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  This is your own record. It is accepted automatically, so the certificate or reference number is
+                  required as proof, and Sister is told.
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

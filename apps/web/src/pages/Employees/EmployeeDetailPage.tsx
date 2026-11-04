@@ -209,6 +209,9 @@ export default function EmployeeDetailPage() {
   const { user } = useAuth();
   const isFullHR = user?.permissionTier === 'FULL';
   const isSelf = user?.employee?.id === employeeId;
+  // HR reads every record but changes only their own and those below HR; Sister
+  // changes anyone. The API answers per record (`viewerCanManage`) and enforces it.
+  const canManage = isFullHR && employee?.viewerCanManage !== false;
   
   const visibleTabs = [
     "Overview",
@@ -461,6 +464,12 @@ export default function EmployeeDetailPage() {
         </p>
       )}
 
+      {isFullHR && !canManage && (
+        <p className={`rounded-xl border px-3 py-2 text-sm ${STATUS_TONE_CHIP.info}`}>
+          This is an HR record. You can view it, but only Sister can change the record or account of an HR person or Sister.
+        </p>
+      )}
+
       <motion.div variants={staggerItem} className="rounded-2xl border border-border-soft bg-surface shadow-card overflow-hidden">
         <div className="h-32 bg-gradient-to-r from-primary-600 to-primary-400 relative">
           <ProfileBannerImage src={employee.bannerUrl} />
@@ -564,7 +573,7 @@ export default function EmployeeDetailPage() {
             {/* Administrative actions: HR (FULL) only, and the API refuses them to
                 anyone else (archive / restore / account routes are FULL-only).
                 Self-service editing is Edit My Profile on My Profile. */}
-            {isFullHR && (
+            {canManage && (
               <div className="flex gap-2">
                 <Button variant="update" leftIcon={<Edit2 className="h-4 w-4" />} onClick={() => setIsEditOpen(true)}>
                   Edit Profile
@@ -683,7 +692,7 @@ export default function EmployeeDetailPage() {
                 <InfoField label="Telephone Number" value={employee.telephoneNumber || employee.homePhone} />
                 <InfoField label="Personal Email (login)" value={employee.personalEmail} missing={isMissing("email")} />
               </InfoGrid>
-              {isFullHR && employee.loginEmailMatchesPersonalEmail === false && (
+              {canManage && employee.loginEmailMatchesPersonalEmail === false && (
                 <p className={`mt-3 rounded-xl border px-3 py-2 text-xs ${STATUS_TONE_CHIP.warning}`}>
                   This account still signs in with <strong>{employee.user?.email}</strong>, recorded before the personal
                   email became the login. Switch it from <strong>Account Management</strong>.
@@ -742,7 +751,7 @@ export default function EmployeeDetailPage() {
 
             <InfoSection
               title="Immediate Supervisor"
-              action={user?.permissionTier === 'FULL' ? (
+              action={canManage ? (
                 <Button size="sm" variant="update" onClick={() => setIsSupervisorOpen(true)}>
                   Override Supervisor
                 </Button>
@@ -750,9 +759,10 @@ export default function EmployeeDetailPage() {
             >
               
               <div className="mb-4">
-                {employee.supervisorAssignmentStatus === 'PENDING' && (
+                {/* A top-level role is never pending — nobody sits above it (as on the Org Chart). */}
+                {employee.supervisorAssignmentStatus === 'PENDING' && !employee.noSupervisorRequired && (
                   <div className="bg-status-warning-surface border border-status-warning-border text-status-warning-foreground text-sm px-3 py-2 rounded-lg mb-3">
-                    <strong>Pending HR Review:</strong> {employee.supervisorPendingReason}
+                    <strong>Pending HR Review:</strong> {employee.supervisorPendingReason ? formatEnumLabel(employee.supervisorPendingReason) : 'No reason recorded'}
                   </div>
                 )}
                 {employee.supervisorAssignmentSource === 'MANUAL_OVERRIDE' && (
@@ -781,7 +791,7 @@ export default function EmployeeDetailPage() {
                       </div>
                     )}
                   </div>
-                ) : employee.noSupervisorRequired && employee.supervisorAssignmentStatus !== 'PENDING' ? (
+                ) : employee.noSupervisorRequired ? (
                   <InfoEmpty>No supervisor required — {employee.jobRole?.title ?? 'this'} is a top-level role.</InfoEmpty>
                 ) : (
                   <InfoEmpty>No active supervisor assigned.</InfoEmpty>
@@ -792,6 +802,7 @@ export default function EmployeeDetailPage() {
             {/* A second, additional overseer (HR only). The immediate supervisor above is unchanged. */}
             {isFullHR && (
               <EmployeeAdditionalOversight
+                readOnly={!canManage}
                 employeeId={employee.id}
                 immediateSupervisorName={employee.immediateSupervisor ? `${employee.immediateSupervisor.firstName} ${employee.immediateSupervisor.lastName}`.trim() : null}
               />
@@ -830,7 +841,7 @@ export default function EmployeeDetailPage() {
             title="Government IDs"
             description="Statutory numbers on file for this employee."
             missingCount={missingBySection["Government"]}
-            action={isFullHR ? (
+            action={canManage ? (
               <Button size="sm" variant="update" leftIcon={<Edit2 />} onClick={() => setIsGovernmentOpen(true)}>
                 Edit Government Information
               </Button>
@@ -901,7 +912,7 @@ export default function EmployeeDetailPage() {
             title="Uploaded Documents"
             description="Contracts, clearances, IDs and certificates on file."
             missingCount={missingBySection["Documents"]}
-            action={isFullHR ? (
+            action={canManage ? (
               <Button size="sm" variant="create" leftIcon={<UploadCloud />} onClick={() => setIsUploadOpen(true)}>
                 Upload File
               </Button>
@@ -974,7 +985,7 @@ export default function EmployeeDetailPage() {
                             {doc.isVisibleToSupervisor ? "Supervisor Visible" : "Supervisor Hidden"}
                           </Badge>
                         </div>
-                        {isFullHR && (
+                        {canManage && (
                           <div className="flex gap-1">
                             <Button size="sm" variant="update" className="h-7 px-2 text-xs" onClick={() => setActiveDocForEdit(doc)}>Edit</Button>
                             <Button size="sm" variant="update" className="h-7 px-2 text-xs" onClick={() => setActiveDocForReplace(doc)}>Replace</Button>
@@ -1056,14 +1067,14 @@ export default function EmployeeDetailPage() {
         )}
 
         {activeTab === "Account Management" && (
-          <AccountManagementPanel employee={employee} onUpdate={fetchEmployee} />
+          <AccountManagementPanel employee={employee} onUpdate={fetchEmployee} readOnly={!canManage} />
         )}
       </motion.div>
       </div>
 
       {/* Dialogs */}
       <EmployeeEditForm
-        isOpen={isEditOpen && isFullHR}
+        isOpen={isEditOpen && canManage}
         onClose={() => setIsEditOpen(false)}
         employee={employee}
         onSaveSuccess={fetchEmployee}

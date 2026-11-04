@@ -228,8 +228,8 @@ export default function ApplicantDetailPage() {
         )}
       </div>
 
-      {/* Tabs Navigation */}
-      <div className="flex overflow-x-auto pb-2 -mb-2 hide-scrollbar">
+      {/* Tabs Navigation — the page's space-y gap keeps it clear of the panel below */}
+      <div className="flex overflow-x-auto hide-scrollbar">
         <div className="flex space-x-1 bg-surface-2 p-1 rounded-lg border">
           {tabs.map((tab) => (
             <button
@@ -355,19 +355,28 @@ export default function ApplicantDetailPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Internal Notes */}
             <div className="flex flex-col h-[500px]">
-              <h3 className="text-lg font-semibold text-foreground mb-4 border-b pb-2 flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-muted-foreground" />
-                Internal Notes
-              </h3>
+              <div className="mb-4 border-b pb-2">
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-muted-foreground" />
+                  Internal Notes
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Only HR can see these notes. They stay on this application and are never shown or emailed to the applicant.
+                </p>
+              </div>
               <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2 custom-scrollbar">
                 {application.notes?.length > 0 ? (
                   application.notes.map((note: any) => (
                     <div key={note.id} className="bg-surface-2 p-3 rounded-md text-sm border border-border">
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="font-medium text-foreground text-xs">{note.createdByUser?.firstName} {note.createdByUser?.lastName}</span>
-                        <span className="text-xs text-muted-foreground">{formatDate(note.createdAt, true)}</span>
+                      <div className="flex justify-between items-start gap-3 mb-1">
+                        <span className="font-medium text-foreground text-xs">
+                          {note.createdByUser
+                            ? `${note.createdByUser.firstName} ${note.createdByUser.lastName}`.trim()
+                            : 'HR'}
+                        </span>
+                        <span className="text-xs text-muted-foreground shrink-0">{formatDate(note.createdAt, true)}</span>
                       </div>
-                      <p className="text-foreground whitespace-pre-wrap">{note.content}</p>
+                      <p className="text-foreground whitespace-pre-wrap">{note.note}</p>
                     </div>
                   ))
                 ) : (
@@ -376,7 +385,7 @@ export default function ApplicantDetailPage() {
               </div>
               <form onSubmit={handleAddNote} className="mt-auto bg-surface-2 p-3 rounded-lg border border-border">
                 <textarea
-                  placeholder="Add a private note for HR..."
+                  placeholder="Add a private note — only HR can see it"
                   className="w-full text-sm bg-surface border-border rounded-md p-3 min-h-[80px] resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
                   value={noteContent}
                   onChange={(e) => setNoteContent(e.target.value)}

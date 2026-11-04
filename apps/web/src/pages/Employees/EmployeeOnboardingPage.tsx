@@ -12,6 +12,7 @@ import { scheduleApi } from "@/services/api/schedule";
 import { toast } from"sonner";
 import { jsPDF } from "jspdf";
 import { OrgSelector } from "@/components/common/OrgSelector";
+import { useAuth } from "@/providers/AuthProvider";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { HelpLink } from "@/components/common/HelpLink";
 import {
@@ -39,6 +40,9 @@ const STEPS = [
 
 export default function EmployeeOnboardingPage() {
  const navigate = useNavigate();
+ // Only Sister adds someone in an HR or Sister job role (the API refuses anyone else).
+ const { user } = useAuth();
+ const isSister = user?.employee?.jobRole?.code ==="SISTER";
  const search: any = useSearch({ strict: false });
  const draftId = search.draftId;
  const [currentStep, setCurrentStep] = useState(0);
@@ -829,6 +833,7 @@ export default function EmployeeOnboardingPage() {
  </div>
  <div className="bg-surface-2 p-4 rounded-xl border border-border">
  <OrgSelector
+ hrRolesAllowed={isSister}
  unitId={formData.unitId}
  departmentId={formData.departmentId}
  jobRoleId={formData.jobRoleId}

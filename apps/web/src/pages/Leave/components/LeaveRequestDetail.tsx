@@ -1,7 +1,7 @@
 import { confirmAction } from '@/components/shared/ConfirmProvider';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { CheckCircle2, XCircle, X, FileText, CalendarRange, Ban, Loader2, Check } from 'lucide-react';
+import { CheckCircle2, XCircle, X, FileText, CalendarRange, Ban, Loader2, Check, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import { STATUS_TONE_CHIP } from '@/components/ui/status-tone';
@@ -12,6 +12,7 @@ import { leaveApi } from '@/services/api/leave';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
 import { NO_CREDIT_LEAVE_TYPES, daysText, leaveCalendarDays, leaveStage, leaveTypeLabel } from '@/lib/leaveTypes';
 import { toast } from 'sonner';
+import { useHrAuthority, HR_READ_ONLY_NOTE } from '@/hooks/useHrAuthority';
 
 /**
  * One leave request, the way Hospicio's Leave Application Form reads — the
@@ -174,6 +175,7 @@ export function LeaveRequestDetail({
   const [note, setNote] = useState('');
   const [declineReason, setDeclineReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const hr = useHrAuthority();
 
   const load = async () => {
     setLoadError(null);
@@ -205,9 +207,15 @@ export function LeaveRequestDetail({
 
   const own = !!leave && leave.employeeId === viewerEmployeeId;
   const open = !!leave && ['PENDING', 'FOR_REVIEW'].includes(leave.status);
-  const canHead = !!leave && isTeamHead && !own && leave.status === 'PENDING';
-  const canHR = !!leave && isHR && open;
-  const canCancel = own && open;
+  // The HR rule: HR never decides another HR person's or Sister's leave, and
+  // HR's own leave is accepted automatically, so nobody decides their own.
+  const lockedForHr = !!leave && hr.isLocked(leave.employeeId);
+  const canHead = !!leave && isTeamHead && !own && !lockedForHr && leave.status === 'PENDING';
+  const canHR = !!leave && isHR && open && !own && !lockedForHr;
+  // HR's own automatically accepted leave can still be withdrawn until it starts.
+  const autoAccepted = !!leave && leave.status === 'APPROVED' && !!leave.approvedById && leave.approvedById === leave.employeeId;
+  const startsLater = !!leave && String(leave.startDate).slice(0, 10) > new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+  const canCancel = own && (open || (autoAccepted && startsLater));
   const stage = leaveStage(leave);
   const record = leave?.leaveRecord;
   const revised = !!leave?.originalStartDate;
@@ -240,6 +248,26 @@ export function LeaveRequestDetail({
                 <span className={cn('inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-bold', STATUS_TONE_CHIP[stage.tone])}>{stage.label}</span>
                 <StageTracker leave={leave} />
               </div>
+
+              {isHR && open && (lockedForHr || own) && (
+                <div className="flex items-start gap-2 rounded-xl border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+                  <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span>
+                    {own
+                      ? 'This is your own leave. HR leave is accepted automatically when filed, so nobody approves or declines it by hand.'
+                      : `${HR_READ_ONLY_NOTE} That includes deciding on their leave.`}
+                  </span>
+                </div>
+              )}
+              {autoAccepted && (
+                <div className="flex items-start gap-2 rounded-xl border border-status-success-border bg-status-success-surface/40 p-3 text-xs text-foreground">
+                  <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-success-foreground" aria-hidden="true" />
+                  <span>
+                    Accepted automatically: HR&apos;s own leave needs no approval, so it was checked against the days left and the dates instead.
+                    {own && startsLater ? ' You can still cancel it until the day it starts.' : ''}
+                  </span>
+                </div>
+              )}
 
               {/* Employee information — from the record, never typed */}
               <Section title="Employee information">
@@ -442,8 +470,10 @@ export function LeaveRequestDetail({
                       disabled={busy}
                       onClick={async () => {
                         const ok = await confirmAction({
-                          title: 'Cancel this leave request?',
-                          message: 'It will be withdrawn and its days released.',
+                          title: autoAccepted ? 'Cancel this leave?' : 'Cancel this leave request?',
+                          message: autoAccepted
+                            ? 'It was accepted automatically. Cancelling it gives its days back to your balance.'
+                            : 'It will be withdrawn and its days released.',
                           confirmLabel: 'Cancel request',
                           cancelLabel: 'Keep it',
                           danger: true,

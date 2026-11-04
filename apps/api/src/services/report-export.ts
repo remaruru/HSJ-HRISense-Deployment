@@ -47,14 +47,20 @@ const numericColumns = (report: ReportResult): boolean[] =>
     return values.length > 0 && values.every((v) => typeof v === 'number');
   });
 
-/** Bar colour for one slice: status charts use the status colours, the rest one teal. */
+/**
+ * The one hue of nominal bars — the web charts' light-mode `nominal` (`chartTheme.ts`).
+ * Blue, so it never reads as a status colour or as the brand teal.
+ */
+const NOMINAL = '#2a78d6';
+
+/** Bar colour for one slice: status charts use the status colours, ordinal ones a teal ramp, the rest one blue. */
 function sliceColor(chart: ReportChart, index: number, tone?: Tone): string {
   if (chart.encoding === 'status') return TONE[tone ?? 'neutral'].bar;
   if (chart.encoding === 'ordinal') {
     const shades = ['#9fd6d4', '#6cc5c3', '#3fa9a7', '#148281', '#0f6766', '#0d4f4e', '#093b3a'];
     return shades[Math.min(index, shades.length - 1)];
   }
-  return BRAND.teal;
+  return NOMINAL;
 }
 
 export function reportToPdf(report: ReportResult): Promise<Buffer> {

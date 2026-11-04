@@ -2,6 +2,33 @@ import { Request, Response, NextFunction } from 'express';
 import { ComplianceService } from '../services/compliance.service';
 import { AppError } from '../middleware/errorHandler';
 import { OrgHierarchyService } from '../services/org-hierarchy.service';
+import { OwnRecordService } from '../services/own-record.service';
+import { NotificationService } from '../services/notification.service';
+import { prisma } from '../config/prisma';
+import { NotificationType } from '@prisma/client';
+
+/**
+ * Sister's heads-up when someone changes who a requirement applies to, or
+ * archives one: HR could otherwise quietly exempt themselves. Nothing is
+ * blocked; Sister only oversees.
+ */
+async function tellSisterAboutRule(actor: any, requirementId: string | null | undefined, change: string) {
+  if (!requirementId) return;
+  const [requirement, who] = await Promise.all([
+    prisma.complianceRequirement.findUnique({ where: { id: requirementId }, select: { title: true } }),
+    actor?.employeeId
+      ? prisma.employee.findUnique({ where: { id: actor.employeeId }, select: { firstName: true, lastName: true } })
+      : null,
+  ]);
+  const name = who ? `${who.firstName} ${who.lastName}`.trim() : 'Someone';
+  await NotificationService.notifySister({
+    type: NotificationType.COMPLIANCE_ALERT,
+    eventId: `requirement-rule-sister:${requirementId}:${Date.now()}`,
+    title: 'Compliance requirement changed',
+    message: `${name} ${change} "${requirement?.title ?? 'a requirement'}". This is for your information only.`,
+    link: '/compliance',
+  }, actor?.userId);
+}
 
 export class ComplianceController {
 
@@ -26,8 +53,8 @@ export class ComplianceController {
     try {
       const user = (req as any).user;
       const data = await ComplianceService.createRequirement(
-        { ...req.body, createdById: user.id },
-        user.id,
+        { ...req.body, createdById: user.userId },
+        user.userId,
         req.ip,
         req.headers['user-agent']
       );
@@ -39,7 +66,7 @@ export class ComplianceController {
     try {
       const user = (req as any).user;
       const data = await ComplianceService.updateRequirement(
-        req.params.id, req.body, user.id, req.ip, req.headers['user-agent']
+        req.params.id, req.body, user.userId, req.ip, req.headers['user-agent']
       );
       res.json({ success: true, data });
     } catch (err) { next(err); }
@@ -48,7 +75,8 @@ export class ComplianceController {
   static async archiveRequirement(req: Request, res: Response, next: NextFunction) {
     try {
       const user = (req as any).user;
-      await ComplianceService.archiveRequirement(req.params.id, user.id, req.ip, req.headers['user-agent']);
+      await ComplianceService.archiveRequirement(req.params.id, user.userId, req.ip, req.headers['user-agent']);
+      await tellSisterAboutRule(user, req.params.id, 'archived the requirement');
       res.json({ success: true, message: 'Requirement archived.' });
     } catch (err) { next(err); }
   }
@@ -59,8 +87,9 @@ export class ComplianceController {
     try {
       const user = (req as any).user;
       const data = await ComplianceService.addScope(
-        req.params.id, req.body, user.id, req.ip, req.headers['user-agent']
+        req.params.id, req.body, user.userId, req.ip, req.headers['user-agent']
       );
+      await tellSisterAboutRule(user, req.params.id, 'changed who must meet the requirement (added a group to)');
       res.status(201).json({ success: true, data });
     } catch (err) { next(err); }
   }
@@ -68,7 +97,11 @@ export class ComplianceController {
   static async deleteScope(req: Request, res: Response, next: NextFunction) {
     try {
       const user = (req as any).user;
-      await ComplianceService.deleteScope(req.params.scopeId, user.id, req.ip, req.headers['user-agent']);
+      const scope = await prisma.complianceRequirementScope.findUnique({
+        where: { id: req.params.scopeId }, select: { requirementId: true },
+      });
+      await ComplianceService.deleteScope(req.params.scopeId, user.userId, req.ip, req.headers['user-agent']);
+      await tellSisterAboutRule(user, scope?.requirementId, 'changed who must meet the requirement (removed a group from)');
       res.json({ success: true, message: 'Scope removed.' });
     } catch (err) { next(err); }
   }
@@ -87,17 +120,30 @@ export class ComplianceController {
     try {
       const user = (req as any).user;
       const employeeId = req.params.employeeId || req.body.employeeId;
+      // HR's own record is accepted automatically, so it needs proof. This
+      // module has no file upload: the proof is the certificate or reference number.
+      const ownRecord = OwnRecordService.isOwn(user, employeeId);
+      const reference = typeof req.body.referenceNumber === 'string' ? req.body.referenceNumber.trim() : '';
+      if (ownRecord && !reference) {
+        throw new AppError(
+          'Add the certificate or reference number. Your own records are accepted automatically, so they need proof.',
+          400, undefined, 'VALIDATION_ERROR'
+        );
+      }
       const data = await ComplianceService.createEmployeeRecord(
         {
           employeeId,
           ...req.body,
           completedAt: new Date(req.body.completedAt),
           expiresAt: req.body.expiresAt ? new Date(req.body.expiresAt) : undefined,
-          createdById: user.id,
+          createdById: user.userId,
         },
-        user.id, req.ip, req.headers['user-agent']
+        user.userId, req.ip, req.headers['user-agent']
       );
-      res.status(201).json({ success: true, data });
+      const autoAccepted = ownRecord
+        ? await OwnRecordService.acceptWithProof('compliance', data.id, user, `reference no. ${reference}`)
+        : false;
+      res.status(201).json({ success: true, data: autoAccepted ? { ...data, reviewStatus: 'ACCEPTED' } : data, autoAccepted });
     } catch (err) { next(err); }
   }
 
@@ -105,7 +151,7 @@ export class ComplianceController {
     try {
       const user = (req as any).user;
       const data = await ComplianceService.reviewRecord(
-        req.params.recordId, req.body, user.id, req.ip, req.headers['user-agent']
+        req.params.recordId, req.body, user.userId, req.ip, req.headers['user-agent']
       );
       res.json({ success: true, data });
     } catch (err) { next(err); }
@@ -114,7 +160,7 @@ export class ComplianceController {
   static async deleteRecord(req: Request, res: Response, next: NextFunction) {
     try {
       const user = (req as any).user;
-      await ComplianceService.softDeleteRecord(req.params.recordId, user.id, req.ip, req.headers['user-agent']);
+      await ComplianceService.softDeleteRecord(req.params.recordId, user.userId, req.ip, req.headers['user-agent']);
       res.json({ success: true, message: 'Record deleted.' });
     } catch (err) { next(err); }
   }

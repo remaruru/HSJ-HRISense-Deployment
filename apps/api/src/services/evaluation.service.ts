@@ -640,9 +640,36 @@ export class EvaluationService {
   }
 
   /**
-   * Helper to resolve unique active employees matching a list of scopes.
+   * The active employees a cycle's scopes cover, minus HR and Sister (FULL
+   * tier). The user's rule (2026-11-04): HR people are not evaluated in the
+   * system — HR would grade one another, and Sister only oversees — so no
+   * scope, not even one naming them, puts them in a cycle.
    */
   static async resolveTargetEmployees(scopes: Array<{
+    scopeType: RequirementScopeType;
+    targetUnitId?: string;
+    targetDepartmentId?: string;
+    targetJobRoleId?: string;
+    targetEmployeeId?: string;
+  }>): Promise<string[]> {
+    return (await this.splitScopeEmployees(scopes)).evaluated;
+  }
+
+  /** The scope's employees, split into those evaluated and the HR people left out. */
+  static async splitScopeEmployees(scopes: Parameters<typeof EvaluationService.resolveScopeEmployees>[0]) {
+    const all = await this.resolveScopeEmployees(scopes);
+    if (!all.length) return { evaluated: [] as string[], leftOutHr: [] as string[] };
+    const hr = new Set((await prisma.employee.findMany({
+      where: { id: { in: all }, jobRole: { permissionTier: PermissionTier.FULL } },
+      select: { id: true },
+    })).map((e) => e.id));
+    return { evaluated: all.filter((id) => !hr.has(id)), leftOutHr: all.filter((id) => hr.has(id)) };
+  }
+
+  /**
+   * Helper to resolve unique active employees matching a list of scopes.
+   */
+  private static async resolveScopeEmployees(scopes: Array<{
     scopeType: RequirementScopeType;
     targetUnitId?: string;
     targetDepartmentId?: string;
@@ -983,7 +1010,7 @@ export class EvaluationService {
       throw new AppError('Selected evaluation template is invalid or inactive', 400);
     }
     const scopes = data.scopes?.length ? data.scopes : [{ scopeType: RequirementScopeType.ALL }];
-    const ids = await this.resolveTargetEmployees(scopes);
+    const { evaluated: ids, leftOutHr } = await this.splitScopeEmployees(scopes);
     const employees = await prisma.employee.findMany({
       where: { id: { in: ids } },
       select: { id: true, firstName: true, lastName: true, employeeNumber: true, jobRole: { select: { id: true, title: true } } },
@@ -1004,7 +1031,8 @@ export class EvaluationService {
       cur.count += 1;
       byTemplate.set(r.template.id, cur);
     }
-    return { total: rows.length, byTemplate: [...byTemplate.values()], employees: rows };
+    // HR and Sister are never evaluated; the screen says how many were left out.
+    return { total: rows.length, byTemplate: [...byTemplate.values()], employees: rows, leftOutHr: leftOutHr.length };
   }
 
   /**

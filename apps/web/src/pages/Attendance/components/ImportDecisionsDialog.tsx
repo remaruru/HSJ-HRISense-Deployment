@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
+import { useHrAuthority } from '@/hooks/useHrAuthority';
 import {
   AttendanceImportService, CLASSIFICATION_LABELS, CORRECTION_STATUSES, FLAG_LABELS,
   type CorrectionStatus, type ImportCandidate,
@@ -58,6 +59,10 @@ export function ImportDecisionsDialog({
   onApply: () => Promise<void> | void;
 }) {
   const [rows, setRows] = useState<ImportCandidate[]>([]);
+  // The HR rule: your own day and another HR person's or Sister's day can only be
+  // imported as the device recorded it — never skipped, kept or fixed by you.
+  const hr = useHrAuthority();
+  const mayReject = (r: ImportCandidate) => !r.employee || hr.canDecide(r.employee.id);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [group, setGroup] = useState<string>('');
@@ -106,10 +111,18 @@ export function ImportDecisionsDialog({
       if (choice === 'accept') {
         await AttendanceImportService.decide(batchId, targets.map((r) => r.id), 'USE_UPLOADED');
       } else {
+        const held = targets.filter((r) => !mayReject(r));
+        targets = targets.filter(mayReject);
         const fresh = targets.filter((r) => !isConflict(r)).map((r) => r.id);
         const conflicts = targets.filter(isConflict).map((r) => r.id);
         if (fresh.length) await AttendanceImportService.decide(batchId, fresh, 'SKIP');
         if (conflicts.length) await AttendanceImportService.decide(batchId, conflicts, 'KEEP_EXISTING');
+        if (held.length) {
+          toast.info(
+            `${held.length} day${held.length === 1 ? '' : 's'} of HR people ${held.length === 1 ? 'was' : 'were'} left as they are: ` +
+              "you can't skip or keep the old version of your own or another HR person's day. Import them instead."
+          );
+        }
       }
       const done = new Set(targets.map((r) => r.id));
       const left = rows.filter((r) => !done.has(r.id));
@@ -211,6 +224,7 @@ export function ImportDecisionsDialog({
                   key={row.id}
                   row={row}
                   busy={busy}
+                  canReject={mayReject(row)}
                   onDecide={(choice) => decide([row], choice)}
                   onFix={(body) => fix(row, body)}
                 />
@@ -245,11 +259,14 @@ type FixBody = { sessions: Array<{ in: string; out: string }>; status: Correctio
 function DecisionRow({
   row,
   busy,
+  canReject,
   onDecide,
   onFix,
 }: {
   row: ImportCandidate;
   busy: boolean;
+  /** False for your own day and another HR person's or Sister's: import only. */
+  canReject: boolean;
   onDecide: (choice: Choice) => void;
   onFix: (body: FixBody) => Promise<boolean>;
 }) {
@@ -284,10 +301,16 @@ function DecisionRow({
         <Button size="xs" variant="create" disabled={busy || editing} onClick={() => onDecide('accept')}>
           {conflict ? 'Use file' : 'Import'}
         </Button>
-        <Button size="xs" variant="outline" disabled={busy || editing} onClick={() => onDecide('reject')}>
-          {conflict ? 'Keep record' : 'Skip'}
-        </Button>
-        {row.employee && (
+        {canReject ? (
+          <Button size="xs" variant="outline" disabled={busy || editing} onClick={() => onDecide('reject')}>
+            {conflict ? 'Keep record' : 'Skip'}
+          </Button>
+        ) : (
+          <span className="self-center text-[11px] text-muted-foreground" title="Only Sister can skip, keep or fix an HR person's day.">
+            HR day: import only
+          </span>
+        )}
+        {row.employee && canReject && (
           <Button size="xs" variant="update" disabled={busy || editing} onClick={() => setEditing(true)}>
             <Pencil /> Fix
           </Button>

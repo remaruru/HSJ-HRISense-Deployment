@@ -56,6 +56,7 @@ import { api } from '@/services/api';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
+import { useHrAuthority } from '@/hooks/useHrAuthority';
 
 interface TrainingDetailModalProps {
   open: boolean;
@@ -212,16 +213,22 @@ export function TrainingDetailModal({
     return list;
   }, [activity?.participants, statusFilter, search]);
 
+  // The HR rule: HR may invite anyone, but marks results (status, certificate)
+  // only for people below HR and themselves — another HR person's or Sister's
+  // result only Sister marks.
+  const hr = useHrAuthority();
+  const resultEditable = filteredParticipants.filter((p) => hr.canManage(p.employeeId));
+
   // Bulk Selection Handlers
   const isAllSelected =
-    filteredParticipants.length > 0 &&
-    filteredParticipants.every((p) => selectedEmployeeIds.includes(p.employeeId));
+    resultEditable.length > 0 &&
+    resultEditable.every((p) => selectedEmployeeIds.includes(p.employeeId));
 
   const toggleSelectAll = () => {
     if (isAllSelected) {
       setSelectedEmployeeIds([]);
     } else {
-      setSelectedEmployeeIds(filteredParticipants.map((p) => p.employeeId));
+      setSelectedEmployeeIds(resultEditable.map((p) => p.employeeId));
     }
   };
 
@@ -842,6 +849,8 @@ export function TrainingDetailModal({
                                     <input
                                       type="checkbox"
                                       checked={isSelected}
+                                      disabled={!hr.canManage(p.employeeId)}
+                                      title={hr.canManage(p.employeeId) ? undefined : "Only Sister marks an HR person's result."}
                                       onChange={() => toggleSelectOne(p.employeeId)}
                                       className="rounded border-gray-300 text-primary focus:ring-primary h-3.5 w-3.5 dark:border-border-soft"
                                     />
@@ -912,7 +921,7 @@ export function TrainingDetailModal({
                                       >
                                         <Download className="h-3 w-3" />
                                       </Button>
-                                      {isFullHR && activity.status !== 'CANCELLED' && (
+                                      {isFullHR && hr.canManage(p.employeeId) && activity.status !== 'CANCELLED' && (
                                         <Button
                                           variant="update"
                                           size="sm"
@@ -922,7 +931,7 @@ export function TrainingDetailModal({
                                         </Button>
                                       )}
                                     </div>
-                                  ) : isFullHR && activity.status !== 'CANCELLED' && p.participationStatus === 'COMPLETED' ? (
+                                  ) : isFullHR && hr.canManage(p.employeeId) && activity.status !== 'CANCELLED' && p.participationStatus === 'COMPLETED' ? (
                                     <Button
                                       variant="create"
                                       size="sm"
@@ -937,6 +946,7 @@ export function TrainingDetailModal({
                                 </td>
                                 {isFullHR && activity.status !== 'CANCELLED' && (
                                   <td className="px-4 py-3 text-right">
+                                    {hr.canManage(p.employeeId) ? (
                                     <Button
                                       variant="update"
                                       size="sm"
@@ -944,6 +954,11 @@ export function TrainingDetailModal({
                                       className="text-xs h-7">
                                       Update
                                     </Button>
+                                    ) : (
+                                      <span className="text-[11px] text-muted-foreground" title="Only Sister marks an HR person's result.">
+                                        HR: view only
+                                      </span>
+                                    )}
                                   </td>
                                 )}
                               </tr>

@@ -7,6 +7,7 @@ import { authorize as requireRoles } from '../middleware/authorize';
 import { DocumentController, uploadDocumentSchema, updateMetadataSchema } from '../controllers/document.controller';
 import { validate } from '../middleware/validate';
 import { AppError } from '../middleware/errorHandler';
+import { requireHrAuthorityOver, targetFromParam, targetOfDocument } from '../middleware/hr-authority';
 
 const router = Router();
 
@@ -59,6 +60,9 @@ router.use(requireAuth);
 router.post(
   '/employees/:employeeId/documents',
   requireRoles(['FULL']),
+  // Sister: anyone's documents; other HR: their own and anyone below HR.
+  // Checked before the upload parser, so a refused upload never writes a file.
+  requireHrAuthorityOver(targetFromParam('employeeId')),
   upload.single('file'),
   validate(uploadDocumentSchema),
   DocumentController.upload
@@ -83,6 +87,7 @@ router.get(
 router.put(
   '/documents/:documentId',
   requireRoles(['FULL']),
+  requireHrAuthorityOver(targetOfDocument),
   validate(updateMetadataSchema),
   DocumentController.updateMetadata
 );
@@ -90,12 +95,14 @@ router.put(
 router.delete(
   '/documents/:documentId',
   requireRoles(['FULL']),
+  requireHrAuthorityOver(targetOfDocument),
   DocumentController.delete
 );
 
 router.put(
   '/documents/:documentId/file',
   requireRoles(['FULL']),
+  requireHrAuthorityOver(targetOfDocument),
   upload.single('file'),
   DocumentController.replace
 );

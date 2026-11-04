@@ -10,6 +10,11 @@
  *           dark   #059669 #d97706 #e11d48 #8b5cf6   all checks pass
  *   ordinal light  #4db8b6 #148281 #0d6362 #0a4a49   all checks pass
  *           dark   #c2e8e7 #8ed4d2 #4db8b6 #148281   all checks pass
+ *   nominal light  #2a78d6   dark #3987e5   contrast passes on both surfaces
+ *           Blue, the one hue no status uses, so a "which / where" bar beside a
+ *           status chart never reads as approved, pending or rejected. (Colours
+ *           per category were tried and refused: next to the status chart, every
+ *           third categorical hue lands on a status hue.)
  *
  * Two validator warnings are carried deliberately, each with the relief the
  * method requires:
@@ -46,7 +51,7 @@ export const CHART_THEME: { light: Mode; dark: Mode } = {
       neutral: '#64748b',
     },
     ordinal: ['#4db8b6', '#148281', '#0d6362', '#0a4a49'],
-    nominal: '#148281',
+    nominal: '#2a78d6',
     grid: '#e2e8f0',
     axis: '#64748b',
     surface: '#ffffff',
@@ -60,7 +65,7 @@ export const CHART_THEME: { light: Mode; dark: Mode } = {
       neutral: '#8d9aa9',
     },
     ordinal: ['#c2e8e7', '#8ed4d2', '#4db8b6', '#148281'],
-    nominal: '#4db8b6',
+    nominal: '#3987e5',
     grid: '#2a3440',
     axis: '#8d9aa9',
     surface: '#1b232d',

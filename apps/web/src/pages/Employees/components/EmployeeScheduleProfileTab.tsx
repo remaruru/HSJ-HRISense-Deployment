@@ -7,6 +7,7 @@ import { weeklyScheduleApi, EmployeeWeeklySchedule, ShiftDefinition, EmployeeWee
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { useAuth } from '@/providers/AuthProvider';
+import { useHrAuthority } from '@/hooks/useHrAuthority';
 import { staggerContainer, staggerItem } from '@/lib/motion';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
 import { isAxiosError } from 'axios';
@@ -196,8 +197,10 @@ export function EmployeeScheduleProfileTab({
   const { user } = useAuth();
   // HR edits anyone's week; a supervisor edits their direct reports' (the API
   // refuses a supervisor's own). Never from a self view.
+  const hr = useHrAuthority();
+  // HR sets schedules below HR and their own; another HR person's or Sister's only Sister sets.
   const canEdit = !readOnly && (
-    user?.permissionTier === 'FULL' ||
+    (user?.permissionTier === 'FULL' && hr.canManage(employeeId)) ||
     (user?.permissionTier === 'SUPERVISOR' && user?.employee?.id !== employeeId)
   );
 

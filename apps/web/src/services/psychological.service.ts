@@ -40,6 +40,8 @@ export interface PsychologicalRecord {
   conductedBy?: string | null;
   employeeVisibleSummary?: string | null;
   hrConfidentialNotes?: string | null;
+  /** True when the API held back the private notes (an HR person's or Sister's record; Sister's alone). */
+  confidentialNotesHidden?: boolean;
   expiresAt?: string | null;
   reviewStatus: 'PENDING_REVIEW' | 'ACCEPTED' | 'NEEDS_CORRECTION';
   reviewedById?: string | null;
