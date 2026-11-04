@@ -1,4 +1,5 @@
 import React from 'react';
+import { renderInlineBold } from './helpText';
 import { AlertTriangle } from 'lucide-react';
 
 interface HelpWarningProps {
@@ -22,7 +23,7 @@ export const HelpWarning: React.FC<HelpWarningProps> = ({
           {title}
         </h5>
         <p className="text-sm leading-relaxed text-status-danger-foreground/90">
-          {text}
+          {renderInlineBold(text)}
         </p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { renderInlineBold } from './helpText';
 import { CheckCircle2 } from 'lucide-react';
 
 interface HelpExpectedResultProps {
@@ -18,7 +19,7 @@ export const HelpExpectedResult: React.FC<HelpExpectedResultProps> = ({ text }) 
           What you should see
         </h5>
         <p className="text-sm leading-relaxed text-status-success-foreground/90">
-          {text}
+          {renderInlineBold(text)}
         </p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { renderInlineBold } from './components/helpText';
 import { useParams, useNavigate } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
 import {
@@ -305,7 +306,7 @@ export default function HelpGuidePage() {
                   <h3>What happens next?</h3>
                 </div>
                 <p className="text-sm md:text-base text-primary-950/85 dark:text-primary-200/90 leading-relaxed">
-                  {guide.content.whatHappensNext}
+                  {renderInlineBold(guide.content.whatHappensNext)}
                 </p>
               </motion.section>
             )}
@@ -326,7 +327,7 @@ export default function HelpGuidePage() {
                 </div>
                 <ul className="space-y-2 text-sm md:text-base text-foreground/90 leading-relaxed list-disc list-inside">
                   {guide.content.tips.map((tip, idx) => (
-                    <li key={idx}>{tip}</li>
+                    <li key={idx}>{renderInlineBold(tip)}</li>
                   ))}
                 </ul>
               </motion.section>

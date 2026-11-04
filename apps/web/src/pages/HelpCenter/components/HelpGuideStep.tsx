@@ -1,4 +1,5 @@
 import React from 'react';
+import { renderInlineBold } from './helpText';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { HelpGuideStep as IHelpGuideStep } from '../helpCenter.types';
 import { HelpScreenshot } from './HelpScreenshot';
@@ -75,7 +76,7 @@ export const HelpGuideStep: React.FC<HelpGuideStepProps> = ({
         {/* ─── Step Explanation (if present) ────────────────────────────── */}
         {step.explanation && (
           <p className="text-sm md:text-base text-muted-foreground leading-relaxed bg-muted/30 p-3.5 rounded-xl border border-border/60">
-            {step.explanation}
+            {renderInlineBold(step.explanation)}
           </p>
         )}
 

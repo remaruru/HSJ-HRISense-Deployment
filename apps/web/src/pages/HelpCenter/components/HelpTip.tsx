@@ -1,4 +1,5 @@
 import React from 'react';
+import { renderInlineBold } from './helpText';
 import { Lightbulb } from 'lucide-react';
 
 interface HelpTipProps {
@@ -18,7 +19,7 @@ export const HelpTip: React.FC<HelpTipProps> = ({ text }) => {
           Tip
         </h5>
         <p className="text-sm leading-relaxed text-status-warning-foreground/90">
-          {text}
+          {renderInlineBold(text)}
         </p>
       </div>
     </div>

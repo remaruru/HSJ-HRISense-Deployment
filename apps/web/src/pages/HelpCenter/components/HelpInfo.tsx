@@ -1,4 +1,5 @@
 import React from 'react';
+import { renderInlineBold } from './helpText';
 import { Info } from 'lucide-react';
 
 interface HelpInfoProps {
@@ -22,7 +23,7 @@ export const HelpInfo: React.FC<HelpInfoProps> = ({
           {title}
         </h5>
         <p className="text-sm leading-relaxed text-status-info-foreground/90">
-          {text}
+          {renderInlineBold(text)}
         </p>
       </div>
     </div>

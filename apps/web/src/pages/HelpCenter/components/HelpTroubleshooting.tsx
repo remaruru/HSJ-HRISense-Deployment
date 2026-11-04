@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { renderInlineBold } from './helpText';
 import { ChevronDown, HelpCircle, LifeBuoy } from 'lucide-react';
 import type { HelpTroubleshootingItem } from '../helpCenter.types';
 
@@ -45,7 +46,7 @@ export const HelpTroubleshooting: React.FC<HelpTroubleshootingProps> = ({ items 
                 className="w-full p-4 md:p-5 text-left flex items-center justify-between gap-3 hover:bg-muted/40 transition-colors focus:outline-hidden focus:ring-4 focus:ring-primary-500/10"
               >
                 <span className="text-sm md:text-base font-bold font-heading text-foreground">
-                  {item.problem}
+                  {renderInlineBold(item.problem)}
                 </span>
                 <ChevronDown
                   className={`h-5 w-5 text-muted-foreground shrink-0 transition-transform duration-200 ${
@@ -61,7 +62,7 @@ export const HelpTroubleshooting: React.FC<HelpTroubleshootingProps> = ({ items 
                       Try this:
                     </span>
                     <p className="text-sm md:text-base text-foreground/90 leading-relaxed">
-                      {item.solution}
+                      {renderInlineBold(item.solution)}
                     </p>
                   </div>
 

@@ -594,11 +594,14 @@ export class AwardService {
   static async confirmShortlist(awardId: string, actor: Actor) {
     const a = await this.loadAward(awardId);
     if (a.status !== 'DELIBERATION') throw new AppError('Decisions are recorded during the review.', 409);
-    const pending = await prisma.awardResult.findMany({ where: { awardId, shortlisted: true, decision: 'PENDING' } });
+    const shortlisted = await prisma.awardResult.findMany({ where: { awardId, shortlisted: true, decision: 'PENDING' } });
+    // Nobody decides their own award: the reviewer's own result stays undecided
+    // for another HR person or Sister, exactly as the one-by-one Confirm refuses it.
+    const pending = shortlisted.filter((r) => !actor.employeeId || r.employeeId !== actor.employeeId);
     for (const r of pending) {
       await prisma.awardResult.update({ where: { id: r.id }, data: { decision: 'CONFIRMED', placement: r.rank, decidedById: actor.employeeId ?? actor.id, decidedAt: new Date() } });
     }
-    await createAuditLog({ actorUserId: actor.id, action: 'AWARD_SHORTLIST_CONFIRMED', entityType: 'Award', entityId: awardId, metadata: { confirmed: pending.length } });
+    await createAuditLog({ actorUserId: actor.id, action: 'AWARD_SHORTLIST_CONFIRMED', entityType: 'Award', entityId: awardId, metadata: { confirmed: pending.length, leftForOthers: shortlisted.length - pending.length } });
     return this.getAward(awardId);
   }
 

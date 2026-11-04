@@ -65,6 +65,7 @@ export const LEAVE_GUIDES: HelpGuideDefinition[] = [
           stepNumber: 4,
           title: 'Submit',
           instruction: 'Submit the request.',
+          info: "HR Personnel and Sister: your own leave is accepted as soon as you file it, if it starts today or later and you have enough leave credits of that type. The days are charged at once, Sister is notified, and you can cancel it until it starts.",
           expectedResult: 'A confirmation appears and the request is listed under Leave Requests as **Waiting for head** (or **Waiting for HR** if you have no assigned head).',
           uiPath: 'New Request -> submit',
         },
@@ -279,6 +280,7 @@ export const LEAVE_GUIDES: HelpGuideDefinition[] = [
           stepNumber: 2,
           title: 'Add or change a balance',
           instruction: 'Choose the **Year** and the **Leave type**, then enter the total and, if applicable, any forfeited days.',
+          info: "Nobody changes their own leave balance, and only Sister changes the balance of another HR person or Sister. Your own balance follows the automatic yearly entitlement.",
           warning: 'A total you enter is marked as entered by HR and the automatic entitlement will not change it. To go back to the policy figure, use **Use policy** in the entitlement table. Used and pending days are maintained by HRISense from actual requests.',
           expectedResult: 'The form holds the figures you entered.',
           uiPath: 'Leave Balances -> add / edit',
@@ -415,6 +417,7 @@ export const LEAVE_GUIDES: HelpGuideDefinition[] = [
           stepNumber: 3,
           title: 'Decide',
           instruction: 'Select **Approve** (or **Approve as requested**) to grant what was filed; **Approve proposed change** to grant the head\'s dates; or **Approve other dates** to set your own From / To with a reason. Select **Decline** and give the reason if it cannot be granted.',
+          info: "You never decide your own leave or that of another HR person or Sister: leave filed by HR Personnel and Sister is accepted automatically, so it does not wait for a decision.",
           explanation: 'When the approved leave differs, the employee\'s original request is kept and shown beside the final approved leave, with the reason. The balance is charged the final days, never the original ones.',
           warning: 'The decision is final in HRISense and the employee is notified.',
           expectedResult: 'The request shows as **Approved**, **Approved with changes** or **Declined**, and the employee\'s balance is updated.',
@@ -423,6 +426,10 @@ export const LEAVE_GUIDES: HelpGuideDefinition[] = [
       ],
       whatHappensNext: 'Approved leave appears on the leave calendar and in the leave report. The employee is notified either way.',
       troubleshooting: [
+        {
+          problem: "A request has no Approve or Decline buttons.",
+          solution: "It is your own leave, or the leave of another HR person or Sister. Those are accepted automatically when filed; only Sister changes another HR person's leave.",
+        },
         {
           problem: 'The employee has no balance for that leave type.',
           solution: 'Record the balance on their Leave Balances tab first, then decide the request.',
