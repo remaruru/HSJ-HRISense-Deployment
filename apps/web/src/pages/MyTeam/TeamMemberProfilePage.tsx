@@ -230,7 +230,7 @@ export default function TeamMemberProfilePage() {
             <>
               <InfoSection title="Work Profile">
                 <InfoGrid columns={3}>
-                  <InfoField label="Employee ID" value={member.employeeNumber} />
+                  {member.employeeNumber && <InfoField label="Employee ID" value={member.employeeNumber} />}
                   <InfoField label="Job Role" value={member.jobRole?.title} />
                   <InfoField label="Unit" value={member.unit?.name} />
                   <InfoField label="Department" value={member.department?.name} />

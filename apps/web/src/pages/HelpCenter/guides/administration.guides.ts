@@ -174,7 +174,7 @@ export const ADMINISTRATION_GUIDES: HelpGuideDefinition[] = [
         'The chart button beside the question box opens **Quick analytics** — ready-made charts (for example your attendance over the last 6 months) calculated directly from HRISense, which work even when AI is not configured.',
         'Attendance rate counts only days that have a record: Present, Late and Half day are presence; only an Absent record is an absence. Days with no imported record are never counted as absent — record coverage shows how complete the data is.',
         'The assistant never sees passwords, government ID numbers, addresses, phone numbers, salaries, résumé contents, medical HR notes or confidential psychological notes.',
-        'Birth dates and ages follow your access: HR for anyone, supervisors for their direct reports, everyone for themselves.',
+        "Birth dates and ages are private: HR can see anyone's, and everyone else only their own. Supervisors see their team's work details, never their personal details.",
         'When it lists people by experience, age or trainings, the assistant only states the facts — it never calls anyone "the best" or recommends a person. The choice stays with you.',
       ],
       relatedGuideIds: ['AI_ASSISTANCE_ASK', 'AI_ASSISTANCE_EXPORT', 'AI_ASSISTANCE_JOB_OPENING'],

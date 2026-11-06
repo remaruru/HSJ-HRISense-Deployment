@@ -3176,7 +3176,7 @@ Full technical design: [`docs/HRISENSE_AI_ARCHITECTURE.md`](HRISENSE_AI_ARCHITEC
 | Any employee's work records; organisation figures: headcount, attendance coverage and trends, no-record-today lists, leave awaiting HR, compliance standing and expiries within N days, training completion by unit, evaluation progress, recruitment pipeline, announcement read rates, unconfigured schedules, supervisor-assignment issues, import history, audit activity counts, the Reports & Analytics reports | — | — | ✅ |
 | Other people's leave balances, evaluations, medical or psychological records | — | — | ✅ (metadata and statuses only) |
 | People by role, kind of work, unit, experience, length of service, age or hire date — "nurses (Clinic Staff) with 10+ years of experience", "the 10 longest-serving caretakers", "the oldest employee" | own record | self + direct reports | ✅ everyone |
-| Birth date and age | own | self + direct reports | ✅ |
+| Birth date and age | own | own only (never a direct report's) | ✅ |
 | Prepare a job opening; compare an opening's applicants | — | — | ✅ |
 
 **Experience** has three parts and every answer gives all three: **length of

@@ -127,7 +127,7 @@ export const QUESTION_BANK: BankItem[] = [
 
   // ── 8. Supervisors: their team only ─────────────────────────────────────────
   { id: 'sup-team-experience', role: 'SUPERVISOR', q: 'Who in my team has the most experience?', expect: { tools: ['find_employees'] } },
-  { id: 'sup-team-ages', role: 'SUPERVISOR', q: "What are my team members' ages and birthdays?", expect: { tools: ['find_employees', 'get_employee_profile'] } },
+  { id: 'sup-team-ages', role: 'SUPERVISOR', q: "What are my team members' ages and birthdays?", expect: { status: ['ANSWERED', 'NOT_AUTHORIZED', 'NO_DATA'], avoid: ['years old', '1980-', '1990-'] } },
   { id: 'sup-caretaker-guest', role: 'SUPERVISOR', q: 'An important guest is coming. Which of my caretakers has served the longest?', expect: { tools: ['find_employees'] } },
   { id: 'sup-outside', role: 'SUPERVISOR', q: 'How long has the clinic staff been working here?', expect: { tools: ['find_employees', 'search_employees', 'get_employee_profile'], status: ['ANSWERED', 'NOT_AUTHORIZED', 'NO_DATA'] } },
   { id: 'sup-attendance', role: 'SUPERVISOR', q: "Show my team's attendance this month", expect: { tools: ['get_team_attendance'], status: ['ANSWERED', 'NO_DATA'] } },
@@ -191,7 +191,7 @@ export const QUESTION_BANK: BankItem[] = [
   { id: 'more-typo-exp', role: 'HR', q: 'who has the mos experiance in the kitchn', expect: { tools: ['find_employees'], mentionsAny: ['Kitchen', 'Canteen', 'Bakery'] } },
   { id: 'more-regular', role: 'HR', q: 'How many regular vs contractual employees?', expect: { tools: ['get_headcount', 'find_employees'] } },
   { id: 'more-orgchart', role: 'HR', q: 'Who does the Rendu A staff report to?', expect: { tools: ['find_employees', 'get_employee_profile', 'search_employees'] } },
-  { id: 'sup-oldest', role: 'SUPERVISOR', q: 'Who in my team is the oldest?', expect: { tools: ['find_employees'] } },
+  { id: 'sup-oldest', role: 'SUPERVISOR', q: 'Who in my team is the oldest?', expect: { status: ['ANSWERED', 'NOT_AUTHORIZED', 'NO_DATA'], avoid: ['years old'] } },
   { id: 'sup-service-each', role: 'SUPERVISOR', q: 'How long has each of my team members served?', expect: { tools: ['find_employees', 'get_team_overview'] } },
   { id: 'sup-experience-tl', role: 'SUPERVISOR', q: 'sino sa team ko ang pinakamatagal na?', expect: { tools: ['find_employees'] } },
   { id: 'sup-hire', role: 'SUPERVISOR', q: 'I need another person in my team. Can you post a job opening?', expect: { avoid: ['Publish button'] } },

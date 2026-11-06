@@ -27,7 +27,8 @@ import { toast } from "sonner";
 
 interface OrgNodeData {
   id: string;
-  employeeNumber: string;
+  /** Only HR, and each person for themselves, receive employee numbers. */
+  employeeNumber: string | null;
   fullName: string;
   firstName: string;
   lastName: string;
@@ -494,7 +495,7 @@ export default function OrgChartPage() {
     const matched = nodes.filter(
       (n) =>
         n.fullName.toLowerCase().includes(q) ||
-        n.employeeNumber.toLowerCase().includes(q) ||
+        (n.employeeNumber ?? '').toLowerCase().includes(q) ||
         n.jobRoleTitle.toLowerCase().includes(q) ||
         n.unitName.toLowerCase().includes(q) ||
         (n.departmentName && n.departmentName.toLowerCase().includes(q))
@@ -1066,7 +1067,7 @@ function UnassignedEmployeeCard({ emp, isFullHR, onOpenAssignSupervisor, navigat
               Professional
             </span>
           )}
-          <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{emp.employeeNumber}</p>
+          {emp.employeeNumber && <p className="text-[10px] text-muted-foreground font-mono mt-0.5">{emp.employeeNumber}</p>}
           <OversightCardBadge nodeId={emp.id} immediateSupervisorId={emp.immediateSupervisorId} />
         </div>
       </div>
@@ -1122,7 +1123,7 @@ function OrgChartPyramidBranch({
   if (visitedPath.has(node.id)) {
     return (
       <div className="p-2 bg-status-danger-surface border border-status-danger-border rounded-xl text-status-danger-foreground text-xs my-1 w-56 text-center dark:bg-status-danger-surface dark:border-status-danger-border dark:text-status-danger-foreground">
-        Cycle: {node.fullName} ({node.employeeNumber})
+        Cycle: {node.fullName}{node.employeeNumber ? ` (${node.employeeNumber})` : ''}
       </div>
     );
   }
@@ -1241,7 +1242,7 @@ function OrgChartPyramidBranch({
 
         {/* Card Footer */}
         <div className="mt-3 pt-2 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground">
-          <span className="font-mono">{node.employeeNumber}</span>
+          <span className="font-mono">{node.employeeNumber ?? ''}</span>
           <div className="flex items-center gap-1">
             <Button
               size="xs"

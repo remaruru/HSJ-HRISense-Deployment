@@ -29,7 +29,8 @@ import { formatEnumLabel } from '@/pages/Profile/profileFormat';
 
 interface TeamMember {
   id: string;
-  employeeNumber: string;
+  /** Not sent to supervisors: an employee number is personal (HR and the employee only). */
+  employeeNumber?: string | null;
   firstName: string;
   middleName?: string | null;
   lastName: string;
@@ -193,7 +194,7 @@ export default function MyTeamPage() {
                       <Avatar size="md" src={m.photoUrl || undefined} name={`${m.firstName} ${m.lastName}`} />
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold text-foreground break-words">{nameOf(m)}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{m.employeeNumber}</p>
+                        {m.employeeNumber && <p className="text-xs text-muted-foreground font-mono">{m.employeeNumber}</p>}
                         <p className="mt-1 text-sm text-foreground break-words">{m.jobRole?.title ?? 'No job role'}</p>
                         {m.unit?.name && <p className="text-xs text-muted-foreground break-words">{m.unit.name}</p>}
                       </div>
@@ -234,7 +235,7 @@ export default function MyTeamPage() {
                           <Avatar size="sm" src={m.photoUrl || undefined} name={`${m.firstName} ${m.lastName}`} />
                           <div className="min-w-0">
                             <p className="font-semibold text-foreground leading-tight">{nameOf(m)}</p>
-                            <p className="text-xs text-muted-foreground font-mono">{m.employeeNumber}</p>
+                            {m.employeeNumber && <p className="text-xs text-muted-foreground font-mono">{m.employeeNumber}</p>}
                           </div>
                         </div>
                       </td>

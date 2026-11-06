@@ -501,8 +501,8 @@ export class EmployeeService {
   /**
    * What a supervisor sees of a direct report (My Team): the WORK profile —
    * identity, job role, unit, employment status and dates, reporting line,
-   * profile completion. Never the personal record: birth details, civil status,
-   * religion, phones, emails, addresses, government IDs, PRC license number,
+   * profile completion. Never the personal record: employee number, birth details,
+   * civil status, religion, phones, emails, addresses, government IDs, PRC license number,
    * emergency contacts, leave-eligibility flags, timekeeping code, account
    * details or HR notes. Only HR (FULL) and the employee themselves get those
    * (`OrgHierarchyService.canViewFullEmployeeRecord`).
@@ -516,7 +516,8 @@ export class EmployeeService {
       o ? Object.fromEntries(keys.filter((k) => k in o).map((k) => [k, o[k]])) : null;
     return {
       id: emp.id,
-      employeeNumber: emp.employeeNumber,
+      // The employee number is personal: HR and the employee only (November 2026).
+      employeeNumber: null,
       firstName: emp.firstName,
       middleName: emp.middleName ?? null,
       lastName: emp.lastName,
@@ -1852,7 +1853,8 @@ export class EmployeeService {
       where.OR = [
         { firstName: { contains: q } },
         { lastName: { contains: q } },
-        { employeeNumber: { contains: q } },
+        // Only HR searches by employee number; nobody else sees other people's numbers.
+        ...(requestingRole === 'FULL' ? [{ employeeNumber: { contains: q } }] : []),
         { jobRole: { title: { contains: q } } },
         { unit: { name: { contains: q } } },
         { department: { name: { contains: q } } },
@@ -1951,7 +1953,8 @@ export class EmployeeService {
 
     const nodes = employees.map(emp => ({
       id: emp.id,
-      employeeNumber: emp.employeeNumber,
+      // Employee numbers are personal: HR sees all, everyone else only their own.
+      employeeNumber: requestingRole === 'FULL' || emp.id === requestingEmployeeId ? emp.employeeNumber : null,
       fullName: `${emp.firstName} ${emp.lastName}`.trim(),
       firstName: emp.firstName,
       lastName: emp.lastName,

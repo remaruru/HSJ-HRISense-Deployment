@@ -285,7 +285,11 @@ export class AdditionalOversightService {
     );
     const offChart = [...new Set(pairs.flatMap((p) => [p.overseerId, p.overseenId]))].filter((id) => !visibleIds.has(id));
     const people = Object.fromEntries(
-      (await prisma.employee.findMany({ where: { id: { in: offChart } }, select: PERSON_SELECT })).map((e) => [e.id, personOf(e)])
+      (await prisma.employee.findMany({ where: { id: { in: offChart } }, select: PERSON_SELECT })).map((e) => [
+        e.id,
+        // Employee numbers are personal: HR sees all, everyone else only their own.
+        { ...personOf(e), employeeNumber: viewer.isFull || e.id === viewer.employeeId ? e.employeeNumber : null },
+      ])
     );
     return { links: pairs, people };
   }

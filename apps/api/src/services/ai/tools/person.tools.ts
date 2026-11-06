@@ -40,11 +40,11 @@ import { ageOn, experienceFigures } from './people.tools';
  * person asking. Every handler resolves the target through `resolveTarget`,
  * which applies the assistant's access rule before any record is read.
  *
- * Data minimisation — never returned by any tool here: date of birth, sex,
- * civil status, religion, addresses, phone numbers, personal e-mail,
+ * Data minimisation — never returned by any tool here: sex, civil status, religion, addresses, phone numbers, personal e-mail,
  * emergency contacts, government ID numbers, licence numbers, photos, medical
  * HR notes, psychological confidential notes, document contents, and
- * free-text notes written about another person.
+ * free-text notes written about another person. Date of birth and age are
+ * returned only to HR and to the person themselves (never to a supervisor).
  */
 
 // ── Attendance (shared with the team and HR tools) ───────────────────────────
@@ -302,7 +302,7 @@ export function monthStartKey(dayKey: string, offset: number): string {
 const profileTool = defineTool({
   name: 'get_employee_profile',
   description:
-    "Work profile of one employee: name, employee number, job role, unit, profession, employment status and state, hire / probation / regularization dates, length of service at Hospicio, experience before Hospicio and total experience, birth date and age, immediate supervisor and reporting-line status. Never includes addresses, contacts or government IDs. Omit employeeId for the person asking. To compare or rank several people, use find_employees instead.",
+    "Work profile of one employee: name, employee number, job role, unit, profession, employment status and state, hire / probation / regularization dates, length of service at Hospicio, experience before Hospicio and total experience, birth date and age (HR, or the person themselves only), immediate supervisor and reporting-line status. Never includes addresses, contacts or government IDs. Omit employeeId for the person asking. To compare or rank several people, use find_employees instead.",
   tiers: ALL_TIERS,
   args: z.object({ employeeId: employeeIdArg.optional() }).strict(),
   async run(ctx: ToolContext, args: { employeeId?: string }) {
@@ -342,7 +342,8 @@ const profileTool = defineTool({
       data: {
         id: e.id,
         name: fullName(e),
-        employeeNumber: e.employeeNumber,
+        // Employee number: HR or the person themselves (never a supervisor).
+        employeeNumber: hr || e.id === ctx.actor.employeeId ? e.employeeNumber : undefined,
         jobRole: e.jobRole?.title ?? null,
         accessLevel: e.jobRole ? TIER_LABEL[e.jobRole.permissionTier] : null,
         unit: e.unit?.name ?? null,
@@ -362,9 +363,11 @@ const profileTool = defineTool({
             experienceNote: 'lengthOfService is at Hospicio; priorExperienceYears is before Hospicio (null = not recorded); totalExperienceYears is both.',
           };
         })(),
-        // Same scope as this tool: HR anyone, supervisor self + direct reports, employee self.
-        birthDate: dateKey(e.dateOfBirth),
-        age: ageOn(e.dateOfBirth, ctx.today),
+        // Personal details: HR for anyone, otherwise only the person themselves.
+        // A supervisor sees a direct report's work profile, never their birth date or age.
+        ...(hr || e.id === ctx.actor.employeeId
+          ? { birthDate: dateKey(e.dateOfBirth), age: ageOn(e.dateOfBirth, ctx.today) }
+          : { birthDate: undefined, age: undefined, personalDetails: 'Private: only HR and the employee can see the employee number, birth date or age.' }),
         probationDate: dateKey(e.probationDate),
         regularizationDate: dateKey(e.regularizationDate),
         separationDate: hr ? dateKey(e.separationDate) : undefined,

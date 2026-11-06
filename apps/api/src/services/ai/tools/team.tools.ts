@@ -94,7 +94,8 @@ const teamOverviewTool = defineTool({
       return {
         id: m.id,
         name: fullName(m),
-        employeeNumber: m.employeeNumber,
+        // A supervisor never sees a team member's employee number; HR may.
+        employeeNumber: ctx.actor.tier === PermissionTier.FULL ? m.employeeNumber : undefined,
         jobRole: m.jobRole?.title ?? null,
         employmentState: humanise(m.employmentState),
         schedule: sched.status,
@@ -501,7 +502,11 @@ const searchEmployeesTool = defineTool({
         ...scope,
         ...(hr && args.includeArchived ? {} : { deletedAt: null }),
         AND: tokens.map((t) => ({
-          OR: [{ firstName: { contains: t } }, { lastName: { contains: t } }, { middleName: { contains: t } }, { employeeNumber: { contains: t } }],
+          OR: [
+            { firstName: { contains: t } }, { lastName: { contains: t } }, { middleName: { contains: t } },
+            // Only HR finds people by employee number; a supervisor never sees their team's numbers.
+            ...(hr ? [{ employeeNumber: { contains: t } }] : []),
+          ],
         })),
       },
       take: 15,
@@ -524,7 +529,7 @@ const searchEmployeesTool = defineTool({
         matches: rows.map((r) => ({
           id: r.id,
           name: fullName(r),
-          employeeNumber: r.employeeNumber,
+          employeeNumber: hr || r.id === ctx.actor.employeeId ? r.employeeNumber : undefined,
           jobRole: r.jobRole?.title ?? null,
           unit: r.unit?.name ?? null,
           employmentState: humanise(r.employmentState),

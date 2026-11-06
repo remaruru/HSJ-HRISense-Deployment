@@ -188,7 +188,10 @@ export function ProfileHero({
               {place ? <> · {place}</> : null}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <Badge variant="outline" className={`border font-mono ${STATUS_TONE_CHIP.neutral}`}>{employee?.employeeNumber}</Badge>
+              {/* Not sent to a supervisor viewing a team member: the number is personal. */}
+              {employee?.employeeNumber && (
+                <Badge variant="outline" className={`border font-mono ${STATUS_TONE_CHIP.neutral}`}>{employee.employeeNumber}</Badge>
+              )}
               {employee?.employmentStatus && (
                 <Badge className={`border ${employee.employmentStatus === 'PROBATIONARY' ? STATUS_TONE_CHIP.warning : STATUS_TONE_CHIP.total}`}>
                   {formatEnumLabel(employee.employmentStatus)}

@@ -61,11 +61,14 @@ export function ageOn(birthDate: Date | null, today: string): number | null {
   return servicePeriod(birthDate, today)?.years ?? null;
 }
 
-/** Whether this asker may see this employee's birth date and age (same scope as the profile). */
+/**
+ * Whether this asker may see this employee's birth date, age and employee number:
+ * HR for anyone, everyone else only for themselves. A supervisor never sees a
+ * direct report's personal details (the same rule as My Team and the Org Chart).
+ */
 function mayDisclosePersonal(ctx: ToolContext, employeeId: string): boolean {
   if (employeeId === ctx.actor.employeeId) return true;
-  if (isHr(ctx.actor)) return true;
-  return ctx.actor.tier === PermissionTier.SUPERVISOR && ctx.actor.directReportIds.includes(employeeId);
+  return isHr(ctx.actor);
 }
 
 // ── Work groups: Hospicio's everyday words → its role codes ──────────────────
@@ -201,7 +204,7 @@ type FindArgs = z.infer<typeof findArgs>;
 const findTool = defineTool({
   name: 'find_employees',
   description:
-    "Find and rank people by job role, unit, profession, employment status, length of service at Hospicio, experience before Hospicio, total experience, age or hire date — e.g. \"Clinic Staff with at least 10 years of experience\", \"the 10 longest-serving caretakers\", \"who is the oldest employee\". Within the asker's access (HR: everyone; supervisor: themselves and direct reports; employee: themselves). Each person comes with lengthOfService, priorExperienceYears (null = not recorded), totalExperienceYears, birthDate and age, a profileLink, and optional extras. When nobody matches, `closest` lists the nearest people (same role/unit filters, other limits ignored) so you can offer them. Also registers a chart dataset of the ranked measure.",
+    "Find and rank people by job role, unit, profession, employment status, length of service at Hospicio, experience before Hospicio, total experience, age or hire date — e.g. \"Clinic Staff with at least 10 years of experience\", \"the 10 longest-serving caretakers\", \"who is the oldest employee\". Within the asker's access (HR: everyone; supervisor: themselves and direct reports; employee: themselves). Each person comes with lengthOfService, priorExperienceYears (null = not recorded), totalExperienceYears, birthDate and age (HR: anyone; everyone else: only themselves, null for others), a profileLink, and optional extras. When nobody matches, `closest` lists the nearest people (same role/unit filters, other limits ignored) so you can offer them. Also registers a chart dataset of the ranked measure.",
   tiers: ALL_TIERS,
   args: findArgs,
   async run(ctx: ToolContext, args: FindArgs) {
@@ -354,7 +357,7 @@ const findTool = defineTool({
       return {
         id: p.e.id,
         name: fullName(p.e),
-        employeeNumber: p.e.employeeNumber,
+        employeeNumber: mayDisclosePersonal(ctx, p.e.id) ? p.e.employeeNumber : undefined,
         jobRole: p.e.jobRole?.title ?? null,
         unit: p.e.unit?.name ?? null,
         profession: p.e.professionalRole || undefined,
@@ -396,7 +399,7 @@ const findTool = defineTool({
         series: [{ key, label }],
         rows: shown
           .map((p) => ({
-            employee: fullName(p.e) ?? p.e.employeeNumber,
+            employee: fullName(p.e) ?? 'Unnamed employee',
             [key]: sortBy === 'age' ? p.age : sortBy === 'priorExperience' ? p.fig.priorExperienceYears : sortBy === 'totalExperience' ? p.fig.totalExperienceYears : p.fig.serviceYears,
           }))
           .filter((r) => typeof r[key] === 'number'),

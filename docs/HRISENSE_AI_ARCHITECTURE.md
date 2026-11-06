@@ -160,7 +160,7 @@ be UUIDs; date ranges are bounded; unit names are resolved server-side.
 | `get_audit_activity` | HR | days |
 | `get_workforce_fact_sheet` | HR | periodDays |
 | `get_org_catalog` | All (headcounts HR only) | — (units, roles and the fixed **work groups**) |
-| `find_employees` | All (scoped; birth date and age within scope) | workGroup, roleIds, roleText, unitIds, unitText, profession, employmentStatus, min/max service years, min prior/total experience, min/max age, hiredFrom/To, sortBy, order, limit, include latestEvaluation (HR) / trainingsCompleted / complianceAttention (HR) |
+| `find_employees` | All (scoped; birth date and age: HR anyone, others only themselves) | workGroup, roleIds, roleText, unitIds, unitText, profession, employmentStatus, min/max service years, min prior/total experience, min/max age, hiredFrom/To, sortBy, order, limit, include latestEvaluation (HR) / trainingsCompleted / complianceAttention (HR) |
 | `prepare_job_opening` | HR | jobRoleId or jobRoleTitle, unitId (org-wide roles), title, employmentType, vacancies, description, responsibilities, qualifications, requiredDocuments, openingDate, closingDate |
 | `compare_applicants` | HR | openingId or openingText, status |
 
@@ -178,9 +178,9 @@ be UUIDs; date ranges are bounded; unit names are resolved server-side.
 * **Experience** = `priorExperienceYears` (before Hospicio, optional, HR-entered;
   null = not recorded) + length of service from `hireDate` (calendar years and
   months, `lib/service-period`). Every person comes with all three figures; the
-  `summary` (averages, by unit) is computed server-side. Birth date and age follow
-  the person tools' scope: HR anyone, supervisor self + direct reports, employee
-  self.
+  `summary` (averages, by unit) is computed server-side. Birth date and age are
+  personal: HR anyone, everyone else only themselves (a supervisor never sees a
+  direct report's).
 * **Job openings.** `prepare_job_opening` validates the role, unit, dates and
   vacancies and stores the draft in the request's `DraftStore` (`job1`); nothing
   is written. `submit_answer.jobOpeningDraftId` attaches the VALIDATED draft to

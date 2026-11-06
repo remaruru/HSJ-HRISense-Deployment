@@ -99,7 +99,6 @@ describe('toTeamMemberView — what a supervisor receives about a direct report'
   const view: any = EmployeeService.toTeamMemberView(full);
 
   test('keeps the work profile', () => {
-    assert.equal(view.employeeNumber, 'DEV-001');
     assert.equal(view.jobRole.title, 'Bakery Staff');
     assert.equal(view.unit.name, 'Auxiliary Services');
     assert.equal(view.employmentState, 'ACTIVE');
@@ -107,6 +106,11 @@ describe('toTeamMemberView — what a supervisor receives about a direct report'
     assert.equal(view.immediateSupervisor.id, SUP);
     assert.equal(view.isProfessional, true);
     assert.equal(view.viewScope, 'TEAM_MEMBER');
+  });
+
+  test('never the employee number (personal: HR and the employee only)', () => {
+    assert.equal(view.employeeNumber, null);
+    assert.ok(!JSON.stringify(view).includes('DEV-001'));
   });
 
   test('drops every personal, account and HR-only field', () => {

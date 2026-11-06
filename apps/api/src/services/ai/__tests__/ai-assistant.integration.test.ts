@@ -1117,7 +1117,7 @@ describe('revision: people lookups, job openings, applicants and exports', () =>
     await prisma.jobOpening.deleteMany({ where: { id: { in: made.openings } } });
   });
 
-  test("find_employees stays inside each tier's access; birth dates follow it", async () => {
+  test("find_employees stays inside each tier's access; birth dates only for HR and the person", async () => {
     const r1 = await run('R1', 'find_employees', {});
     assert.deepEqual(r1.json.data.matches.map((m: any) => m.id), [ids.R1], 'an employee finds only themselves');
     assert.equal(r1.json.data.matches[0].birthDate, '1980-02-02');
@@ -1125,7 +1125,17 @@ describe('revision: people lookups, job openings, applicants and exports', () =>
     const sup = await run('SUP', 'find_employees', {});
     const supIds = sup.json.data.matches.map((m: any) => m.id);
     assert.ok(supIds.includes(ids.R1) && supIds.includes(ids.R2) && !supIds.includes(ids.C) && !supIds.includes(ids.O));
-    assert.equal(sup.json.data.matches.find((m: any) => m.id === ids.R1).birthDate, '1980-02-02', 'a supervisor sees their team member');
+    const teamMember = sup.json.data.matches.find((m: any) => m.id === ids.R1);
+    assert.equal(teamMember.birthDate ?? null, null, 'a supervisor never sees a team member birth date');
+    assert.equal(teamMember.age ?? null, null, 'a supervisor never sees a team member age');
+    assert.ok(!JSON.stringify(sup.json).includes('1980-02-02'), 'no team birth date anywhere in the answer');
+    const supProfile = await run('SUP', 'get_employee_profile', { employeeId: ids.R1 });
+    assert.ok(supProfile.ok, 'a supervisor can open a team member work profile');
+    assert.equal(supProfile.json.data.birthDate ?? null, null, 'but never their birth date');
+    assert.equal(supProfile.json.data.age ?? null, null, 'or their age');
+    assert.ok(!supProfile.content.includes('1980-02-02'));
+    const own = await run('SUP', 'get_employee_profile');
+    assert.ok(own.json.data.birthDate !== undefined, 'a supervisor still sees their own birth date');
 
     const hr = await run('HR', 'find_employees', { roleText: TAG, limit: 50 });
     const hrIds = hr.json.data.matches.map((m: any) => m.id);
