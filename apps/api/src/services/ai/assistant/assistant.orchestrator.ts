@@ -6,7 +6,7 @@ import { buildChart, ChartPayload, DatasetStore } from '../charts/chart-schema';
 import { getAiAvailability, getAiConfig } from '../config/ai-config';
 import { ConversationService, MessageStatus, newMessageId, StoredMessage } from '../conversation/conversation.service';
 import { classifyInput, GuardResult, normaliseMessage } from '../guard/input-guard';
-import { cleanAnswer, cleanFollowUps } from '../guard/output-guard';
+import { cleanAnswer, cleanFollowUps, stripIdentifiers } from '../guard/output-guard';
 import { searchKnowledge } from '../knowledge/knowledge.service';
 import { validateLink, SafeLink } from '../links/app-links';
 import {
@@ -131,6 +131,7 @@ function finalFromSubmit(raw: unknown, actor: AiActor, datasets: DatasetStore, d
   }
 
   const cleaned = cleanAnswer(answer.answer);
+  cleaned.text = stripIdentifiers(cleaned.text, { hideEmployeeNumbers: actor.tier === PermissionTier.SUPERVISOR }).text.trim();
   if (!cleaned.text) {
     return { status: 'OUT_OF_SCOPE', content: OUT_OF_SCOPE_MESSAGE, followUps: SUGGESTIONS[actor.tier].slice(0, 3) };
   }
@@ -166,7 +167,7 @@ function finalFromSubmit(raw: unknown, actor: AiActor, datasets: DatasetStore, d
     content: action ? trimJobOpeningRepeat(cleaned.text, action.draft) : cleaned.text,
     charts: charts.length ? charts : undefined,
     links: links.length ? links : undefined,
-    followUps: cleanFollowUps(answer.followUps),
+    followUps: cleanFollowUps(answer.followUps).map((f) => stripIdentifiers(f, { hideEmployeeNumbers: actor.tier === PermissionTier.SUPERVISOR }).text.trim()),
     notices: notices.length ? notices : undefined,
     action,
   };

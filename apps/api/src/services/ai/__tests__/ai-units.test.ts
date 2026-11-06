@@ -10,7 +10,7 @@ import { spawnSync } from 'child_process';
 import { PermissionTier } from '@prisma/client';
 import { z } from 'zod';
 import { classifyInput, normaliseMessage } from '../guard/input-guard';
-import { cleanAnswer, cleanFollowUps, redactSecrets } from '../guard/output-guard';
+import { cleanAnswer, cleanFollowUps, redactSecrets, stripIdentifiers } from '../guard/output-guard';
 import { validateLink, pagesForTier } from '../links/app-links';
 import { buildChart, chartPayloadSchema, DatasetStore } from '../charts/chart-schema';
 import { getGuide, searchKnowledge, guideVisibleTo, entriesForRole } from '../knowledge/knowledge.service';
@@ -142,6 +142,40 @@ describe('input guard', () => {
 // ── Output guard ──────────────────────────────────────────────────────────────
 
 describe('output guard', () => {
+  test('supervisor answers never show employee numbers, IDs or # columns', () => {
+    const uuid = '3f2b8c1e-9a4d-4e2b-8f1a-0c9d7e6b5a42';
+    const raw = [
+      'Your direct reports today:',
+      '',
+      '| # | Employee No. | Name | Role | ID |',
+      '|---|---|---|---|---|',
+      `| 1 | HSJ-014 | Ana Cruz | Clinic Staff | ${uuid} |`,
+      `| 2 | HSJ-022 | Ben Reyes | Kitchen Staff | ${uuid} |`,
+      '',
+      '- **Employee No.:** HSJ-014',
+      `- Ana Cruz (Employee No. HSJ-014) is present (ID: ${uuid}).`,
+      '- Number of staff on duty: 2',
+      'Ben Reyes (HSJ-022) is on leave.',
+    ].join('\n');
+    const { text, stripped } = stripIdentifiers(raw, { hideEmployeeNumbers: true });
+    assert.equal(stripped, true);
+    assert.ok(!text.includes('HSJ-'), text);
+    assert.ok(!text.includes(uuid), text);
+    assert.ok(!/\|\s*#\s*\|/.test(text), text);
+    assert.ok(text.includes('| Name | Role |'), text);
+    assert.ok(text.includes('| Ana Cruz | Clinic Staff |'), text);
+    assert.ok(text.includes('- Ana Cruz is present.'), text);
+    assert.ok(text.includes('Number of staff on duty: 2'), text);
+    assert.ok(text.includes('Ben Reyes is on leave.'), text);
+  });
+
+  test('HR keeps employee numbers but never internal ids', () => {
+    const uuid = '3f2b8c1e-9a4d-4e2b-8f1a-0c9d7e6b5a42';
+    const { text } = stripIdentifiers(`| Name | Employee No. |\n|---|---|\n| Ana | HSJ-014 |\nAna (ID: ${uuid})`, { hideEmployeeNumbers: false });
+    assert.ok(text.includes('HSJ-014'));
+    assert.ok(!text.includes(uuid));
+  });
+
   test('removes code blocks, HTML and inline links', () => {
     const out = cleanAnswer('Here:\n```sql\nSELECT 1\n```\n<script>alert(1)</script><b>Bold</b> [click](https://evil.example) javascript:alert(1)');
     assert.ok(!out.text.includes('SELECT'));

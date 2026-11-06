@@ -57,6 +57,73 @@ export function cleanAnswer(raw: string): CleanedText {
   return { text: trimmed.length > MAX_ANSWER ? `${trimmed.slice(0, MAX_ANSWER - 1)}…` : trimmed, removedCode, redacted };
 }
 
+// ── Identifiers ──────────────────────────────────────────────────────────────
+
+const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+/** An internal record id, with the label/brackets around it ("(ID: …)", "id …"). */
+const INTERNAL_ID = new RegExp(`\\s*[([]?\\s*(?:(?:employee|record|staff)\\s*id|id|#)?\\s*[:#=]?\\s*${UUID}\\s*[)\\]]?`, 'gi');
+
+/** Table headers that are only an identifier or a row counter. */
+const ID_HEADER =
+  /^(?:#|no\.?|nos?\.|id|ids|i\.d\.|(?:employee|emp\.?|staff|personnel|record)\s*(?:id|no\.?|number|num\.?|#|code)|id\s*(?:no\.?|number|#))$/i;
+
+/** A line that only states an identifier ("Employee No.: HSJ-014", "ID: 12"). */
+const ID_LINE =
+  /^\s*(?:[-*•]\s+|\d+[.)]\s+)?(?:\*\*)?\s*(?:(?:employee|emp\.?|staff|personnel)\s*(?:id|no\.?|number|num\.?|#|code)|id(?:\s*(?:no\.?|number))?|#)\s*(?:\*\*)?\s*[:=-]\s*(?:\*\*)?\s*\S+\s*(?:\*\*)?\s*$/i;
+
+/** A bare employee-number code in brackets after a name: "Ana Cruz (HSJ-014)". */
+const BRACKETED_CODE = /\s*[([]\s*#?[A-Z]{2,6}-?\d{2,8}\s*[)\]]/g;
+
+/** An inline mention: "(Employee No. HSJ-014)", ", employee #014". */
+const ID_INLINE = /\s*[([,]?\s*(?:employee|emp\.?|staff)\s*(?:id|no\.?|number|num\.?|#)\s*[:#]?\s*[A-Za-z]{0,6}-?\d[\w-]*\s*[)\]]?/gi;
+
+function splitRow(line: string): string[] {
+  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|');
+}
+
+function isSeparator(line: string): boolean {
+  return /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(line);
+}
+
+/** Drops identifier / row-number columns from every pipe table in the text. */
+function dropIdColumns(text: string): string {
+  const lines = text.split('\n');
+  for (let i = 0; i + 1 < lines.length; i++) {
+    if (!lines[i].includes('|') || !isSeparator(lines[i + 1])) continue;
+    const header = splitRow(lines[i]).map((c) => c.replace(/\*\*/g, '').trim());
+    const drop = new Set(header.map((h, idx) => (ID_HEADER.test(h) ? idx : -1)).filter((idx) => idx >= 0));
+    if (!drop.size || drop.size === header.length) continue;
+    let j = i;
+    while (j < lines.length && lines[j].includes('|')) {
+      const cells = splitRow(lines[j]).filter((_, idx) => !drop.has(idx));
+      lines[j] = `| ${cells.map((c) => c.trim()).join(' | ')} |`;
+      j++;
+    }
+    i = j - 1;
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Removes identifiers from an answer. Internal record ids are never useful to a
+ * reader (links carry them), so they go for everyone. A supervisor never sees
+ * employee numbers, so ID / "#" / "No." columns and employee-number mentions are
+ * removed from a supervisor's answer as well.
+ */
+export function stripIdentifiers(text: string, opts: { hideEmployeeNumbers: boolean }): { text: string; stripped: boolean } {
+  let out = text.replace(INTERNAL_ID, '');
+  if (opts.hideEmployeeNumbers) {
+    out = dropIdColumns(out)
+      .split('\n')
+      .filter((line) => !ID_LINE.test(line))
+      .join('\n')
+      .replace(ID_INLINE, '')
+      .replace(BRACKETED_CODE, '');
+  }
+  out = out.replace(/\(\s*\)|\[\s*\]/g, '').replace(/[ \t]+([,.;:])/g, '$1').replace(/[ \t]{2,}/g, ' ');
+  return { text: out, stripped: out !== text };
+}
+
 /** Follow-up suggestions: short, plain, no markup. */
 export function cleanFollowUps(items: string[] | undefined): string[] {
   return (items ?? [])
