@@ -82,6 +82,26 @@ export function fitToBudget(data: unknown, budget = MAX_TOOL_RESULT_CHARS): stri
   return json.length <= budget ? json : JSON.stringify({ ok: false, error: 'RESULT_TOO_LARGE', message: 'The result was too large. Ask a narrower question (shorter date range or one unit).' });
 }
 
+/** Keys that hold an employee number, in any tool result or nested service object. */
+const EMPLOYEE_NUMBER_KEY = /^(employeeNumber|employeeNo|employeeNum|empNumber|employee_number)$/i;
+
+/** A deep copy of `data` without employee-number fields; the removed values are collected in `found`. */
+export function stripEmployeeNumbers(data: unknown, found: Set<string>): unknown {
+  if (Array.isArray(data)) return data.map((v) => stripEmployeeNumbers(v, found));
+  if (data && typeof data === 'object' && !(data instanceof Date)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+      if (EMPLOYEE_NUMBER_KEY.test(k)) {
+        if (typeof v === 'string' && v.trim()) found.add(v.trim());
+        continue;
+      }
+      out[k] = stripEmployeeNumbers(v, found);
+    }
+    return out;
+  }
+  return data;
+}
+
 /**
  * Runs one tool call from the model. Order of checks:
  *   1. the tool exists;
@@ -112,10 +132,16 @@ export async function executeTool(ctx: ToolContext, name: string, rawArguments: 
 
   try {
     const output = await tool.run(ctx, parsed.data);
+    // A supervisor's assistant never receives any employee number (theirs or their team's):
+    // every `employeeNumber`-style field is removed, and any copy of those numbers inside text too.
+    const supervisor = String(ctx.actor.tier) === 'SUPERVISOR';
+    const numbers = new Set<string>();
+    let content = fitToBudget(supervisor ? stripEmployeeNumbers(output.data, numbers) : output.data);
+    if (supervisor) for (const n of numbers) if (n.length >= 3) content = content.split(n).join('');
     return {
       name,
       ok: true,
-      content: fitToBudget(output.data),
+      content,
       rows: output.rows,
       targetEmployeeId: output.targetEmployeeId,
       ms: Date.now() - started,
