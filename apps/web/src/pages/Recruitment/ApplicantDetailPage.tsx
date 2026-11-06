@@ -275,6 +275,14 @@ export default function ApplicantDetailPage() {
                     <dt className="text-muted-foreground mb-1">Unit</dt>
                     <dd className="text-foreground">{application.jobOpening.unit?.name || "—"}</dd>
                   </div>
+                  <div>
+                    <dt className="text-muted-foreground mb-1">Related Experience (as reported)</dt>
+                    <dd className="text-foreground">
+                      {(application as any).priorExperienceYears === null || (application as any).priorExperienceYears === undefined
+                        ? "Not given"
+                        : `${(application as any).priorExperienceYears} ${(application as any).priorExperienceYears === 1 ? "year" : "years"}`}
+                    </dd>
+                  </div>
                   <div className="sm:col-span-2">
                     <dt className="text-muted-foreground mb-1">Applicant Message / Source</dt>
                     <dd className="text-foreground bg-surface-2 p-3 rounded-md border mt-1">

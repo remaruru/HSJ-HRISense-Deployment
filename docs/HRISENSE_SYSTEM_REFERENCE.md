@@ -1573,6 +1573,13 @@ and days, counted on the calendar (never days ÷ 365). An ended employment with
 no recorded end date shows *"Cannot be calculated — no end date recorded"*
 instead of counting to today.
 
+**Experience** — next to it, **Experience Before Hospicio** (optional; HR enters
+it in years, 0–60, on the Employment section of the edit form or during
+onboarding — *"Not recorded"* when blank) and **Total Experience** (length of
+service + experience before Hospicio). A hired applicant's onboarding draft starts
+with the experience they reported on the Careers form. Supervisors see both on
+My Team. AI Assistance uses all three (§20.1).
+
 ### 6.6 Archiving and restoring
 
 **Archive** does not delete anything. It sets the employee's *archived* date,
@@ -2940,7 +2947,7 @@ Personal Information, **Internal Notes**, **Status History**, and tabs:
 |---|---|
 | **Careers** (`/careers`) | A hero, then **Open Positions**: **only the Job Openings accepting applications now** — one card per opening (posting title, the position, unit and department, employment type, vacancies, closing date, **View Opening**, **Apply Now**) with an *Open now* count. **Search** covers only those openings; filters: **All open positions / a unit**, and the **employment type** when there is more than one. Job roles without an opening are **not** listed (changed 8 Oct 2026 — the earlier "every job role" directory was withdrawn). With nothing open: *"There are no open positions right now"*. Then the *Application Process*. |
 | **Opening** (`/careers/$slug`) | Overview, key responsibilities, qualifications, required documents, **Apply Now**, **Back to Careers**. An opening that is not accepting applications (see below) or is unknown shows *"Opening Unavailable"* |
-| **Apply** (`/careers/$slug/apply`) | *Submit Application*: **Personal Information** (first, middle and last name, suffix; email; mobile number; present address; **sex** and **religion**, both **optional** — *Sex
+| **Apply** (`/careers/$slug/apply`) | *Submit Application*: **Personal Information** (first, middle and last name, suffix; email; mobile number; present address; **sex**, **religion** and **years of related work experience** (0–60), all **optional** — *Sex
 (optional)* defaults to *Not specified*, *Religion (optional)* can stay blank,
 and the server stores a blank as no value; HR sees *"Not provided"*, and
 onboarding from the applicant leaves those fields for HR to fill), **Documents** (**resume required**, cover letter optional; PDF, DOC or DOCX only), **Additional Information** (how they heard of the job, a message), and a **privacy consent** tick (required) |
@@ -3148,7 +3155,9 @@ record* is its own category, never counted as absent.
 **Purpose** — the **HSJ HRISense assistant**: answers questions about HRISense
 and about the records the signed-in person is allowed to see, in plain
 language, with charts where they help. For HR it is organisation-wide decision
-support. **It is read-only and advisory: every decision stays with people.**
+support. **It is read-only and advisory: every decision stays with people.** The
+one thing it prepares is a **job opening for HR**, which is created only when HR
+presses **Publish** on it (§20.4).
 
 **Who** — **everyone signed in** (HR, supervisors, employees), each within their
 own access. **Where** — `/ai-assistance` (sidebar *AI & Analytics → AI
@@ -3166,13 +3175,31 @@ Full technical design: [`docs/HRISENSE_AI_ARCHITECTURE.md`](HRISENSE_AI_ARCHITEC
 | Direct reports (employees whose **immediate supervisor** is them — not the whole unit): profile, attendance, schedules, leave requests (no reasons), compliance (**without** medical/psychological requirements), training | — | ✅ | ✅ (own reports) |
 | Any employee's work records; organisation figures: headcount, attendance coverage and trends, no-record-today lists, leave awaiting HR, compliance standing and expiries within N days, training completion by unit, evaluation progress, recruitment pipeline, announcement read rates, unconfigured schedules, supervisor-assignment issues, import history, audit activity counts, the Reports & Analytics reports | — | — | ✅ |
 | Other people's leave balances, evaluations, medical or psychological records | — | — | ✅ (metadata and statuses only) |
+| People by role, kind of work, unit, experience, length of service, age or hire date — "nurses (Clinic Staff) with 10+ years of experience", "the 10 longest-serving caretakers", "the oldest employee" | own record | self + direct reports | ✅ everyone |
+| Birth date and age | own | self + direct reports | ✅ |
+| Prepare a job opening; compare an opening's applicants | — | — | ✅ |
+
+**Experience** has three parts and every answer gives all three: **length of
+service** at Hospicio (from the hire date), **experience before Hospicio** (the
+optional *Experience before Hospicio* field HR records, or what an applicant
+reported on the Careers form), and the **total**.
+
+**Hospicio's own words.** People ask in English, Filipino or Taglish, with
+everyday words. The assistant maps them to Hospicio's roles through fixed **work
+groups** — *nurse, clinic* → Clinic Staff; *caretaker, house parent, bantay,
+tagapag-alaga* → the Pastoral Care / Homelife residential staff (Rendu A/B/C, St.
+Joseph, St. Mary, St. Vincent, Sta. Luisa, Sigliv Boys, Tahan Center, Sanctuary
+Center) and Dormitory Staff; *teacher* → ECCD Teacher, Pre-School Staff; *cook* →
+Kitchen, Canteen, Bakery; and so on — and says which roles it used. When nothing
+matches exactly it says so in one sentence and offers the **closest match** and a
+next step (for HR, preparing a job opening), never a bare "no".
 
 **Never available to the assistant, for anyone:** passwords, tokens, keys,
-dates of birth, addresses, phone numbers, personal e-mail, emergency contacts,
+addresses, phone numbers, personal e-mail, emergency contacts,
 government ID numbers, licence numbers, photos, **medical HR notes**,
-**psychological confidential notes**, document contents, evaluator comments, and
-free-text notes written about another person. Payroll does not exist in HRISense
-(Appendix E.5).
+**psychological confidential notes**, document contents (including **résumés**),
+interview notes and recommendations, evaluator comments, and free-text notes
+written about another person. Payroll does not exist in HRISense (Appendix E.5).
 
 ### 20.2 How an answer is produced
 
@@ -3184,17 +3211,21 @@ free-text notes written about another person. Payroll does not exist in HRISense
    credentials or secrets, SQL or code, attempts to override instructions or
    claim a role the person does not hold, payroll questions, and clearly
    unrelated requests.
-3. The AI may only call **narrow lookup tools** offered to that tier (39 in all,
+3. The AI may only call **narrow lookup tools** offered to that tier (43 in all,
    e.g. `get_attendance`, `get_team_overview`, `get_compliance_overview`,
-   `search_help_center`). Each tool re-checks the person's access before
-   reading anything. There is no general query, SQL or table access, and no
-   tool that changes data.
-4. All figures (counts, rates, balances, coverage, completion) are **computed by
-   the server**. Charts are drawn from those server-computed datasets; the AI
+   `find_employees`, `get_org_catalog`, `search_help_center`; HR also
+   `prepare_job_opening` and `compare_applicants`). Each tool re-checks the
+   person's access before reading anything. There is no general query, SQL or
+   table access, and no tool that changes data — `prepare_job_opening` only
+   returns a checked draft.
+4. All figures (counts, rates, balances, coverage, completion, length of
+   service, ages, averages) are **computed by the server**. Charts are drawn from those server-computed datasets; the AI
    can only choose which dataset to show and as what chart type.
 5. The answer is checked: code and HTML are removed, credential-shaped text and
    government ID numbers are redacted, links are kept only if they point to a
-   page that person can open.
+   page that person can open (with only the parameters that page understands,
+   §20.3). The label *Outside your access* is shown only when a lookup really
+   refused. An answer cut off by the length limit keeps the text that arrived.
 6. The question, the answer, the tools used and whose records were read are
    **audited** (`ai_request_logs`; plus an `AI_ASSISTANT_DATA_ACCESS` entry in
    the Audit Log when another employee's records were read).
@@ -3202,8 +3233,10 @@ free-text notes written about another person. Payroll does not exist in HRISense
 **Rules it follows:** a day with **no attendance record is never an absence**;
 **UNCONFIGURED** schedule days are neither working days nor days off; leave
 statuses mean what §12.1 says; employees see evaluations only when finalized and
-made visible; it never predicts attrition or performance, never judges an
-applicant, and never recommends a decision about a specific person. Anything
+made visible; it may list and sort people by a stated fact (experience, length
+of service, age, evaluation result, trainings) but never calls anyone "the best",
+never predicts attrition or performance, never ranks or judges an applicant, and
+never recommends a decision about a specific person. Anything
 outside HRISense gets exactly: *"I'm the HSJ HRISense assistant, so I can help
 with HRISense, your authorized workforce information, and Hospicio de San Jose
 HR workflows."*
@@ -3216,8 +3249,13 @@ HR workflows."*
   remove from list). Each answer may carry a label — *Outside your access*, *No
   data found*, *Outside HRISense*, *Can't help with that*, *AI not configured*,
   *Couldn't answer* — charts with **View data** (the exact figures as a table),
-  links to the relevant pages, and follow-up suggestions. Questions are limited
-  to 2,000 characters and, by default, 60 per person per hour.
+  buttons that open the **exact record** (an employee's profile on a section —
+  `/employees/<id>?tab=compliance`; a person's or a requirement's compliance —
+  `/compliance?employee=<id>` / `?requirement=<id>`; a training activity —
+  `/training?activity=<id>`; a job opening or an application; a filtered Employee
+  Directory), **Export: PDF / Excel** (§20.5), and follow-up suggestions.
+  Questions are limited to 2,000 characters and, by default, 60 per person per
+  hour.
 - **Workforce summary** (HR) — the deterministic **workforce fact sheet** for the
   last N days (7–180, default 30: headcount, attendance, leave, compliance,
   training, evaluations, recruitment; `GET /ai/facts`, always available) and
@@ -3252,6 +3290,52 @@ weekly schedule. Months with no imported data are shown as *no data*, never 0%.
 **When no AI provider is configured**, typed questions get a clear notice and
 the matching Help Center guides; **Quick analytics**, HR's workforce fact sheet
 and every other part of HRISense work normally.
+
+### 20.4 Job openings prepared by the assistant (HR)
+
+HR asks in their own words ("Prepare a job opening for 2 Clinic Staff with at
+least 10 years of experience"). The assistant writes the description,
+responsibilities, qualifications and required documents; the server checks the
+role and unit, the dates and the vacancies, and fills sensible defaults (1
+vacancy, Regular, opening today, closing 30 days later), which the answer names.
+The answer shows a **job opening card** with every field:
+
+- **Publish job opening** — creates the opening through Job Openings, from the
+  draft stored with that answer (nothing the browser sends), and publishes it to
+  the Careers page. Only an **HR Officer or Sister** publishes; for other HR
+  staff it is saved as a **draft** for an HR Officer. A second click does nothing.
+  `POST /ai/assistant/conversations/:id/messages/:messageId/publish-job-opening`.
+- **Edit in the form first** — opens Recruitment → Job Openings → Create with
+  every field filled in.
+
+The audit trail is the usual `JOB_OPENING_CREATED` / `JOB_OPENING_OPEN`. The
+assistant itself never publishes, and never says it did.
+
+**Comparing applicants** — "Compare the applicants for the Clinic Staff opening"
+lists each application with the experience the applicant **reported** (not
+verified), documents submitted, stage and interviews, against the opening's
+qualifications, with a button to each application. It never ranks, scores or
+recommends; HR picks.
+
+### 20.5 Exporting
+
+Every answer (including Quick analytics) has **Export: PDF / Excel**:
+`GET /ai/assistant/conversations/:id/messages/:messageId/export?format=pdf|excel`
+— only the asker's own conversations. HR's **Workforce summary** has **Export PDF
+/ Export Excel** (`POST /ai/summary/export`). The PDF carries the question, the
+answer, each chart with its data table, the links, who asked and when, and an
+*AI-generated — check important figures* note; the Excel workbook has the answer
+on its first sheet and every table and chart's figures on their own sheets,
+numbers kept as numbers.
+
+### 20.6 Testing the assistant
+
+Besides the automated tests, `npm run ai:question-bank --workspace=apps/api`
+asks about 140 questions real HR staff, supervisors and employees may ask — in
+English, Filipino and Taglish, with typos — through the real model and checks
+each answer (the lookups used, what it must and must not say, its status, the
+job opening card). It needs an AI key and the demo data, and is never part of
+the normal test run.
 
 **Configuration** (`apps/api/.env.local` — git-ignored; `.env.local` overrides `apps/api/.env`, which is tracked by git and must not hold keys): `AI_PROVIDER` (`openai` default, or
 `anthropic`), `OPENAI_API_KEY` / `OPENAI_MODEL` (default `gpt-4o-mini`) /
@@ -3961,6 +4045,7 @@ Indexes / constraints: index(token)
 | separationReason | `String?` |  |  |
 | prcLicenseNumber | `String?` |  |  |
 | professionalRole | `String?` |  |  |
+| priorExperienceYears | `Float?` |  | Years of work experience before Hospicio (optional). Length of service comes from hireDate; total = both. |
 | prcIssuedDate | `DateTime?` |  | PRC licence dates — only with a licence number. Valid / expiring / expired is derived from prcValidUntil, never stored. |
 | prcValidUntil | `DateTime?` |  |  |
 | ncCertificateNumber | `String?` |  |  |
@@ -5371,6 +5456,7 @@ Indexes / constraints: index(email); index(mobile)
 | status | `JobApplicationStatus` | default SUBMITTED |  |
 | source | `String?` |  |  |
 | applicantMessage | `String?` |  |  |
+| priorExperienceYears | `Float?` |  | Years of related work experience the applicant reported on the Careers form (optional, 0–60). |
 | privacyConsent | `Boolean` |  |  |
 | consentTimestamp | `DateTime` |  |  |
 | onboardingDraftId | `String?` | unique |  |

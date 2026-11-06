@@ -563,7 +563,7 @@ const complianceOverviewTool = defineTool({
         else unitRow.needsAttention++;
 
         const days = item.expiresAt ? Math.round((new Date(item.expiresAt).getTime() - todayMs) / 86_400_000) : null;
-        const row = { employee: fullName(e), employeeNumber: e.employeeNumber, unit: e.unit?.name ?? null, requirement: item.requirement.title, category: humanise(item.requirement.category), status: item.status, expiresOn: dateKey(item.expiresAt), daysUntilExpiry: days };
+        const row = { employee: fullName(e), employeeNumber: e.employeeNumber, link: `/compliance?employee=${e.id}`, unit: e.unit?.name ?? null, requirement: item.requirement.title, category: humanise(item.requirement.category), status: item.status, expiresOn: dateKey(item.expiresAt), daysUntilExpiry: days };
         if (item.status !== 'VALID') attention.push(row);
         if (days !== null && days >= 0 && days <= within) expiringWithin.push(row);
       }
@@ -630,6 +630,7 @@ const trainingOverviewTool = defineTool({
       orderBy: { startDate: 'desc' },
       take: 60,
       select: {
+        id: true,
         title: true,
         type: true,
         status: true,
@@ -650,7 +651,7 @@ const trainingOverviewTool = defineTool({
         unitAgg.set(u, row);
       }
       const counted = a.participants.length - (c.CANCELLED ?? 0);
-      return { title: a.title, type: humanise(a.type), status: a.status, startDate: dateKey(a.startDate), participants: a.participants.length, ...c, completionRate: pct(c.COMPLETED ?? 0, counted) };
+      return { title: a.title, link: `/training?activity=${a.id}`, type: humanise(a.type), status: a.status, startDate: dateKey(a.startDate), participants: a.participants.length, ...c, completionRate: pct(c.COMPLETED ?? 0, counted) };
     });
     const units = [...unitAgg.values()].map((u) => ({ ...u, completionRate: pct(u.completed, u.assigned) }));
     const dataset = ctx.datasets.add({

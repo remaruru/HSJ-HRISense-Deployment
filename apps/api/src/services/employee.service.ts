@@ -132,6 +132,19 @@ function employeeSearchConditions(search: unknown): any[] {
   });
 }
 
+/**
+ * Years of work experience before Hospicio: optional; blank means "not
+ * recorded". Whole or half years from 0 to 60, kept to one decimal.
+ */
+export function normalizePriorExperienceYears(value: unknown): number | null {
+  if (value === undefined || value === null || (typeof value === 'string' && !value.trim())) return null;
+  const n = typeof value === 'number' ? value : Number(String(value).trim());
+  if (!Number.isFinite(n) || n < 0 || n > 60) {
+    throw new AppError('Years of experience before Hospicio must be a number from 0 to 60.', 400);
+  }
+  return Math.round(n * 10) / 10;
+}
+
 export class EmployeeService {
   /**
    * List employees — HR sees all, supervisors see direct reports + own profile, standard sees own profile.
@@ -523,6 +536,7 @@ export class EmployeeService {
       regularizationDate: emp.regularizationDate ?? null,
       separationDate: emp.separationDate ?? null,
       professionalRole: emp.professionalRole ?? null,
+      priorExperienceYears: emp.priorExperienceYears ?? null,
       // Whether a PRC license is on file — not the number.
       isProfessional: !!(emp.prcLicenseNumber && String(emp.prcLicenseNumber).trim()),
       immediateSupervisorId: emp.immediateSupervisorId ?? null,
@@ -709,6 +723,7 @@ export class EmployeeService {
               separationReason: hasEnded(data.employmentState) ? (data.separationReason || null) : null,
               prcLicenseNumber: data.prcLicenseNumber || null,
               professionalRole: data.professionalRole || null,
+              priorExperienceYears: normalizePriorExperienceYears(data.priorExperienceYears),
               ...recordFieldsForCreate(data),
               sssNumber: data.sssNumber || null,
               philhealthNumber: data.philhealthNumber || null,
@@ -995,6 +1010,7 @@ export class EmployeeService {
     // still validated as a whole. HR-only fields, so skip for self-service edits.
     if (permissionTier === PermissionTier.FULL) {
       validateEmployment(data, employee);
+      if ('priorExperienceYears' in data) data.priorExperienceYears = normalizePriorExperienceYears(data.priorExperienceYears);
       // Optional HSJ record fields, judged on the merged record.
       normalizeRecordFields(data, employee);
       // Moving back to ACTIVE / ON_LEAVE clears the ending details.

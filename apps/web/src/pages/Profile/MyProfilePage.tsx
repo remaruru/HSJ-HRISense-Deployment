@@ -11,7 +11,7 @@ import { SectionNav, type SectionNavGroup } from '@/components/ui/section-nav';
 import { MetricBreakdownDialog } from '@/components/shared/MetricBreakdown';
 import { profileCompletionSpec } from '@/components/shared/profileCompletionSpec';
 import { staggerContainer, staggerItem } from '@/lib/motion';
-import { EMPLOYMENT_STATE_LABELS, employmentDuration, formatEmploymentDate, hasEnded, type EmploymentState } from '@/lib/employment';
+import { EMPLOYMENT_STATE_LABELS, employmentDuration, formatEmploymentDate, hasEnded, priorExperienceText, totalExperienceText, type EmploymentState } from '@/lib/employment';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
 import { useAuth } from '@/providers/AuthProvider';
@@ -321,6 +321,8 @@ export default function MyProfilePage() {
                     label="Length of Service"
                     value={service ? service.text : endDateMissing ? 'Cannot be calculated — no end date recorded' : undefined}
                   />
+                  <InfoField label="Experience Before Hospicio" value={priorExperienceText(employee.priorExperienceYears)} />
+                  <InfoField label="Total Experience" value={totalExperienceText(service, employee.priorExperienceYears)} />
                   <InfoField label="Probation Date" value={formatDate(employee.probationDate)} />
                   <InfoField label="Regularization Date" value={formatDate(employee.regularizationDate)} />
                   <InfoField label="Unit" value={employee.unit?.name} missing={isMissing('unit')} />

@@ -759,6 +759,10 @@ model Employee {
   regularizationDate DateTime?        @db.Date
   separationDate     DateTime?        @db.Date
   separationReason   String?
+  /// Years of work experience BEFORE joining Hospicio (optional, HR enters it).
+  /// Length of service at Hospicio comes from hireDate and is never stored.
+  /// Total experience = this + length of service.
+  priorExperienceYears Float?
 
   // Professional credentials — optional; only licensed professionals have them.
   // An employee counts as "Professional" in the UI when prcLicenseNumber is set.
@@ -2636,6 +2640,8 @@ model JobApplication {
   status           JobApplicationStatus @default(SUBMITTED)
   source           String?
   applicantMessage String?              @db.Text
+  /// Years of related work experience the applicant reported (optional).
+  priorExperienceYears Float?
 
   privacyConsent   Boolean
   consentTimestamp DateTime

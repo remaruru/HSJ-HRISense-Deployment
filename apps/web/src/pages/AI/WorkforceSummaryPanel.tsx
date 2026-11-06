@@ -3,7 +3,8 @@ import { formatPct } from '@/lib/percent';
 import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from '@tanstack/react-router';
-import { AlertTriangle, ArrowUpRight, Info, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { AlertTriangle, ArrowUpRight, FileSpreadsheet, FileText, Info, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { staggerContainer, staggerItem } from '@/lib/motion';
 import { api } from '@/services/api';
@@ -143,6 +144,28 @@ export function WorkforceSummaryPanel() {
   };
 
   const aiAvailable = status?.available === true;
+
+  // The summary on screen as a PDF to read or an Excel workbook to work with.
+  const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null);
+  const exportSummary = async (format: 'pdf' | 'excel') => {
+    if (!analysis || !facts || exporting) return;
+    setExporting(format);
+    try {
+      const res = await api.post('/ai/summary/export', { format, periodDays: facts.periodDays, analysis }, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `HRISense_Workforce_summary_${new Date().toISOString().slice(0, 10)}.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'The summary could not be exported. Please try again.'));
+    } finally {
+      setExporting(null);
+    }
+  };
 
   return (
     <motion.div
@@ -304,9 +327,21 @@ export function WorkforceSummaryPanel() {
 
       {/* AI narrative */}
       <motion.div variants={staggerItem} className="hrisense-surface p-5">
-        <h3 className="font-bold font-heading text-foreground flex items-center gap-2 mb-1">
-          <Sparkles className="h-4.5 w-4.5 text-accent" /> AI summary
-        </h3>
+        <div className="flex flex-wrap items-start justify-between gap-2 mb-1">
+          <h3 className="font-bold font-heading text-foreground flex items-center gap-2">
+            <Sparkles className="h-4.5 w-4.5 text-accent" /> AI summary
+          </h3>
+          {analysis && !isAnalysing && (
+            <div className="flex items-center gap-1.5">
+              <Button variant="outline" size="sm" onClick={() => exportSummary('pdf')} disabled={Boolean(exporting)}>
+                {exporting === 'pdf' ? <Loader2 className="animate-spin" /> : <FileText />} Export PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportSummary('excel')} disabled={Boolean(exporting)}>
+                {exporting === 'excel' ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />} Export Excel
+              </Button>
+            </div>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground mb-4">
           Generated from the figures above. Nothing here is a decision.
         </p>

@@ -33,6 +33,7 @@ const { seedDevAccounts } = require('../../src/scripts/seed_dev_accounts');
 const { seedTeamAccounts } = require('./team-accounts');
 const { seedSampleSchedules } = require('./sample-schedules');
 const { seedDemoActivity } = require('./seed-activity');
+const { seedDemoExperience } = require('./seed-experience');
 
 const DATA_FILE = path.join(__dirname, 'demo-data.json');
 const CHUNK = 200;
@@ -281,6 +282,13 @@ async function main() {
       await seedDemoActivity({ prisma });
     } catch (err) {
       console.warn(`\nDemo activity: skipped after an error (${err.message || err}). The rest of the seed is unaffected.`);
+    }
+    // Varied hire dates, birth dates and prior experience for the DEV-… employees
+    // (never TEAM-…), once per database. Never allowed to fail the deploy.
+    try {
+      await seedDemoExperience({ prisma });
+    } catch (err) {
+      console.warn(`\nDemo experience: skipped after an error (${err.message || err}). The rest of the seed is unaffected.`);
     }
   }
   const createdAny = result.summary.some((s) => s.name === 'User' && s.created > 0);

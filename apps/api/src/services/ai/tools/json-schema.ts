@@ -54,6 +54,11 @@ export function zodToJsonSchema(schema: z.ZodTypeAny): JsonSchema {
       return withDescription({ type: 'boolean' });
     case 'ZodEnum':
       return withDescription({ type: 'string', enum: [...def.values] });
+    case 'ZodNativeEnum': {
+      // A Prisma enum: its string values only (TS numeric enums would add reverse keys).
+      const values = Object.values(def.values as Record<string, string | number>).filter((v): v is string => typeof v === 'string');
+      return withDescription({ type: 'string', enum: [...new Set(values)] });
+    }
     case 'ZodArray': {
       const out: JsonSchema = { type: 'array', items: zodToJsonSchema(def.type) };
       if (def.minLength) out.minItems = def.minLength.value;

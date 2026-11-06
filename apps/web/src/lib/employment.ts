@@ -95,3 +95,28 @@ export function formatEmploymentDate(value?: string | Date | null): string {
 /** An employee counts as a professional once a PRC licence number is recorded. */
 export const isProfessional = (employee?: { prcLicenseNumber?: string | null } | null): boolean =>
   !!employee?.prcLicenseNumber && String(employee.prcLicenseNumber).trim() !== "";
+
+/**
+ * Years of work experience BEFORE Hospicio (optional; HR records it):
+ * "4.5 years", "1 year", or "Not recorded".
+ */
+export function priorExperienceText(years?: number | null): string {
+  if (years === null || years === undefined || Number.isNaN(Number(years))) return "Not recorded";
+  const n = Number(years);
+  return `${n % 1 === 0 ? n : n.toFixed(1)} ${n === 1 ? "year" : "years"}`;
+}
+
+/**
+ * Total experience = experience before Hospicio + length of service at Hospicio,
+ * e.g. 7 Years, 5 Months + 4.5 years → "11 Years, 11 Months". Only the service
+ * when nothing was recorded before Hospicio.
+ */
+export function totalExperienceText(service: EmploymentDuration | null, priorYears?: number | null): string | undefined {
+  if (!service) return undefined;
+  const priorMonths = Math.round((Number(priorYears) || 0) * 12);
+  const months = service.years * 12 + service.months + priorMonths;
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  const text = `${y} ${y === 1 ? "Year" : "Years"}, ${m} ${m === 1 ? "Month" : "Months"}`;
+  return priorYears === null || priorYears === undefined ? `${text} (at Hospicio only)` : text;
+}

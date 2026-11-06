@@ -5,17 +5,21 @@ import type { ToolSpec } from '../provider/provider.types';
 import { HR_TOOLS } from './hr.tools';
 import { zodToJsonSchema } from './json-schema';
 import { KNOWLEDGE_TOOLS } from './knowledge.tools';
+import { PEOPLE_TOOLS } from './people.tools';
 import { PERSON_TOOLS } from './person.tools';
 import { SELF_TOOLS } from './self.tools';
 import { TEAM_TOOLS } from './team.tools';
+import { RECRUITMENT_TOOLS } from './recruitment.tools';
 import { AiTool, AiToolError, ToolContext, ToolErrorCode } from './tool-types';
 
 /**
  * The complete, closed list of tools. There is no generic query tool, no SQL,
- * no table access by name, no write tool and no code execution: if a question
- * cannot be answered by one of these, the assistant says so.
+ * no table access by name and no code execution: if a question cannot be
+ * answered by one of these, the assistant says so. No tool writes anything:
+ * prepare_job_opening only returns a draft, which is published by HR's own
+ * click on the Publish button (POST …/publish-job-opening), never by the model.
  */
-export const AI_TOOLS: AiTool[] = [...KNOWLEDGE_TOOLS, ...SELF_TOOLS, ...PERSON_TOOLS, ...TEAM_TOOLS, ...HR_TOOLS];
+export const AI_TOOLS: AiTool[] = [...KNOWLEDGE_TOOLS, ...SELF_TOOLS, ...PERSON_TOOLS, ...PEOPLE_TOOLS, ...TEAM_TOOLS, ...HR_TOOLS, ...RECRUITMENT_TOOLS];
 
 const BY_NAME = new Map<string, AiTool>();
 for (const tool of AI_TOOLS) {

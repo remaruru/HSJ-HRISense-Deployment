@@ -1,6 +1,7 @@
 import { confirmAction } from "@/components/shared/ConfirmProvider";
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "@tanstack/react-router";
+import { takeAiJobDraft } from "@/lib/aiJobDraft";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Briefcase, CalendarDays, Eye, FileText, Plus, Save, Send, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -66,20 +67,43 @@ export default function JobOpeningFormPage() {
   const [newPositionOpen, setNewPositionOpen] = useState(false);
   const [titleTouched, setTitleTouched] = useState(false);
 
-  const [formData, setFormData] = useState<CreateJobOpeningPayload>({
-    title: "",
-    unitId: "",
-    departmentId: "",
-    jobRoleId: "",
-    employmentType: "REGULAR",
-    vacancies: 1,
-    description: "",
-    responsibilities: "",
-    qualifications: "",
-    requiredDocuments: "",
-    openingDate: new Date().toISOString().split("T")[0],
-    closingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-  });
+  // A job opening AI Assistance prepared ("Edit in the form first") starts the form once.
+  const [aiDraft] = useState(() => (isEditing ? null : takeAiJobDraft()));
+  // Its title was written for this opening: keep it when the role list loads.
+  useEffect(() => {
+    if (aiDraft) setTitleTouched(true);
+  }, [aiDraft]);
+  const [formData, setFormData] = useState<CreateJobOpeningPayload>(() =>
+    aiDraft
+      ? {
+          title: aiDraft.title,
+          unitId: aiDraft.unitId,
+          departmentId: aiDraft.departmentId ?? "",
+          jobRoleId: aiDraft.jobRoleId,
+          employmentType: aiDraft.employmentType as any,
+          vacancies: aiDraft.vacancies,
+          description: aiDraft.description,
+          responsibilities: aiDraft.responsibilities,
+          qualifications: aiDraft.qualifications,
+          requiredDocuments: aiDraft.requiredDocuments ?? "",
+          openingDate: aiDraft.openingDate,
+          closingDate: aiDraft.closingDate,
+        }
+      : {
+          title: "",
+          unitId: "",
+          departmentId: "",
+          jobRoleId: "",
+          employmentType: "REGULAR",
+          vacancies: 1,
+          description: "",
+          responsibilities: "",
+          qualifications: "",
+          requiredDocuments: "",
+          openingDate: new Date().toISOString().split("T")[0],
+          closingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+        }
+  );
 
   // The CURRENT job roles and units — never a list typed into the page.
   useEffect(() => {

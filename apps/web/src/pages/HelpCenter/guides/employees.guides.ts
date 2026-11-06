@@ -544,7 +544,7 @@ export const EMPLOYEE_GUIDES: HelpGuideDefinition[] = [
         {
           stepNumber: 2,
           title: 'Change what needs changing',
-          instruction: 'Update the fields you need. Changing the **Unit** clears the Department and Job Role so you can pick ones that belong to the new unit.',
+          instruction: 'Update the fields you need. Changing the **Unit** clears the Department and Job Role so you can pick ones that belong to the new unit. **Experience before Hospicio (years)** is optional: with the start date it gives the **Total Experience** shown on the profile and used by AI Assistance.',
           warning: 'Changing the job role can change what the employee is allowed to see in HRISense, because permissions follow the job role.',
           expectedResult: 'The form shows your new values.',
           uiPath: 'Edit form',

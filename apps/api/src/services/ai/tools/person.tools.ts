@@ -33,6 +33,7 @@ import {
 } from './tool-helpers';
 import { ALL_TIERS, AiTool, AiToolError, dateArg, defineTool, employeeIdArg, ToolContext } from './tool-types';
 import { profileLinkFor } from '../links/app-links';
+import { ageOn, experienceFigures } from './people.tools';
 
 /**
  * Person-level tools. Each takes an optional `employeeId`; omitted means the
@@ -301,7 +302,7 @@ export function monthStartKey(dayKey: string, offset: number): string {
 const profileTool = defineTool({
   name: 'get_employee_profile',
   description:
-    "Work profile of one employee: name, employee number, job role, unit, employment status and state, hire / probation / regularization dates, immediate supervisor and reporting-line status. Never includes personal details (birth date, addresses, contacts, government IDs). Omit employeeId for the person asking.",
+    "Work profile of one employee: name, employee number, job role, unit, profession, employment status and state, hire / probation / regularization dates, length of service at Hospicio, experience before Hospicio and total experience, birth date and age, immediate supervisor and reporting-line status. Never includes addresses, contacts or government IDs. Omit employeeId for the person asking. To compare or rank several people, use find_employees instead.",
   tiers: ALL_TIERS,
   args: z.object({ employeeId: employeeIdArg.optional() }).strict(),
   async run(ctx: ToolContext, args: { employeeId?: string }) {
@@ -321,6 +322,8 @@ const profileTool = defineTool({
         regularizationDate: true,
         separationDate: true,
         professionalRole: true,
+        priorExperienceYears: true,
+        dateOfBirth: true,
         biometricCode: true,
         deletedAt: true,
         supervisorAssignmentStatus: true,
@@ -350,6 +353,18 @@ const profileTool = defineTool({
         archived: Boolean(e.deletedAt),
         workScheduleLabel: humanise(e.workSchedule),
         hireDate: dateKey(e.hireDate),
+        ...(() => {
+          const fig = experienceFigures(e.hireDate, e.priorExperienceYears, ctx.today);
+          return {
+            lengthOfService: fig.lengthOfService?.text ?? null,
+            priorExperienceYears: fig.priorExperienceYears,
+            totalExperienceYears: fig.totalExperienceYears,
+            experienceNote: 'lengthOfService is at Hospicio; priorExperienceYears is before Hospicio (null = not recorded); totalExperienceYears is both.',
+          };
+        })(),
+        // Same scope as this tool: HR anyone, supervisor self + direct reports, employee self.
+        birthDate: dateKey(e.dateOfBirth),
+        age: ageOn(e.dateOfBirth, ctx.today),
         probationDate: dateKey(e.probationDate),
         regularizationDate: dateKey(e.regularizationDate),
         separationDate: hr ? dateKey(e.separationDate) : undefined,
@@ -583,6 +598,7 @@ const trainingTool = defineTool({
         certificateStoredFilename: true,
         trainingActivity: {
           select: {
+            id: true,
             title: true,
             type: true,
             provider: true,
@@ -621,6 +637,7 @@ const trainingTool = defineTool({
         completedHours,
         activities: rows.map((r) => ({
           title: r.trainingActivity.title,
+          link: `/training?activity=${r.trainingActivity.id}`,
           type: humanise(r.trainingActivity.type),
           provider: r.trainingActivity.provider,
           from: dateKey(r.trainingActivity.startDate),
@@ -765,8 +782,11 @@ const complianceTool = defineTool({
     const items = all.filter((i: any) => !(hideHealth && HEALTH_CATEGORIES.has(i.requirement.category)));
     const todayMs = new Date(`${ctx.today}T00:00:00Z`).getTime();
 
+    const hr = isHr(ctx.actor);
     const results = items.map((i: any) => ({
       requirement: i.requirement.title,
+      // HR: the requirement itself on the Compliance page.
+      requirementLink: hr ? `/compliance?requirement=${i.requirement.id}` : undefined,
       category: humanise(i.requirement.category),
       status: i.status,
       tracksExpiry: i.requirement.tracksExpiry,
@@ -795,6 +815,9 @@ const complianceTool = defineTool({
           })
         ),
         requirements: results,
+        // Where this person's compliance opens for this user.
+        link: self ? '/profile?section=compliance' : hr ? `/employees/${target}?tab=compliance` : profileLinkFor(ctx.actor, target) ?? undefined,
+        complianceLink: hr ? `/compliance?employee=${target}` : undefined,
         hiddenHealthRequirements: hideHealth ? all.length - items.length : undefined,
         statusMeaning: {
           VALID: 'An accepted record is on file and not expired',

@@ -186,9 +186,11 @@ describe('link allowlist', () => {
   });
 
   test('rejects external, script and malformed links', () => {
-    for (const p of ['https://evil.example', '//evil.example', 'javascript:alert(1)', '/leave/new?x=1', '/leave/../audit', '/help-center/<script>', 'leave/new']) {
+    for (const p of ['https://evil.example', '//evil.example', 'javascript:alert(1)', '/leave/../audit', '/help-center/<script>', 'leave/new']) {
       assert.equal(validateLink(HR, { path: p, label: 'x' }), null, p);
     }
+    // A query the page does not understand is dropped; the page link stays.
+    assert.equal(validateLink(HR, { path: '/leave/new?x=1', label: 'x' })?.path, '/leave/new');
   });
 
   test('profile links: own → My Profile, direct report → My Team, others only for HR', () => {

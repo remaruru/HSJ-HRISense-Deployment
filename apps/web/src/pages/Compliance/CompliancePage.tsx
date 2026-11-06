@@ -44,7 +44,7 @@ import {
 import { api } from "@/services/api";
 import { useAuth } from "@/providers/AuthProvider";
 import { useHrAuthority, HR_READ_ONLY_NOTE } from "@/hooks/useHrAuthority";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -298,6 +298,38 @@ export default function CompliancePage() {
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  // A link (e.g. from AI Assistance) can open one employee's compliance or one
+  // requirement: /compliance?employee=<id> or /compliance?requirement=<id>.
+  const linkSearch = useSearch({ strict: false }) as { employee?: string; requirement?: string };
+  const [handledLink, setHandledLink] = useState<string | null>(null);
+  useEffect(() => {
+    if (isLoading) return;
+    const key = `${linkSearch.employee ?? ""}|${linkSearch.requirement ?? ""}`;
+    if (key === "|" || key === handledLink) return;
+    setHandledLink(key);
+    if (linkSearch.employee) {
+      const listed = employeesComplianceList.find((i) => i.employee.id === linkSearch.employee)?.employee;
+      const fallback = allEmployees.find((e: any) => e.id === linkSearch.employee);
+      setActiveTab("EMPLOYEES");
+      handleOpenEmployeeDetail(listed ?? fallback ?? { id: linkSearch.employee });
+    }
+    if (linkSearch.requirement) {
+      const req = requirements.find((r) => r.id === linkSearch.requirement);
+      if (req) {
+        setSelectedReq(req);
+        setIsViewReqOpen(true);
+      } else {
+        ComplianceService.getRequirement(linkSearch.requirement)
+          .then((r: any) => {
+            setSelectedReq(r);
+            setIsViewReqOpen(true);
+          })
+          .catch((err) => toast.error(getApiErrorMessage(err, "That compliance requirement could not be opened.")));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, linkSearch.employee, linkSearch.requirement]);
 
   // ── Open Employee Compliance Detail Drawer ──
   const handleOpenEmployeeDetail = async (emp: any) => {

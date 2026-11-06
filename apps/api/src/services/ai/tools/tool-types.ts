@@ -2,6 +2,7 @@ import { PermissionTier } from '@prisma/client';
 import { z } from 'zod';
 import type { AiActor } from '../actor/ai-actor';
 import type { DatasetStore } from '../charts/chart-schema';
+import type { DraftStore } from '../actions/job-opening-draft';
 
 /**
  * A data tool the assistant may call.
@@ -25,6 +26,8 @@ export interface AiTool<A = any> {
 export interface ToolContext {
   actor: AiActor;
   datasets: DatasetStore;
+  /** Job openings prepared in this request (never saved by a tool). */
+  drafts: DraftStore;
   /** The request's clock, so every tool in one answer uses the same "today". */
   now: Date;
   /** Today's business date in Asia/Manila, YYYY-MM-DD. */

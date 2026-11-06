@@ -18,7 +18,33 @@ export { chartSchema, type AssistantChartData };
 export const MESSAGE_STATUSES = ['ANSWERED', 'NO_DATA', 'NOT_AUTHORIZED', 'OUT_OF_SCOPE', 'REFUSED', 'AI_UNAVAILABLE', 'ERROR'] as const;
 export type AssistantStatus = (typeof MESSAGE_STATUSES)[number];
 
-const linkSchema = z.object({ path: z.string().regex(/^\/[a-z0-9\-/]*$/i), label: z.string().max(60) });
+// A path inside HRISense, optionally with a query the server allowed (e.g. ?tab=compliance).
+const linkSchema = z.object({ path: z.string().regex(/^\/[a-z0-9\-/]*(\?[a-zA-Z0-9=&\-_.%]*)?$/i), label: z.string().max(60) });
+
+/** A job opening the assistant prepared for HR (shown as a card with a Publish button). */
+const jobOpeningActionSchema = z.object({
+  kind: z.literal('JOB_OPENING'),
+  state: z.enum(['DRAFT', 'SAVED', 'PUBLISHED']),
+  draft: z.object({
+    title: z.string(),
+    jobRoleId: z.string(),
+    jobRoleTitle: z.string(),
+    unitId: z.string(),
+    unitName: z.string(),
+    departmentId: z.string().nullable(),
+    departmentName: z.string().nullable(),
+    employmentType: z.string(),
+    vacancies: z.number(),
+    description: z.string(),
+    responsibilities: z.string(),
+    qualifications: z.string(),
+    requiredDocuments: z.string().nullable(),
+    openingDate: z.string(),
+    closingDate: z.string(),
+  }),
+  published: z.object({ openingId: z.string(), referenceNumber: z.string(), slug: z.string(), publishedAt: z.string() }).optional(),
+});
+export type JobOpeningAction = z.infer<typeof jobOpeningActionSchema>;
 
 export const messageSchema = z.object({
   id: z.string(),
@@ -29,6 +55,7 @@ export const messageSchema = z.object({
   links: z.array(z.unknown()).optional(),
   followUps: z.array(z.string()).optional(),
   notices: z.array(z.string()).optional(),
+  action: z.unknown().optional(),
   createdAt: z.string(),
 });
 
@@ -41,6 +68,8 @@ export interface AssistantMessage {
   links: Array<{ path: string; label: string }>;
   followUps: string[];
   notices: string[];
+  /** A job opening prepared for HR, when the answer has one. */
+  action?: JobOpeningAction;
   createdAt: string;
   /** Client-only: the request failed before the server answered. */
   failed?: boolean;
@@ -66,6 +95,10 @@ function toMessage(raw: unknown): AssistantMessage | null {
     }),
     followUps: (m.followUps ?? []).slice(0, 3),
     notices: m.notices ?? [],
+    action: (() => {
+      const r = jobOpeningActionSchema.safeParse(m.action);
+      return r.success ? r.data : undefined;
+    })(),
     createdAt: m.createdAt,
   };
 }
@@ -151,5 +184,22 @@ export const AssistantService = {
 
   async deleteConversation(id: string): Promise<void> {
     await api.delete(`/ai/assistant/conversations/${encodeURIComponent(id)}`);
+  },
+
+  /**
+   * HR's Publish click on a job opening card. Only the ids are sent: the server
+   * publishes the draft it stored on that message, never anything from here.
+   */
+  async publishJobOpening(conversationId: string, messageId: string): Promise<JobOpeningAction> {
+    const res = await api.post(
+      `/ai/assistant/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/publish-job-opening`,
+      {}
+    );
+    return jobOpeningActionSchema.parse(res.data?.data?.action);
+  },
+
+  /** One of your answers as a PDF or Excel file (the server builds it from the stored answer). */
+  exportMessagePath(conversationId: string, messageId: string, format: 'pdf' | 'excel'): string {
+    return `/ai/assistant/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/export?format=${format}`;
   },
 };

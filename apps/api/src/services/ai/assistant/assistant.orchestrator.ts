@@ -1,3 +1,4 @@
+import { PermissionTier } from '@prisma/client';
 import { businessDateKey, instantToBusinessDate } from '../../../lib/businessDate';
 import { AiActor, resolveAiActor } from '../actor/ai-actor';
 import { AiAuditService, ToolAuditEntry } from '../audit/ai-audit.service';
@@ -22,6 +23,7 @@ import { AiProvider, AiProviderError, ChatMessage, getAiProvider, hasTestProvide
 import { executeTool, toolSpecsForTier } from '../tools/registry';
 import { weekdayOf } from '../tools/tool-helpers';
 import type { ToolContext } from '../tools/tool-types';
+import { DraftStore, MessageAction } from '../actions/job-opening-draft';
 
 /**
  * The assistant's request pipeline.
@@ -57,6 +59,7 @@ interface Outcome {
   links?: SafeLink[];
   followUps?: string[];
   notices?: string[];
+  action?: MessageAction;
 }
 
 interface RunState {
@@ -110,7 +113,7 @@ function unavailableOutcome(question: string, actor: AiActor, reason: string): O
   };
 }
 
-function finalFromSubmit(raw: unknown, actor: AiActor, datasets: DatasetStore): Outcome {
+function finalFromSubmit(raw: unknown, actor: AiActor, datasets: DatasetStore, drafts?: DraftStore, toolAudit: ToolAuditEntry[] = []): Outcome {
   const parsed = submitAnswerSchema.safeParse(raw);
   let answer: SubmitAnswer;
   const notices: string[] = [];
@@ -145,14 +148,92 @@ function finalFromSubmit(raw: unknown, actor: AiActor, datasets: DatasetStore): 
     if (safe && !links.some((l) => l.path === safe.path)) links.push(safe);
   }
 
+  // A job opening HR asked for: only a draft the tool validated in THIS request.
+  let action: MessageAction | undefined;
+  if (answer.jobOpeningDraftId && actor.tier === PermissionTier.FULL) {
+    const draft = drafts?.get(answer.jobOpeningDraftId);
+    if (draft) action = { kind: 'JOB_OPENING', state: 'DRAFT', draft };
+    else notices.push('The job opening could not be attached — ask again to prepare it.');
+  }
+
+  // "Outside your access" only when a lookup really refused; otherwise the
+  // label would blame the user's access for something the assistant could not do.
+  let status = answer.status;
+  if (status === 'NOT_AUTHORIZED' && !toolAudit.some((t) => t.code === 'NOT_AUTHORIZED')) status = 'ANSWERED';
+
   return {
-    status: answer.status,
-    content: cleaned.text,
+    status,
+    content: action ? trimJobOpeningRepeat(cleaned.text, action.draft) : cleaned.text,
     charts: charts.length ? charts : undefined,
     links: links.length ? links : undefined,
     followUps: cleanFollowUps(answer.followUps),
     notices: notices.length ? notices : undefined,
+    action,
   };
+}
+
+const JOB_FIELDS = /^(?:title|job title|position|role|job role|unit|department|employment(?: type)?|type|vacanc(?:y|ies)|slots?|opening date|opens|closing date|closes|dates?|description|responsibilities|duties|qualifications|requirements|required documents|documents)\b/i;
+
+/**
+ * The job opening card already shows every field, so a field-by-field repeat in
+ * the answer text is removed (field lines, and the bullet lists under a field
+ * heading), as is any mention of the internal draft id. What is left is the
+ * model's own explanation; if nothing is left, a one-line summary.
+ */
+export function trimJobOpeningRepeat(text: string, draft: { title: string; vacancies: number; closingDate: string }): string {
+  const out: string[] = [];
+  // After a field heading ("### Responsibilities", "**Description:**"), the block
+  // under it is skipped up to the next blank line.
+  let skipping = false;
+  let skippedSomething = false;
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    const bare = line.replace(/^#{1,3}\s+/, '').replace(/^(?:[-*•]|\d+[.)])\s+/, '').replace(/\*\*/g, '').trim();
+    if (skipping) {
+      if (!line && skippedSomething) skipping = false;
+      else if (line) skippedSomething = true;
+      continue;
+    }
+    if (/draft\s*id/i.test(line)) continue;
+    if (/^(?:-{3,}|\*{3,}|_{3,})$/.test(line)) continue;
+    if (/details\s*[:.]?$/i.test(bare) && bare.length <= 60) continue;
+    if (JOB_FIELDS.test(bare) && bare.length <= 200) {
+      // A field with its value on the same line is dropped; a bare heading also drops the block under it.
+      if (!/:\s*\S/.test(bare) || /^#{1,3}\s/.test(line) || bare.length <= 40) {
+        skipping = true;
+        skippedSomething = false;
+      }
+      continue;
+    }
+    out.push(raw);
+  }
+  const trimmed = out
+    .join('\n')
+    // "Here are the details:" / "Please see the full breakdown below:" point at text that is gone.
+    .replace(/\s*(?:here are|below are|please see|see)\s+the\s+(?:full\s+)?(?:details|breakdown)[^.:\n]*[:.]/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/:\s*$/, '.')
+    .trim();
+  return trimmed.length >= 20
+    ? trimmed
+    : `I've prepared a job opening for **${draft.title}** (${draft.vacancies} ${draft.vacancies === 1 ? 'vacancy' : 'vacancies'}, closing ${draft.closingDate}). Review it on the card below, then press **Publish job opening** — or **Edit in the form first**.`;
+}
+
+/**
+ * When the model's answer runs past the output limit, its submit_answer JSON is
+ * cut off and cannot be parsed. Keep the answer text that did arrive (and say it
+ * was cut short) rather than failing the whole question.
+ */
+export function salvageCutOffAnswer(raw: string): unknown {
+  const m = /"answer"\s*:\s*"((?:[^"\\]|\\.)*)/s.exec(raw);
+  if (!m || !m[1].trim()) return {};
+  let text = m[1];
+  try {
+    text = JSON.parse(`"${text.replace(/\\$/, '')}"`);
+  } catch {
+    text = text.replace(/\\n/g, '\n').replace(/\\"/g, '"');
+  }
+  return { answer: `${text.trimEnd()}\n\n(This answer was cut short. Ask for fewer people or one unit at a time.)`, status: 'ANSWERED' };
 }
 
 async function runModel(
@@ -166,7 +247,8 @@ async function runModel(
   const config = getAiConfig();
   const today = businessToday(now);
   const datasets = new DatasetStore();
-  const ctx: ToolContext = { actor, datasets, now, today };
+  const drafts = new DraftStore();
+  const ctx: ToolContext = { actor, datasets, drafts, now, today };
   const system = buildSystemPolicy(actor, today, weekdayOf(today));
   const tools = [...toolSpecsForTier(actor.tier), submitAnswerSpec];
   const messages: ChatMessage[] = [...history, { role: 'user', content: question }];
@@ -189,7 +271,7 @@ async function runModel(
     if (!result.toolCalls.length) {
       // A model that ignores tool_choice and answers in text: accept it as an
       // answer, through the same cleaning as submit_answer.
-      if (result.text) return finalFromSubmit({ answer: result.text, status: 'ANSWERED' }, actor, datasets);
+      if (result.text) return finalFromSubmit({ answer: result.text, status: 'ANSWERED' }, actor, datasets, drafts, state.toolAudit);
       // Nothing at all — typically a reasoning model that spent its whole output
       // budget thinking. Stop instead of retrying: each retry costs a request
       // against the provider's daily limit.
@@ -224,9 +306,9 @@ async function runModel(
       try {
         args = JSON.parse(submit.arguments || '{}');
       } catch {
-        args = {};
+        args = salvageCutOffAnswer(submit.arguments || '');
       }
-      return finalFromSubmit(args, actor, datasets);
+      return finalFromSubmit(args, actor, datasets, drafts, state.toolAudit);
     }
 
     messages.push({ role: 'assistant', content: result.text, toolCalls: dataCalls });
@@ -301,6 +383,7 @@ export class AssistantOrchestrator {
       ...(outcome.links?.length ? { links: outcome.links } : {}),
       ...(outcome.followUps?.length ? { followUps: outcome.followUps } : {}),
       ...(outcome.notices ? { notices: outcome.notices } : {}),
+      ...(outcome.action ? { action: outcome.action } : {}),
       createdAt: new Date().toISOString(),
     };
 

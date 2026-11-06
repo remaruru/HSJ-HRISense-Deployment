@@ -526,7 +526,7 @@ export const RECRUITMENT_GUIDES: HelpGuideDefinition[] = [
         {
           stepNumber: 2,
           title: 'Fill in your details',
-          instruction: 'Enter your name, email address, mobile number (digits only, like 09171234567) and present address. **Sex** and **Religion** are optional — you may choose not to say. Tick **Privacy Consent** before submitting.',
+          instruction: 'Enter your name, email address, mobile number (digits only, like 09171234567) and present address. **Sex**, **Religion** and **Years of related work experience** are optional — you may choose not to say. Tick **Privacy Consent** before submitting.',
           warning: 'Use an email address you check regularly. It is the only way the hospital can contact you about your application.',
           expectedResult: 'The form is complete.',
           uiPath: 'Application form',

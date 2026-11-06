@@ -1,5 +1,6 @@
 import { formatPct, ratio } from '@/lib/percent';
 import { useState, useEffect, useMemo } from 'react';
+import { useSearch } from '@tanstack/react-router';
 import {
   BookOpen,
   Plus,
@@ -64,6 +65,11 @@ export default function TrainingPage() {
   const [createModalOpen, setCreateModalOpen] = useState<boolean>(false);
   const [editingActivity, setEditingActivity] = useState<TrainingActivity | null>(null);
   const [detailActivityId, setDetailActivityId] = useState<string | null>(null);
+  // A link (e.g. from AI Assistance) can open one activity: /training?activity=<id>.
+  const linkSearch = useSearch({ strict: false }) as { activity?: string };
+  useEffect(() => {
+    if (linkSearch.activity && /^[0-9a-f-]{36}$/i.test(linkSearch.activity)) setDetailActivityId(linkSearch.activity);
+  }, [linkSearch.activity]);
 
   /**
    * `overrides` exists only so "Clear Filters" can refetch with the cleared

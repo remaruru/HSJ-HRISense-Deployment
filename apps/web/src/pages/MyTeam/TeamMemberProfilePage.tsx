@@ -11,7 +11,7 @@ import { SectionNav, type SectionNavGroup } from '@/components/ui/section-nav';
 import { STATUS_TONE_CHIP } from '@/components/ui/status-tone';
 import { MetricBreakdownDialog, type MetricBreakdownSpec } from '@/components/shared/MetricBreakdown';
 import { profileCompletionSpec } from '@/components/shared/profileCompletionSpec';
-import { EMPLOYMENT_STATE_LABELS, employmentDuration, formatEmploymentDate, hasEnded, type EmploymentState } from '@/lib/employment';
+import { EMPLOYMENT_STATE_LABELS, employmentDuration, formatEmploymentDate, hasEnded, priorExperienceText, totalExperienceText, type EmploymentState } from '@/lib/employment';
 import { staggerContainer, staggerItem } from '@/lib/motion';
 import { api } from '@/services/api';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
@@ -252,6 +252,8 @@ export default function TeamMemberProfilePage() {
                 <InfoField label="Employee Status" value={stateLabel} />
                 <InfoField label="Start Date" value={formatEmploymentDate(member.hireDate)} />
                 <InfoField label="Length of Service" value={service?.text} />
+                <InfoField label="Experience Before Hospicio" value={priorExperienceText(member.priorExperienceYears)} />
+                <InfoField label="Total Experience" value={totalExperienceText(service, member.priorExperienceYears)} />
                 <InfoField label="Probation Date" value={formatDate(member.probationDate)} />
                 <InfoField label="Regularization Date" value={formatDate(member.regularizationDate)} />
                 <InfoField label="Professional Role" value={member.professionalRole || 'Not applicable'} />

@@ -44,6 +44,7 @@ import { TrainingService } from '../../training.service';
 import { QuickViewService } from '../quick-views/quick-view.service';
 import { QUICK_VIEWS } from '../quick-views/quick-views';
 import { buildChart, chartPayloadSchema } from '../charts/chart-schema';
+import { DraftStore } from '../actions/job-opening-draft';
 
 if (!/hrisense_migration_dev_db/.test(process.env.DATABASE_URL ?? '')) {
   throw new Error('Refusing to run: this test only runs against hrisense_migration_dev_db.');
@@ -102,7 +103,7 @@ const lastToolResult = (req: CompletionRequest, name: string) => {
 
 function ctx(actor: AiActor): ToolContext {
   const now = new Date();
-  return { actor, datasets: new DatasetStore(), now, today: businessDateKey(instantToBusinessDate(now)) };
+  return { actor, datasets: new DatasetStore(), drafts: new DraftStore(), now, today: businessDateKey(instantToBusinessDate(now)) };
 }
 const run = async (who: string, tool: string, args: unknown = {}) => {
   const r = await executeTool(ctx(actors[who]), tool, JSON.stringify(args));
@@ -378,9 +379,12 @@ describe('employee (STANDARD) access', () => {
     assert.ok(!psych.content.includes(SECRET_PSYCH));
   });
 
-  test('profile never exposes personal or government data', async () => {
+  test('profile never exposes contact or government data (birth date and age are allowed in scope)', async () => {
     const p = await run('R1', 'get_employee_profile');
-    for (const leaked of ['SECRET-ADDRESS-123', '34-1234567-8', '09170000000', '1990-01-01']) assert.ok(!p.content.includes(leaked), leaked);
+    for (const leaked of ['SECRET-ADDRESS-123', '34-1234567-8', '09170000000']) assert.ok(!p.content.includes(leaked), leaked);
+    // Nov 2026 revision: birth date and age follow the profile's own scope (here: the person asking).
+    assert.equal(p.json.data.birthDate, '1990-01-01');
+    assert.equal(typeof p.json.data.age, 'number');
   });
 });
 
@@ -823,7 +827,7 @@ describe('attendance analytics — deterministic figures', () => {
     assert.deepEqual(d.periodsWithNoImportedData, ['2026-07']);
     assert.equal(d.attendanceDataAvailable.first, '2026-08-03');
     // The chart is built by the server from the same rows: July is a gap (null), never 0.
-    const ctxd = { actor: actors.R1, datasets: new DatasetStore(), now: new Date(), today: '2026-10-01' };
+    const ctxd = { actor: actors.R1, datasets: new DatasetStore(), drafts: new DraftStore(), now: new Date(), today: '2026-10-01' };
     const again = await executeTool(ctxd, 'get_attendance_summary', JSON.stringify({ from: '2026-07-01', to: '2026-09-30' }));
     const ids2 = JSON.parse(again.content).data.charts.map((c: any) => c.datasetId);
     const line = buildChart(ctxd.datasets, { datasetId: ids2[0], type: 'line' });
@@ -1050,5 +1054,206 @@ describe('AI summary sources (HR workforce summary)', () => {
     for (const item of [...analysis.observations, ...analysis.areasForReview]) {
       for (const src of item.sources) if (src.chart) assert.ok(chartPayloadSchema.safeParse(src.chart).success);
     }
+  });
+});
+
+// ── November 2026 revision: people, job openings, applicants, exports ─────────
+
+describe('revision: people lookups, job openings, applicants and exports', () => {
+  const made = { openings: [] as string[], applicants: [] as string[] };
+  let hasSister = false;
+  let hrConversation = '';
+  let hrMessage = '';
+
+  const token = (key: string) =>
+    signAccessToken({ userId: users[key], email: `${key}@example.test`, roleCode: 'X', permissionTier: actors[key].tier, employeeId: ids[key] });
+  const request = async (method: string, path: string, key: string, body?: unknown) => {
+    const res = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: { authorization: `Bearer ${token(key)}`, 'content-type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const type = res.headers.get('content-type') ?? '';
+    return { status: res.status, type, raw: Buffer.from(await res.arrayBuffer()) };
+  };
+  const json = (r: { raw: Buffer }) => JSON.parse(r.raw.toString() || 'null');
+  const roleOf = async (key: string) => (await prisma.employee.findUnique({ where: { id: ids[key] }, select: { jobRoleId: true, unitId: true } }))!;
+  const draftArgs = async () => ({
+    jobRoleId: (await roleOf('R1')).jobRoleId,
+    vacancies: 2,
+    description: 'Gives first aid and nursing care to the children of Hospicio.',
+    responsibilities: '- Give first aid\n- Keep health records',
+    qualifications: '- Registered Nurse\n- At least 10 years of related experience',
+  });
+
+  before(async () => {
+    // R1: a long-serving team member with experience before Hospicio.
+    await prisma.employee.update({ where: { id: ids.R1 }, data: { hireDate: new Date('2010-03-01'), priorExperienceYears: 4, dateOfBirth: new Date('1980-02-02') } });
+    // A Sister (final HR authority in recruitment) when the database has the role.
+    const sister = await prisma.jobRole.findFirst({ where: { code: 'SISTER' } });
+    if (sister) {
+      const { unitId } = await roleOf('HR');
+      const e = await prisma.employee.create({
+        data: {
+          employeeNumber: `${TAG}-SIS`, firstName: 'Soledad', lastName: `${TAG}SIS`, gender: 'PREFER_NOT_TO_SAY',
+          dateOfBirth: new Date('1970-05-05'), civilStatus: 'SINGLE', mobilePhone: '09170000000', presentAddress: 'x',
+          emergencyContactName: 'QA', emergencyContactRel: 'QA', emergencyContactPhone: '09170000000',
+          hireDate: new Date('2001-01-01'), unitId, jobRoleId: sister.id,
+        },
+      });
+      const u = await prisma.user.create({ data: { email: `${TAG.toLowerCase()}-sis@example.test`, passwordHash: 'x', isActive: true, employeeId: e.id } });
+      ids.SIS = e.id;
+      users.SIS = u.id;
+      actors.SIS = await resolveAiActor(u.id);
+      hasSister = true;
+    }
+  });
+
+  after(async () => {
+    await prisma.applicantInterview.deleteMany({ where: { application: { jobOpeningId: { in: made.openings } } } });
+    await prisma.applicationStatusHistory.deleteMany({ where: { application: { jobOpeningId: { in: made.openings } } } }).catch(() => undefined);
+    await prisma.jobApplication.deleteMany({ where: { jobOpeningId: { in: made.openings } } });
+    await prisma.applicant.deleteMany({ where: { id: { in: made.applicants } } });
+    await prisma.jobOpening.deleteMany({ where: { id: { in: made.openings } } });
+  });
+
+  test("find_employees stays inside each tier's access; birth dates follow it", async () => {
+    const r1 = await run('R1', 'find_employees', {});
+    assert.deepEqual(r1.json.data.matches.map((m: any) => m.id), [ids.R1], 'an employee finds only themselves');
+    assert.equal(r1.json.data.matches[0].birthDate, '1980-02-02');
+
+    const sup = await run('SUP', 'find_employees', {});
+    const supIds = sup.json.data.matches.map((m: any) => m.id);
+    assert.ok(supIds.includes(ids.R1) && supIds.includes(ids.R2) && !supIds.includes(ids.C) && !supIds.includes(ids.O));
+    assert.equal(sup.json.data.matches.find((m: any) => m.id === ids.R1).birthDate, '1980-02-02', 'a supervisor sees their team member');
+
+    const hr = await run('HR', 'find_employees', { roleText: TAG, limit: 50 });
+    const hrIds = hr.json.data.matches.map((m: any) => m.id);
+    assert.ok(hrIds.includes(ids.C) && hrIds.includes(ids.O), 'HR sees everyone');
+    assert.ok(!JSON.stringify(hr.json).includes('SECRET-ADDRESS-123'), 'never addresses');
+  });
+
+  test('experience = before Hospicio + service; nobody qualifies → the closest are offered', async () => {
+    const ten = await run('HR', 'find_employees', { roleText: TAG, minTotalExperienceYears: 15 });
+    assert.deepEqual(ten.json.data.matches.map((m: any) => m.id), [ids.R1]);
+    const m = ten.json.data.matches[0];
+    assert.equal(m.priorExperienceYears, 4);
+    assert.ok(m.totalExperienceYears >= m.serviceYears + 3.9);
+    assert.ok(ten.json.data.summary.averageTotalExperienceYears, 'averages come from the server');
+
+    const none = await run('HR', 'find_employees', { roleText: TAG, minServiceYears: 50 });
+    assert.equal(none.json.data.matchedCount, 0);
+    assert.equal(none.json.data.closest[0].id, ids.R1, 'closest by the same measure');
+  });
+
+  test('get_org_catalog: titles and work groups for everyone, headcounts for HR only', async () => {
+    const emp = await run('R1', 'get_org_catalog');
+    assert.ok(emp.json.data.workGroups.some((g: any) => g.workGroup === 'caretakers'));
+    assert.ok(emp.json.data.units.every((u: any) => u.roles.every((r: any) => r.activeEmployees === undefined)));
+    const hr = await run('HR', 'get_org_catalog');
+    const roles = hr.json.data.units.flatMap((u: any) => u.roles).filter((r: any) => String(r.title).startsWith(TAG));
+    assert.ok(roles.length && roles.every((r: any) => typeof r.activeEmployees === 'number'));
+  });
+
+  test('prepare_job_opening: HR only, validated, and nothing is saved', async () => {
+    assert.equal((await run('R1', 'prepare_job_opening', await draftArgs())).json.error, 'NOT_AUTHORIZED');
+    assert.equal((await run('SUP', 'prepare_job_opening', await draftArgs())).json.error, 'NOT_AUTHORIZED');
+    const before = await prisma.jobOpening.count();
+    const ok = await run('HR', 'prepare_job_opening', await draftArgs());
+    assert.equal(ok.json.ok, true);
+    assert.equal(ok.json.data.draftId, 'job1');
+    assert.equal(ok.json.data.breakdown.vacancies, 2);
+    assert.equal(await prisma.jobOpening.count(), before, 'a tool never writes');
+    const bad = await run('HR', 'prepare_job_opening', { ...(await draftArgs()), openingDate: '2099-01-10', closingDate: '2099-01-01' });
+    assert.equal(bad.json.error, 'INVALID_ARGS');
+  });
+
+  test('compare_applicants: HR only; reported experience yes, interview notes never', async () => {
+    assert.equal((await run('SUP', 'compare_applicants')).json.error, 'NOT_AUTHORIZED');
+    const { jobRoleId, unitId } = await roleOf('R1');
+    const opening = await prisma.jobOpening.create({
+      data: {
+        referenceNumber: `JO-${TAG}`.slice(0, 30), slug: `${TAG.toLowerCase()}-opening`, title: `${TAG} Nurse`, unitId, jobRoleId,
+        employmentType: 'REGULAR', vacancies: 1, description: 'd', responsibilities: 'r', qualifications: 'At least 3 years of experience',
+        openingDate: new Date('2026-01-01'), closingDate: new Date('2099-01-01'), status: 'OPEN', createdById: users.HR, updatedById: users.HR,
+      },
+    });
+    made.openings.push(opening.id);
+    const applicant = await prisma.applicant.create({ data: { firstName: 'Ana', lastName: `${TAG}App`, email: `${TAG.toLowerCase()}-app@example.test`, mobile: '09170000001' } });
+    made.applicants.push(applicant.id);
+    const application = await prisma.jobApplication.create({
+      data: { referenceNumber: `APP-${TAG}`.slice(0, 30), applicantId: applicant.id, jobOpeningId: opening.id, privacyConsent: true, consentTimestamp: new Date(), priorExperienceYears: 3 },
+    });
+    await prisma.applicantInterview.create({
+      data: { applicationId: application.id, scheduledAt: new Date('2026-11-10T02:00:00Z'), interviewType: 'INITIAL', notes: 'SECRET-INTERVIEW-NOTE', recommendation: 'SECRET-RECOMMENDATION', createdById: users.HR, updatedById: users.HR },
+    });
+
+    const listed = await run('HR', 'compare_applicants');
+    assert.ok(listed.json.data.openings.some((o: any) => o.openingId === opening.id));
+    const cmp = await run('HR', 'compare_applicants', { openingId: opening.id });
+    const row = cmp.json.data.applicants[0];
+    assert.equal(row.reportedExperienceYears, 3);
+    assert.equal(row.link, `/recruitment/applicants/${application.id}`);
+    assert.ok(!/SECRET-INTERVIEW-NOTE|SECRET-RECOMMENDATION/.test(JSON.stringify(cmp.json)), 'interview notes and recommendations never reach the model');
+  });
+
+  test('a prepared job opening is attached to the answer for HR only', async () => {
+    const args = await draftArgs();
+    setAiProviderForTests(new ScriptedProvider([() => call('prepare_job_opening', args), submit({ answer: 'Here is the opening for you to review.', status: 'ANSWERED', jobOpeningDraftId: 'job1' })]));
+    const reply = await AssistantOrchestrator.handle({ userId: users.HR, message: 'Prepare a job opening for 2 nurses' });
+    assert.equal(reply.message.action?.state, 'DRAFT');
+    assert.equal(reply.message.action?.draft.vacancies, 2);
+    hrConversation = reply.conversationId;
+    hrMessage = reply.message.id;
+    const stored = await ConversationService.getOwned(actors.HR, hrConversation);
+    assert.equal(stored.messages.find((m) => m.id === hrMessage)?.action?.state, 'DRAFT');
+
+    // A model that names a draft for an employee gets nothing attached.
+    setAiProviderForTests(new ScriptedProvider([submit({ answer: 'x', status: 'ANSWERED', jobOpeningDraftId: 'job1' })]));
+    const emp = await AssistantOrchestrator.handle({ userId: users.R1, message: 'Make a job opening' });
+    assert.equal(emp.message.action, undefined);
+  });
+
+  test('"Outside your access" only when a lookup really refused', async () => {
+    setAiProviderForTests(new ScriptedProvider([submit({ answer: 'I could not find that.', status: 'NOT_AUTHORIZED' })]));
+    const reply = await AssistantOrchestrator.handle({ userId: users.R1, message: 'Who is the oldest employee?' });
+    assert.equal(reply.message.status, 'ANSWERED');
+  });
+
+  test('export: your own answer as PDF and Excel; nobody else can', async () => {
+    assert.ok(hrConversation, 'needs the previous test');
+    const base = `/ai/assistant/conversations/${hrConversation}/messages/${hrMessage}/export`;
+    const pdf = await request('GET', `${base}?format=pdf`, 'HR');
+    assert.equal(pdf.status, 200);
+    assert.match(pdf.type, /application\/pdf/);
+    assert.equal(pdf.raw.subarray(0, 5).toString(), '%PDF-');
+    const xlsx = await request('GET', `${base}?format=excel`, 'HR');
+    assert.equal(xlsx.status, 200);
+    assert.equal(xlsx.raw.subarray(0, 2).toString(), 'PK');
+    assert.equal((await request('GET', `${base}?format=pdf`, 'R1')).status, 404, "another user's conversation does not exist for them");
+    assert.equal((await request('GET', `${base}?format=docx`, 'HR')).status, 400);
+  });
+
+  test('publish: only a recruitment manager can, from the stored draft, once', async (t) => {
+    const path = (c: string, m: string) => `/ai/assistant/conversations/${c}/messages/${m}/publish-job-opening`;
+    assert.equal((await request('POST', path(hrConversation, hrMessage), 'R1', { title: 'evil' })).status, 403);
+    if (!hasSister) return t.skip('no SISTER role in this database');
+
+    const args = await draftArgs();
+    setAiProviderForTests(new ScriptedProvider([() => call('prepare_job_opening', args), submit({ answer: 'Ready.', status: 'ANSWERED', jobOpeningDraftId: 'job1' })]));
+    const reply = await AssistantOrchestrator.handle({ userId: users.SIS, message: 'Prepare a job opening for 2 nurses' });
+    const first = await request('POST', path(reply.conversationId, reply.message.id), 'SIS', { title: 'Injected title', vacancies: 99 });
+    assert.equal(first.status, 200);
+    const action = json(first).data.action;
+    assert.equal(action.state, 'PUBLISHED');
+    made.openings.push(action.published.openingId);
+    const opening = await prisma.jobOpening.findUnique({ where: { id: action.published.openingId } });
+    assert.equal(opening?.status, 'OPEN');
+    assert.equal(opening?.vacancies, 2, 'the stored draft, not the request body');
+    assert.notEqual(opening?.title, 'Injected title');
+
+    const again = await request('POST', path(reply.conversationId, reply.message.id), 'SIS', {});
+    assert.equal(json(again).data.alreadyDone, true, 'a second click does not create a second opening');
+    assert.equal(await prisma.jobOpening.count({ where: { id: { in: made.openings } } }), made.openings.length);
   });
 });

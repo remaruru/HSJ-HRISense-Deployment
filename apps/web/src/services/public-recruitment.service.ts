@@ -37,6 +37,8 @@ export interface SubmitApplicationPayload {
   gender?: string;
   source?: string;
   message?: string;
+  /** Years of related work experience (optional; blank = not given). */
+  priorExperienceYears?: string;
   privacyConsent: boolean;
 }
 

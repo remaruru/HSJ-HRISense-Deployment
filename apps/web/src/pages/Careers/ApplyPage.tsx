@@ -33,7 +33,7 @@ const isPlausiblePhoneNumber = (value: string) => {
 };
 
 /** Fields that can carry their own message, in the order they appear on the form. */
-const FIELD_ORDER = ["firstName", "lastName", "email", "mobileNumber", "gender", "religion", "presentAddress", "resume", "coverLetter", "source", "message", "privacyConsent", "captcha"] as const;
+const FIELD_ORDER = ["firstName", "lastName", "email", "mobileNumber", "gender", "religion", "presentAddress", "priorExperienceYears", "resume", "coverLetter", "source", "message", "privacyConsent", "captcha"] as const;
 type FieldErrors = Partial<Record<string, string>>;
 
 /** A failure the applicant needs to read: what happened, and what to do next. */
@@ -67,6 +67,7 @@ export default function ApplyPage() {
     presentAddress: "",
     gender: "",
     religion: "",
+    priorExperienceYears: "",
     source: "",
     message: "",
     privacyConsent: false
@@ -429,6 +430,26 @@ export default function ApplyPage() {
             <div className="sm:col-span-2 space-y-1.5">
               <label htmlFor="presentAddress" className="text-sm font-medium text-foreground">Present Address</label>
               <Input id="presentAddress" name="presentAddress" value={formData.presentAddress} onChange={handleChange} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="priorExperienceYears" className="text-sm font-medium text-foreground">
+                Years of related work experience <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <Input
+                id="priorExperienceYears"
+                name="priorExperienceYears"
+                type="number"
+                min={0}
+                max={60}
+                step={0.5}
+                inputMode="decimal"
+                placeholder="e.g. 3 or 2.5"
+                value={formData.priorExperienceYears ?? ""}
+                onChange={handleChange}
+                {...fieldA11y("priorExperienceYears")}
+              />
+              <p className="text-xs text-muted-foreground">Work similar to this position, counted in years. Leave it blank if you have none yet.</p>
+              {fieldErrorText("priorExperienceYears")}
             </div>
           </div>
         </section>

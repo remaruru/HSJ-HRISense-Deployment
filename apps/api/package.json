@@ -27,7 +27,8 @@
     "db:seed:demo:export": "node prisma/demo/export-demo-data.js",
     "db:seed:demo:accounts": "node src/scripts/seed_dev_accounts.js",
     "fix-hierarchy": "tsx src/scripts/fix_org_hierarchy.ts",
-    "cleanup-local-dummies": "tsx src/scripts/cleanup_local_dummy_accounts.ts"
+    "cleanup-local-dummies": "tsx src/scripts/cleanup_local_dummy_accounts.ts",
+    "ai:question-bank": "tsx src/scripts/ai-question-bank.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

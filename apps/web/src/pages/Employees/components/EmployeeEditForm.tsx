@@ -67,6 +67,7 @@ type FormState = {
   separationReason: string;
   prcLicenseNumber: string;
   professionalRole: string;
+  priorExperienceYears: string;
   unitId: string;
   departmentId: string;
   jobRoleId: string;
@@ -115,6 +116,7 @@ const FIELD_LABELS: Record<keyof FormState, string> = {
   separationReason: "Reason",
   prcLicenseNumber: "PRC License #",
   professionalRole: "Professional role",
+  priorExperienceYears: "Experience before Hospicio",
   unitId: "Unit",
   departmentId: "Department",
   jobRoleId: "Job role",
@@ -189,6 +191,8 @@ function initialState(employee: any): FormState {
     separationReason: employee.separationReason || "",
     prcLicenseNumber: employee.prcLicenseNumber || "",
     professionalRole: employee.professionalRole || "",
+    priorExperienceYears:
+      employee.priorExperienceYears === null || employee.priorExperienceYears === undefined ? "" : String(employee.priorExperienceYears),
     unitId: employee.unitId || "",
     departmentId: employee.departmentId || "",
     jobRoleId: employee.jobRoleId || "",
@@ -375,6 +379,10 @@ export function EmployeeEditForm({
     }
     if (formData.personalEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.personalEmail.trim())) {
       next.personalEmail = "Enter a valid email address.";
+    }
+    const prior = formData.priorExperienceYears.trim();
+    if (prior && (!/^\d+(\.\d+)?$/.test(prior) || Number(prior) > 60)) {
+      next.priorExperienceYears = "Enter the years as a number from 0 to 60, like 3 or 4.5.";
     }
     const problems = contactProblems(contacts);
     setContactError(problems.length ? `${problems.join("; ")}.` : null);
@@ -773,6 +781,9 @@ export function EmployeeEditForm({
               </Field>
               <Field label="Start date" htmlFor="edit-hireDate" required error={errors.hireDate}>
                 <TextInput {...text("hireDate")} type="date" />
+              </Field>
+              <Field label="Experience before Hospicio (years)" htmlFor="edit-priorExperienceYears" error={errors.priorExperienceYears}>
+                <TextInput {...text("priorExperienceYears")} inputMode="decimal" placeholder="Optional, e.g. 4.5" />
               </Field>
               <Field label="Probation ends" htmlFor="edit-probationDate" error={errors.probationDate}>
                 <TextInput {...text("probationDate")} type="date" min={formData.hireDate || undefined} />

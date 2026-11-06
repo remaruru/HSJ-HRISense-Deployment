@@ -101,6 +101,15 @@ export const submitApplicationSchema = z.object({
   ),
   source: z.string().optional(),
   message: z.string().optional(),
+  // Years of related work experience — OPTIONAL. Blank means "not given".
+  priorExperienceYears: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? undefined : typeof v === 'string' ? Number(v.trim()) : v),
+    z
+      .number({ invalid_type_error: 'Enter your years of experience as a number, like 3 or 2.5.' })
+      .min(0, 'Years of experience cannot be negative.')
+      .max(60, 'Years of experience must be 60 or fewer.')
+      .optional()
+  ),
   privacyConsent: z.preprocess((val) => val === 'true' || val === true, z.boolean().refine((val) => val === true, {
     message: 'Privacy consent is required',
   })),

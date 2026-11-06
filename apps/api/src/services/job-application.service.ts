@@ -22,6 +22,8 @@ export interface SubmitApplicationDTO {
   gender?: string;
   source?: string;
   message?: string;
+  /** Years of related work experience the applicant reported (optional). */
+  priorExperienceYears?: number;
   privacyConsent: boolean;
   resume: Express.Multer.File;
   coverLetter?: Express.Multer.File;
@@ -133,6 +135,7 @@ export class JobApplicationService {
             referenceNumber,
             source: data.source,
             applicantMessage: data.message,
+            priorExperienceYears: typeof data.priorExperienceYears === 'number' ? Math.round(data.priorExperienceYears * 10) / 10 : null,
             privacyConsent: data.privacyConsent,
             consentTimestamp: new Date(),
             status: JobApplicationStatus.SUBMITTED,

@@ -13,9 +13,11 @@
 The HSJ HRISense assistant answers questions from **HR, supervisors and
 employees** about HRISense and about the records **each of them is allowed to
 see**. The AI model never touches the database. It can only ask the server to run
-one of **39 narrow, read-only lookup tools**; the server decides who is asking,
+one of **43 narrow, read-only lookup tools**; the server decides who is asking,
 checks every lookup against that person's access, computes every figure itself,
-and validates everything the model returns before the browser shows it.
+and validates everything the model returns before the browser shows it. The one
+thing it prepares for HR is a **job opening draft**, which becomes a real opening
+only through HR's own **Publish** click (§4.1).
 
 ## 2. The flow, from question to answer
 
@@ -157,6 +159,41 @@ be UUIDs; date ranges are bounded; unit names are resolved server-side.
 | `get_attendance_imports` | HR | — |
 | `get_audit_activity` | HR | days |
 | `get_workforce_fact_sheet` | HR | periodDays |
+| `get_org_catalog` | All (headcounts HR only) | — (units, roles and the fixed **work groups**) |
+| `find_employees` | All (scoped; birth date and age within scope) | workGroup, roleIds, roleText, unitIds, unitText, profession, employmentStatus, min/max service years, min prior/total experience, min/max age, hiredFrom/To, sortBy, order, limit, include latestEvaluation (HR) / trainingsCompleted / complianceAttention (HR) |
+| `prepare_job_opening` | HR | jobRoleId or jobRoleTitle, unitId (org-wide roles), title, employmentType, vacancies, description, responsibilities, qualifications, requiredDocuments, openingDate, closingDate |
+| `compare_applicants` | HR | openingId or openingText, status |
+
+### 4.1 People, experience, job openings (Nov 2026 revision)
+
+* **Hospicio's words → roles.** `WORK_GROUPS` (`tools/people.tools.ts`) maps kinds
+  of work to role **codes** (caretakers → the residential homes and Dormitory
+  Staff; nursing → Clinic Staff; teachers, kitchen, cleaning, …).
+  `find_employees` takes `workGroup`, so "caretaker" always means the same people;
+  `get_org_catalog` shows the groups and every role so the model can map other
+  words. The policy carries a short glossary and the rule: say which roles were
+  used; when nothing matches, one sentence then the `closest` people (same
+  role/unit filters, other limits dropped; for a supervisor whose team has nobody
+  in that role, their own team) and a next step.
+* **Experience** = `priorExperienceYears` (before Hospicio, optional, HR-entered;
+  null = not recorded) + length of service from `hireDate` (calendar years and
+  months, `lib/service-period`). Every person comes with all three figures; the
+  `summary` (averages, by unit) is computed server-side. Birth date and age follow
+  the person tools' scope: HR anyone, supervisor self + direct reports, employee
+  self.
+* **Job openings.** `prepare_job_opening` validates the role, unit, dates and
+  vacancies and stores the draft in the request's `DraftStore` (`job1`); nothing
+  is written. `submit_answer.jobOpeningDraftId` attaches the VALIDATED draft to
+  the stored message (`action`, `actions/job-opening-draft.ts`), for HR only. The
+  browser shows the card; `POST …/messages/:messageId/publish-job-opening`
+  creates the opening from the stored draft (the request body is ignored) through
+  `JobOpeningService`, under `RecruitmentPolicy`: `canManageJobOpenings` to create,
+  `canPublishJobOpening` (HR Officer or Sister) to publish — otherwise it is saved
+  as a draft (`SAVED`). One publish per message (in-flight lock + state check).
+* **Applicants.** `compare_applicants` returns reported experience (applicant's
+  own figure), document types, stage and interview counts/dates, plus the
+  opening's qualifications and links. Résumé contents, interview notes and
+  recommendations are never selected.
 
 **Reuse, not re-implementation:** compliance statuses come from
 `ComplianceService.getEmployeeComplianceSummary` (the same derivation as the
@@ -258,15 +295,21 @@ request, **charts inherit the tools' authorization**.
 
 ## 10. Links
 
-The model may suggest up to 5 links; `links/app-links.ts` keeps only internal
+The model may suggest up to 8 links; `links/app-links.ts` keeps only internal
 paths that exist in HRISense **and** that the asker's tier can open (the
 navigation map), Help Center guides visible to their role, and profile links on
 the screen the asker would use: their own record → **My Profile** (`/profile`);
 a supervisor's direct report → **My Team** (`/my-team/:id`); anyone, for HR →
 Employee Management (`/employees/:id`). A suggested `/employees/:id` or
-`/my-team/:id` is rewritten to that screen. External URLs, `javascript:`, query
-strings, traversal and anyone else's profile are dropped. The browser navigates
-with the router.
+`/my-team/:id` is rewritten to that screen. External URLs, `javascript:`,
+fragments, traversal and anyone else's profile are dropped. **Exact-record links**
+may carry only the query parameters `QUERY_RULES` lists for that page and tier,
+with checked values (UUIDs, dates, known tab names): `/employees/:id?tab=…` and
+`/employees?jobRoleId=…&unitId=…&hireDateFrom/To=…` (HR), `/compliance?employee=…`
+or `?requirement=…` (HR), `/training?activity=…` (all), `/profile?section=…`
+(all), plus `/recruitment/openings/:id` and `/recruitment/applicants/:id` (HR).
+Any other parameter is removed. The pages open the named record or section. The
+browser navigates with the router.
 
 ## 11. Conversations and follow-ups
 
@@ -360,7 +403,17 @@ If the provider account has no credit left, the assistant says exactly that
   knowledge search, knowledge bundle in sync, strict tool schemas, tier tool
   lists, UUID-only ids, policy content and exact refusal wording, configuration
   and key checks, Anthropic message mapping, the compliance scope fix.
-* **`ai-assistant.integration.test.ts` (59, `hrisense_migration_dev_db`):** exact attendance figures for a fixture with every status, leave, a holiday, days off and a record-less workday; monthly trends with a no-data month; August vs September; the range schedule resolver equals the per-day one; chart labels limited to the asker's scope (team, another supervisor's team, organisation, another employee); bar/line/area/pie through the whole pipeline; every Quick analytics view per tier with no provider; quick views outside the tier refused and not widenable over HTTP; follow-up context carries the chart the user saw; and:
+* **`ai-revision.test.ts` (20, no database):** exact-record links per page and
+  tier, experience and age figures, the HR experience input, work groups, a
+  cut-off answer salvaged, Hospicio work words in scope, PDF and Excel exports,
+  job opening drafts, tier tool lists and policy text.
+* **`ai-assistant.integration.test.ts` (71, `hrisense_migration_dev_db`):** the
+  revision block — `find_employees` per tier and birth-date scope, experience and
+  `closest`, the catalog's HR-only headcounts, `prepare_job_opening` HR-only and
+  write-free, `compare_applicants` without interview notes, the draft attached for
+  HR only, *Outside your access* only after a real refusal, exports (own only,
+  PDF/XLSX signatures), and publishing (403 for others; a Sister publishes from
+  the stored draft, ignoring the body; a second click does nothing) — and: exact attendance figures for a fixture with every status, leave, a holiday, days off and a record-less workday; monthly trends with a no-data month; August vs September; the range schedule resolver equals the per-day one; chart labels limited to the asker's scope (team, another supervisor's team, organisation, another employee); bar/line/area/pie through the whole pipeline; every Quick analytics view per tier with no provider; quick views outside the tier refused and not widenable over HTTP; follow-up context carries the chart the user saw; and:
   builds an organisation (HR, a supervisor, two direct reports, a same-unit
   colleague who is *not* a report, an outsider) and proves: employees read only
   themselves (every person tool against every other person); fake ids are
@@ -379,6 +432,12 @@ If the provider account has no credit left, the assistant says exactly that
   data access is written to the Audit Log; a runaway model is stopped; over HTTP,
   token claims are ignored, extra body fields are rejected, other users'
   conversations are 404, onboarding drafts are HR-only.
+
+**Question bank** (`evaluation/question-bank.ts`, `npm run ai:question-bank`):
+about 140 real-world questions (English, Filipino, Taglish, typos) asked through
+the real model as an HR officer, a supervisor and an employee, each checked for
+the lookups used, required and forbidden wording, status and the job opening
+card. Needs a key and the demo data; not part of `npm test`.
 
 ## 16. Adding a capability
 

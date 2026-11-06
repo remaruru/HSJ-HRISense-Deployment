@@ -5,16 +5,24 @@ import {
   ArrowUpRight,
   BarChart3,
   Ban,
+  Briefcase,
+  CheckCircle2,
   CircleSlash,
+  FileSpreadsheet,
+  FileText,
   Info,
   Loader2,
   Lock,
+  Pencil,
   Plus,
   SearchX,
   Send,
   ShieldCheck,
   WifiOff,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { downloadProtectedFile } from '@/lib/downloadProtectedFile';
+import { AI_JOB_DRAFT_KEY } from '@/lib/aiJobDraft';
 import { cn } from '@/lib/utils';
 import { getApiErrorMessage } from '@/utils/error-handler.util';
 import {
@@ -22,6 +30,7 @@ import {
   type AssistantContext,
   type AssistantMessage,
   type AssistantStatus,
+  type JobOpeningAction,
   type QuickViewOption,
 } from '@/services/ai-assistant.service';
 import { AssistantText } from './AssistantText';
@@ -242,7 +251,21 @@ export function AssistantChat({ variant, conversationId: externalId, onConversat
                 </div>
               </div>
             ) : (
-              <AssistantBubble key={m.id} message={m} compact={compact} onFollowUp={send} onNavigate={(path) => navigate({ to: path as any })} disabled={sending} />
+              <AssistantBubble
+                key={m.id}
+                message={m}
+                compact={compact}
+                conversationId={conversationId}
+                canPrepareJobs={context?.accessLevel === 'FULL'}
+                onFollowUp={send}
+                onNavigate={(path) => {
+                  // A link may carry a query the server allowed (?tab=…, ?activity=…).
+                  const [pathname, query] = path.split('?');
+                  navigate({ to: pathname as any, search: query ? (Object.fromEntries(new URLSearchParams(query)) as any) : undefined });
+                }}
+                onActionChange={(action) => setMessages((all) => all.map((x) => (x.id === m.id ? { ...x, action } : x)))}
+                disabled={sending}
+              />
             )
           )
         )}
@@ -406,17 +429,41 @@ function Welcome({
 function AssistantBubble({
   message,
   compact,
+  conversationId,
+  canPrepareJobs,
   onFollowUp,
   onNavigate,
+  onActionChange,
   disabled,
 }: {
   message: AssistantMessage;
   compact: boolean;
+  conversationId: string | null;
+  canPrepareJobs: boolean;
   onFollowUp: (q: string) => void;
   onNavigate: (path: string) => void;
+  onActionChange: (action: JobOpeningAction) => void;
   disabled: boolean;
 }) {
   const meta = message.status ? STATUS_META[message.status] : undefined;
+  const [exporting, setExporting] = useState<'pdf' | 'excel' | null>(null);
+  // Every real answer can be exported — not client-only error bubbles.
+  const exportable = Boolean(conversationId) && !message.id.startsWith('error-') && (!message.status || message.status === 'ANSWERED' || message.status === 'NO_DATA');
+  const exportAs = async (format: 'pdf' | 'excel') => {
+    if (!conversationId || exporting) return;
+    setExporting(format);
+    try {
+      const stamp = new Date().toISOString().slice(0, 10);
+      await downloadProtectedFile(
+        AssistantService.exportMessagePath(conversationId, message.id, format),
+        `HRISense_AI_answer_${stamp}.${format === 'pdf' ? 'pdf' : 'xlsx'}`
+      );
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'The answer could not be exported. Please try again.'));
+    } finally {
+      setExporting(null);
+    }
+  };
   return (
     <div className="flex justify-start">
       <div className={cn('w-full rounded-2xl rounded-bl-md border border-border-soft bg-surface px-3.5 py-3 space-y-3', compact ? 'max-w-[94%]' : 'max-w-[88%]')}>
@@ -429,6 +476,20 @@ function AssistantBubble({
         {message.charts.map((c, i) => (
           <AssistantChart key={i} chart={c} compact={compact} />
         ))}
+        {message.action && (
+          <JobOpeningCard
+            action={message.action}
+            compact={compact}
+            canPublish={canPrepareJobs && Boolean(conversationId)}
+            onPublish={async () => {
+              if (!conversationId) return;
+              const action = await AssistantService.publishJobOpening(conversationId, message.id);
+              onActionChange(action);
+              toast.success(action.state === 'PUBLISHED' ? `Published as ${action.published?.referenceNumber}.` : 'Saved as a draft in Job Openings.');
+            }}
+            onNavigate={onNavigate}
+          />
+        )}
         {message.notices.length > 0 && (
           <ul className="space-y-0.5">
             {message.notices.map((n, i) => (
@@ -452,6 +513,27 @@ function AssistantBubble({
             ))}
           </div>
         )}
+        {exportable && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground">Export:</span>
+            <button
+              type="button"
+              onClick={() => exportAs('pdf')}
+              disabled={Boolean(exporting)}
+              className="inline-flex items-center gap-1 rounded-md border border-border-soft px-2 py-0.5 text-[11px] font-semibold text-muted-foreground hover:border-status-accent-border hover:text-status-accent-foreground disabled:opacity-50"
+            >
+              {exporting === 'pdf' ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" aria-hidden="true" />} PDF
+            </button>
+            <button
+              type="button"
+              onClick={() => exportAs('excel')}
+              disabled={Boolean(exporting)}
+              className="inline-flex items-center gap-1 rounded-md border border-border-soft px-2 py-0.5 text-[11px] font-semibold text-muted-foreground hover:border-status-accent-border hover:text-status-accent-foreground disabled:opacity-50"
+            >
+              {exporting === 'excel' ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileSpreadsheet className="h-3 w-3" aria-hidden="true" />} Excel
+            </button>
+          </div>
+        )}
         {message.followUps.length > 0 && (
           <div className="flex flex-wrap gap-1.5 border-t border-border-soft pt-2.5">
             {message.followUps.map((f) => (
@@ -466,6 +548,173 @@ function AssistantBubble({
               </button>
             ))}
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const EMPLOYMENT_TYPE_LABEL: Record<string, string> = {
+  REGULAR: 'Regular',
+  PROBATIONARY: 'Probationary',
+  CONTRACTUAL: 'Contractual',
+  CASUAL: 'Casual',
+  PART_TIME: 'Part-time',
+};
+
+/** "- a\n- b" → ["a", "b"]; plain text stays one line. */
+const toLines = (text: string | null) =>
+  (text ?? '')
+    .split('\n')
+    .map((l) => l.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim())
+    .filter(Boolean);
+
+
+/**
+ * A job opening the assistant prepared — the full breakdown, and the one button
+ * that creates it. The server publishes the draft it stored with this answer;
+ * nothing typed here is sent.
+ */
+function JobOpeningCard({
+  action,
+  compact,
+  canPublish,
+  onPublish,
+  onNavigate,
+}: {
+  action: JobOpeningAction;
+  compact: boolean;
+  canPublish: boolean;
+  onPublish: () => Promise<void>;
+  onNavigate: (path: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const d = action.draft;
+  const fmt = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+  const section = (title: string, text: string | null) =>
+    text ? (
+      <div className="space-y-1">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{title}</p>
+        <ul className="list-disc space-y-0.5 pl-4 text-[13px] text-foreground">
+          {toLines(text).map((l, i) => (
+            <li key={i}>{l}</li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+  const publish = async () => {
+    setBusy(true);
+    try {
+      await onPublish();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'The job opening could not be published.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const editInForm = () => {
+    try {
+      sessionStorage.setItem(AI_JOB_DRAFT_KEY, JSON.stringify(d));
+    } catch {
+      /* storage unavailable: the form simply starts empty */
+    }
+    onNavigate('/recruitment/openings/new');
+  };
+  return (
+    <div className="rounded-xl border border-status-accent-border bg-status-accent-surface/40 p-3 space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="flex min-w-0 items-start gap-2">
+          <span className="mt-0.5 rounded-lg bg-status-accent-surface p-1.5 text-status-accent-foreground">
+            <Briefcase className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-foreground">{d.title}</p>
+            <p className="text-xs text-muted-foreground">
+              {d.jobRoleTitle} · {d.unitName}
+              {d.departmentName ? ` · ${d.departmentName}` : ''}
+            </p>
+          </div>
+        </div>
+        {action.state === 'PUBLISHED' ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-status-success-border bg-status-success-surface px-2 py-0.5 text-[11px] font-semibold text-status-success-foreground">
+            <CheckCircle2 className="h-3 w-3" aria-hidden="true" /> Published · {action.published?.referenceNumber}
+          </span>
+        ) : action.state === 'SAVED' ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-status-warning-border bg-status-warning-surface px-2 py-0.5 text-[11px] font-semibold text-status-warning-foreground">
+            Saved as draft · {action.published?.referenceNumber}
+          </span>
+        ) : (
+          <span className="rounded-full border border-border-soft bg-surface px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">Not published yet</span>
+        )}
+      </div>
+      <dl className={cn('grid gap-2 text-[12.5px]', compact ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4')}>
+        {[
+          ['Employment', EMPLOYMENT_TYPE_LABEL[d.employmentType] ?? d.employmentType],
+          ['Vacancies', String(d.vacancies)],
+          ['Opens', fmt(d.openingDate)],
+          ['Closes', fmt(d.closingDate)],
+        ].map(([k, v]) => (
+          <div key={k} className="rounded-lg border border-border-soft bg-surface px-2.5 py-1.5">
+            <dt className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">{k}</dt>
+            <dd className="font-semibold text-foreground">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="space-y-1">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Description</p>
+        <p className="text-[13px] leading-relaxed text-foreground whitespace-pre-line">{d.description}</p>
+      </div>
+      {section('Responsibilities', d.responsibilities)}
+      {section('Qualifications', d.qualifications)}
+      {section('Required documents', d.requiredDocuments)}
+      <div className="flex flex-wrap items-center gap-2 border-t border-border-soft pt-2.5">
+        {action.state === 'DRAFT' ? (
+          canPublish ? (
+            <>
+              <button
+                type="button"
+                onClick={publish}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-60"
+              >
+                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />} Publish job opening
+              </button>
+              <button
+                type="button"
+                onClick={editInForm}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-foreground hover:bg-surface-2 disabled:opacity-60"
+              >
+                <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Edit in the form first
+              </button>
+              <span className="text-[11px] text-muted-foreground">Nothing is posted until you press Publish.</span>
+            </>
+          ) : (
+            <span className="text-[11px] text-muted-foreground">Only HR can publish job openings.</span>
+          )
+        ) : (
+          action.published && (
+            <>
+              <button
+                type="button"
+                onClick={() => onNavigate(`/recruitment/openings/${action.published!.openingId}`)}
+                className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-2"
+              >
+                Open the job opening <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+              {action.state === 'PUBLISHED' && (
+                <a
+                  href={`/careers/${action.published.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-semibold text-foreground hover:bg-surface-2"
+                >
+                  View on the Careers page <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
+              )}
+              {action.state === 'SAVED' && <span className="text-[11px] text-muted-foreground">An HR Officer publishes it from Job Openings.</span>}
+            </>
+          )
         )}
       </div>
     </div>

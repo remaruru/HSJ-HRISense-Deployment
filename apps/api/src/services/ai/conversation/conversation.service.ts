@@ -4,6 +4,7 @@ import { prisma } from '../../../config/prisma';
 import { AppError } from '../../../middleware/errorHandler';
 import type { AiActor } from '../actor/ai-actor';
 import { chartPayloadSchema } from '../charts/chart-schema';
+import { MessageAction, messageActionSchema } from '../actions/job-opening-draft';
 import type { ChatMessage } from '../provider/provider.types';
 
 /**
@@ -39,6 +40,8 @@ export const storedMessageSchema = z.object({
   links: z.array(z.object({ path: z.string(), label: z.string() })).optional(),
   followUps: z.array(z.string()).optional(),
   notices: z.array(z.string()).optional(),
+  /** A job opening AI Assistance prepared for HR (see actions/job-opening-draft.ts). */
+  action: messageActionSchema.optional(),
   createdAt: z.string(),
 });
 export type StoredMessage = z.infer<typeof storedMessageSchema>;
@@ -138,9 +141,35 @@ export class ConversationService {
     return messages.slice(-limit).map((m) =>
       m.role === 'user'
         ? { role: 'user' as const, content: m.content }
-        : { role: 'assistant' as const, content: `${m.content}${(m.charts ?? []).map(chartAsText).join('')}` }
+        : { role: 'assistant' as const, content: `${m.content}${(m.charts ?? []).map(chartAsText).join('')}${m.action ? actionAsText(m.action) : ''}` }
     );
   }
+
+  /**
+   * Replaces one assistant message's action — a job opening card becomes
+   * PUBLISHED once HR publishes it. Owned conversations only.
+   */
+  static async setMessageAction(actor: AiActor, conversationId: string, messageId: string, action: MessageAction): Promise<StoredMessage> {
+    const current = await ConversationService.getOwned(actor, conversationId);
+    const index = current.messages.findIndex((m) => m.id === messageId && m.role === 'assistant');
+    if (index < 0) throw new AppError('Message not found.', 404);
+    const messages = current.messages.map((m, i) => (i === index ? { ...m, action } : m));
+    await prisma.aIConversation.updateMany({
+      where: { id: conversationId, userId: actor.userId },
+      data: { messages: messages as any },
+    });
+    return messages[index];
+  }
+}
+
+function actionAsText(action: MessageAction): string {
+  const d = action.draft;
+  if (action.state === 'SAVED') {
+    return `\n[Job opening "${d.title}" was saved by HR as a draft (${action.published?.referenceNumber ?? 'in Job Openings'}); an HR Officer publishes it from Job Openings.]`;
+  }
+  return action.state === 'PUBLISHED'
+    ? `\n[Job opening "${d.title}" was PUBLISHED by HR as ${action.published?.referenceNumber ?? 'a new opening'}.]`
+    : `\n[Job opening draft "${d.title}" (${d.jobRoleTitle}, ${d.unitName}, ${d.vacancies} vacancy/ies, ${d.openingDate} to ${d.closingDate}) is waiting for HR to press Publish. To change it, call prepare_job_opening again with the changes.]`;
 }
 
 function chartAsText(chart: NonNullable<StoredMessage['charts']>[number]): string {

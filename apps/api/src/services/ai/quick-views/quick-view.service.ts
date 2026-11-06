@@ -8,6 +8,7 @@ import { SafeLink, validateLink } from '../links/app-links';
 import { executeTool } from '../tools/registry';
 import type { ToolContext } from '../tools/tool-types';
 import { getQuickView } from './quick-views';
+import { DraftStore } from '../actions/job-opening-draft';
 
 /**
  * Runs one Quick analytics view: no AI provider involved.
@@ -28,7 +29,7 @@ export class QuickViewService {
     const conversation = input.conversationId ? await ConversationService.getOwned(actor, input.conversationId) : null;
 
     const today = businessDateKey(instantToBusinessDate(now));
-    const ctx: ToolContext = { actor, datasets: new DatasetStore(), now, today };
+    const ctx: ToolContext = { actor, datasets: new DatasetStore(), drafts: new DraftStore(), now, today };
     const logId = await AiAuditService.start({
       userId: actor.userId,
       tier: actor.tier,

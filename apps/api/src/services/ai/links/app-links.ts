@@ -84,18 +84,61 @@ export interface SafeLink {
   label: string;
 }
 
+/** Sections of an employee's record HR can be sent straight to (EmployeeDetailPage). */
+export const EMPLOYEE_TABS = [
+  'overview', 'personal', 'contact', 'employment', 'schedule', 'attendance', 'education', 'government',
+  'emergency', 'documents', 'timeline', 'leave-balances', 'compliance', 'evaluations', 'training',
+] as const;
+
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const isUuid = (v: string) => UUID.test(v);
+type QueryRule = Record<string, (v: string) => boolean>;
+
+/**
+ * The query parameters each page understands, and what a value must look like.
+ * Anything else is dropped — a link can open a record or a filter, never inject.
+ */
+const QUERY_RULES: Array<{ path: RegExp; tiers: TierSet; params: QueryRule }> = [
+  { path: /^\/employees\/[0-9a-f-]{36}$/i, tiers: HR, params: { tab: (v) => (EMPLOYEE_TABS as readonly string[]).includes(v) } },
+  {
+    path: /^\/employees$/,
+    tiers: HR,
+    params: { jobRoleId: isUuid, unitId: isUuid, departmentId: isUuid, hireDateFrom: (v) => DATE.test(v), hireDateTo: (v) => DATE.test(v) },
+  },
+  { path: /^\/compliance$/, tiers: HR, params: { employee: isUuid, requirement: isUuid } },
+  { path: /^\/training$/, tiers: ALL, params: { activity: isUuid } },
+  { path: /^\/profile$/, tiers: ALL, params: { section: (v) => /^[a-z-]{2,30}$/.test(v) } },
+];
+
+/** Keeps only the query parameters the target page understands, with valid values. */
+function safeQuery(actor: AiActor, path: string, query: string): string {
+  if (!query) return '';
+  const rule = QUERY_RULES.find((r) => r.path.test(path) && r.tiers.includes(actor.tier));
+  if (!rule) return '';
+  const kept = new URLSearchParams();
+  for (const [k, v] of new URLSearchParams(query)) {
+    if (rule.params[k]?.(v) && !kept.has(k)) kept.set(k, v);
+  }
+  const out = kept.toString();
+  return out ? `?${out}` : '';
+}
+
 /** Returns the link if this actor may be sent there, otherwise null. */
 export function validateLink(actor: AiActor, raw: { path?: unknown; label?: unknown }): SafeLink | null {
   if (typeof raw.path !== 'string' || typeof raw.label !== 'string') return null;
-  const path = raw.path.trim();
+  const [rawPath, ...rest] = raw.path.trim().split('?');
+  const query = rest.join('?').split('#')[0];
+  const path = rawPath;
   const label = raw.label.replace(/[<>`]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60);
   if (!label) return null;
-  // Internal absolute paths only: no scheme, no protocol-relative, no query, no fragment, no traversal.
+  // Internal absolute paths only: no scheme, no protocol-relative, no fragment, no traversal.
+  // A query string is allowed only in the forms QUERY_RULES lists (see safeQuery).
   if (!/^\/[a-z0-9\-/]*$/i.test(path) || path.startsWith('//') || path.includes('..')) return null;
   const clean = path.length > 1 ? path.replace(/\/+$/, '') : path;
+  const withQuery = (p: string) => ({ path: `${p}${safeQuery(actor, p, query)}`, label });
 
   const page = APP_PAGES.find((p) => p.path === clean);
-  if (page) return page.tiers.includes(actor.tier) ? { path: clean, label } : null;
+  if (page) return page.tiers.includes(actor.tier) ? withQuery(clean) : null;
 
   const guide = /^\/help-center\/([a-z0-9-]+)$/.exec(clean);
   if (guide && SLUG.test(guide[1])) return guideVisibleTo(guide[1], actor.tier) ? { path: clean, label } : null;
@@ -104,8 +147,12 @@ export function validateLink(actor: AiActor, raw: { path?: unknown; label?: unkn
   const profile = /^\/(?:employees|my-team)\/([0-9a-f-]{36})$/i.exec(clean);
   if (profile && UUID.test(profile[1])) {
     const link = profileLinkFor(actor, profile[1]);
-    return link ? { path: link, label } : null;
+    return link ? withQuery(link) : null;
   }
+
+  // One job opening or one application (HR — recruitment pages are HR-only).
+  const recruitment = /^\/recruitment\/(openings|applicants)\/([0-9a-f-]{36})$/i.exec(clean);
+  if (recruitment && UUID.test(recruitment[2])) return actor.tier === PermissionTier.FULL ? { path: clean, label } : null;
 
   return null;
 }

@@ -45,3 +45,24 @@ describe('public application — sex and religion are optional', () => {
     assert.equal(submitApplicationSchema.safeParse({ ...base, privacyConsent: 'false' }).success, false);
   });
 });
+
+describe('public application — years of related experience are optional', () => {
+  test('blank or omitted means not given', () => {
+    for (const v of ['', undefined]) {
+      const r = submitApplicationSchema.safeParse({ ...base, priorExperienceYears: v });
+      assert.equal(r.success, true);
+      assert.equal(r.success && r.data.priorExperienceYears, undefined);
+    }
+  });
+  test('a number from 0 to 60 is kept (multipart sends text)', () => {
+    const r = submitApplicationSchema.safeParse({ ...base, priorExperienceYears: '2.5' });
+    assert.equal(r.success && r.data.priorExperienceYears, 2.5);
+    assert.equal(submitApplicationSchema.safeParse({ ...base, priorExperienceYears: '0' }).success, true);
+  });
+  test('negative, too large or not a number is refused with a message', () => {
+    for (const v of ['-1', '61', 'five']) {
+      const r = submitApplicationSchema.safeParse({ ...base, priorExperienceYears: v });
+      assert.equal(r.success, false, v);
+    }
+  });
+});

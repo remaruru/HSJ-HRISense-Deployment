@@ -13,6 +13,14 @@ import { getAiAvailability, getAiConfig } from '../services/ai/config/ai-config'
 import { SUGGESTIONS } from '../services/ai/policy/ai-policy';
 import { quickViewsForTier } from '../services/ai/quick-views/quick-views';
 import { QuickViewService } from '../services/ai/quick-views/quick-view.service';
+import { prisma } from '../config/prisma';
+import { JobOpeningService } from '../services/job-opening.service';
+import { RecruitmentPolicy, RecruitmentPolicyContext } from '../policies/recruitment.policy';
+import { MessageAction, jobOpeningDraftSchema } from '../services/ai/actions/job-opening-draft';
+import { answerToBlocks, ExportDocument, exportToExcel, exportToPdf } from '../services/ai/export/ai-export';
+import { chartPayloadSchema } from '../services/ai/charts/chart-schema';
+import { phDateTime } from '../lib/pdf-brand';
+import { JobOpeningStatus } from '@prisma/client';
 
 const router = Router();
 
@@ -148,6 +156,226 @@ router.delete(
     const actor = await resolveAiActor(req.user!.userId);
     await ConversationService.archive(actor, req.params.id);
     res.json({ success: true, data: { id: req.params.id } });
+  })
+);
+
+// ── Job openings prepared by AI Assistance ───────────────────────────────────
+
+async function recruitmentContext(userId: string, employeeId: string | null | undefined, tier: any): Promise<RecruitmentPolicyContext> {
+  const emp = employeeId
+    ? await prisma.employee.findUnique({ where: { id: employeeId }, include: { jobRole: true, unit: true, department: true } })
+    : null;
+  return {
+    userId,
+    permissionTier: tier,
+    employee: emp ? { id: emp.id, unit: emp.unit, department: emp.department, jobRole: emp.jobRole } : null,
+  };
+}
+
+/** One publish at a time per message, so a double click cannot create two openings. */
+const publishing = new Set<string>();
+
+/**
+ * POST /ai/assistant/conversations/:id/messages/:messageId/publish-job-opening
+ *
+ * HR's click on Publish. The opening is created from the draft STORED on that
+ * message (validated when the assistant prepared it) — the request body is
+ * ignored — through the same service and permissions as the Job Openings form:
+ * anyone who manages job openings can save it; only an HR Officer or Sister
+ * publishes it to the Careers page, otherwise it is saved as a draft for them.
+ */
+router.post(
+  '/assistant/conversations/:id/messages/:messageId/publish-job-opening',
+  asyncHandler(async (req, res) => {
+    if (!uuid.safeParse(req.params.id).success || !uuid.safeParse(req.params.messageId).success) throw new AppError('Message not found.', 404);
+    const actor = await resolveAiActor(req.user!.userId);
+    const context = await recruitmentContext(actor.userId, actor.employeeId, actor.tier);
+    if (!RecruitmentPolicy.canManageJobOpenings(context)) throw new AppError('Only HR can create job openings.', 403);
+
+    const key = `${req.params.id}:${req.params.messageId}`;
+    if (publishing.has(key)) throw new AppError('This job opening is already being published.', 409);
+    publishing.add(key);
+    try {
+      const conversation = await ConversationService.getOwned(actor, req.params.id);
+      const message = conversation.messages.find((m) => m.id === req.params.messageId && m.role === 'assistant');
+      if (!message?.action || message.action.kind !== 'JOB_OPENING') throw new AppError('There is no job opening on that message.', 404);
+      if (message.action.state !== 'DRAFT') {
+        res.json({ success: true, data: { action: message.action, alreadyDone: true } });
+        return;
+      }
+      const draft = jobOpeningDraftSchema.parse(message.action.draft);
+      const opening = await JobOpeningService.createJobOpening(
+        {
+          title: draft.title,
+          unitId: draft.unitId,
+          departmentId: draft.departmentId ?? undefined,
+          jobRoleId: draft.jobRoleId,
+          employmentType: draft.employmentType,
+          vacancies: draft.vacancies,
+          description: draft.description,
+          responsibilities: draft.responsibilities,
+          qualifications: draft.qualifications,
+          requiredDocuments: draft.requiredDocuments ?? undefined,
+          openingDate: new Date(`${draft.openingDate}T00:00:00+08:00`),
+          closingDate: new Date(`${draft.closingDate}T00:00:00+08:00`),
+        },
+        actor.userId
+      );
+      const canPublish = RecruitmentPolicy.canPublishJobOpening(context);
+      const live = canPublish ? await JobOpeningService.changeStatus(opening.id, JobOpeningStatus.OPEN, actor.userId) : opening;
+      const action: MessageAction = {
+        ...message.action,
+        state: canPublish ? 'PUBLISHED' : 'SAVED',
+        published: {
+          openingId: opening.id,
+          referenceNumber: opening.referenceNumber,
+          slug: opening.slug,
+          publishedAt: (live.publishedAt ?? new Date()).toISOString(),
+        },
+      };
+      await ConversationService.setMessageAction(actor, conversation.id, message.id, action);
+      res.json({ success: true, data: { action } });
+    } finally {
+      publishing.delete(key);
+    }
+  })
+);
+
+// ── Exports: an answer, a quick view or the workforce summary → PDF / Excel ──
+
+const exportFormat = (raw: unknown): 'pdf' | 'excel' => {
+  const f = String(raw ?? 'pdf').toLowerCase();
+  if (f === 'pdf') return 'pdf';
+  if (f === 'excel' || f === 'xlsx') return 'excel';
+  throw new AppError('Unsupported export format. Use pdf or excel.', 400);
+};
+
+async function sendExport(res: any, spec: ExportDocument, format: 'pdf' | 'excel', base: string) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const name = `HRISense_${base.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'AI_answer'}_${stamp}`;
+  if (format === 'pdf') {
+    const buffer = await exportToPdf(spec);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${name}.pdf"`);
+    res.send(buffer);
+    return;
+  }
+  const buffer = await exportToExcel(spec);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${name}.xlsx"`);
+  res.send(buffer);
+}
+
+/**
+ * GET /ai/assistant/conversations/:id/messages/:messageId/export?format=pdf|excel
+ * One of YOUR answers exactly as stored — its text, charts (with their data)
+ * and links — as a PDF to read or an Excel workbook to work with.
+ */
+router.get(
+  '/assistant/conversations/:id/messages/:messageId/export',
+  asyncHandler(async (req, res) => {
+    if (!uuid.safeParse(req.params.id).success || !uuid.safeParse(req.params.messageId).success) throw new AppError('Message not found.', 404);
+    const format = exportFormat(req.query.format);
+    const actor = await resolveAiActor(req.user!.userId);
+    const conversation = await ConversationService.getOwned(actor, req.params.id);
+    const index = conversation.messages.findIndex((m) => m.id === req.params.messageId && m.role === 'assistant');
+    if (index < 0) throw new AppError('Message not found.', 404);
+    const message = conversation.messages[index];
+    const question = [...conversation.messages.slice(0, index)].reverse().find((m) => m.role === 'user')?.content ?? conversation.title;
+
+    const blocks = answerToBlocks(message.content);
+    const sections: ExportDocument['sections'] = [{ heading: 'Answer', blocks, charts: message.charts ?? [] }];
+    if (message.action?.kind === 'JOB_OPENING') {
+      const d = message.action.draft;
+      const lines = (t: string | null) => (t ?? '').split('\n').map((l) => l.replace(/^\s*[-*•]\s*/, '').trim()).filter(Boolean);
+      sections.push({
+        heading: `Job opening — ${d.title} (${message.action.state === 'PUBLISHED' ? `published as ${message.action.published?.referenceNumber}` : message.action.state === 'SAVED' ? 'saved as a draft' : 'not yet published'})`,
+        blocks: [
+          { kind: 'table', header: ['Field', 'Value'], rows: [
+            ['Role', d.jobRoleTitle], ['Unit', d.unitName], ['Employment type', d.employmentType.replace(/_/g, ' ').toLowerCase()],
+            ['Vacancies', String(d.vacancies)], ['Opens', d.openingDate], ['Closes', d.closingDate],
+          ] },
+          { kind: 'heading', text: 'Description' }, { kind: 'paragraph', text: d.description },
+          { kind: 'heading', text: 'Responsibilities' }, { kind: 'bullets', items: lines(d.responsibilities) },
+          { kind: 'heading', text: 'Qualifications' }, { kind: 'bullets', items: lines(d.qualifications) },
+          ...(d.requiredDocuments ? [{ kind: 'heading', text: 'Required documents' } as const, { kind: 'bullets', items: lines(d.requiredDocuments) } as const] : []),
+        ],
+      });
+    }
+    await sendExport(
+      res,
+      {
+        title: question,
+        label: 'AI Assistance',
+        meta: [
+          `Asked by ${actor.displayName} (${TIER_LABEL[actor.tier]}) on ${phDateTime(new Date(message.createdAt))}`,
+          `Exported ${phDateTime()} · answers use the asker's own HRISense access`,
+        ],
+        sections,
+        links: message.links,
+        notes: message.notices,
+      },
+      format,
+      question
+    );
+  })
+);
+
+const sourceSchema = z.object({ key: z.string().max(60), label: z.string().max(120), path: z.string().max(200), chart: chartPayloadSchema.nullable() }).strict();
+const itemSchema = z.object({ title: z.string().max(300), detail: z.string().max(3000), basis: z.string().max(1500), sources: z.array(sourceSchema).max(5) }).strict();
+const summaryExportBody = z
+  .object({
+    format: z.enum(['pdf', 'excel']),
+    periodDays: z.number().int().min(7).max(180),
+    analysis: z
+      .object({
+        summary: z.string().max(6000),
+        observations: z.array(itemSchema).max(20),
+        areasForReview: z.array(itemSchema).max(20),
+        dataGaps: z.array(z.string().max(600)).max(20),
+      })
+      .strict(),
+  })
+  .strict();
+
+/**
+ * POST /ai/summary/export — HR's workforce summary as shown on screen. The
+ * written analysis is the one HR is looking at; every chart in it was built by
+ * the server from the fact sheet and is validated again here.
+ */
+router.post(
+  '/summary/export',
+  authorize(['FULL']),
+  asyncHandler(async (req, res) => {
+    const parsed = summaryExportBody.safeParse(req.body ?? {});
+    if (!parsed.success) throw new AppError('This workforce summary could not be exported. Generate it again and retry.', 400);
+    const { format, periodDays, analysis } = parsed.data;
+    const actor = await resolveAiActor(req.user!.userId);
+    const itemSection = (heading: string, items: typeof analysis.observations): ExportDocument['sections'][number] => ({
+      heading,
+      blocks: items.flatMap((it) => [
+        { kind: 'heading', text: it.title } as const,
+        { kind: 'paragraph', text: it.detail } as const,
+        ...(it.basis ? [{ kind: 'paragraph', text: `Based on: ${it.basis}` } as const] : []),
+      ]),
+      charts: items.flatMap((it) => it.sources.filter((s) => s.chart).map((s) => ({ ...(s.chart as any), caption: `${it.title} — ${s.label}` }))),
+    });
+    await sendExport(
+      res,
+      {
+        title: `Workforce summary — last ${periodDays} days`,
+        label: 'AI Workforce Summary',
+        meta: [`Generated for ${actor.displayName} (${TIER_LABEL[actor.tier]})`, `Exported ${phDateTime()}`],
+        sections: [
+          { heading: 'Summary', blocks: answerToBlocks(analysis.summary) },
+          ...(analysis.observations.length ? [itemSection('Observations', analysis.observations)] : []),
+          ...(analysis.areasForReview.length ? [itemSection('Areas for review', analysis.areasForReview)] : []),
+          ...(analysis.dataGaps.length ? [{ heading: 'Data gaps', blocks: [{ kind: 'bullets' as const, items: analysis.dataGaps }] }] : []),
+        ],
+      },
+      format,
+      `Workforce_summary_${periodDays}_days`
+    );
   })
 );
 

@@ -41,6 +41,8 @@ export class ApplicantConversionService {
             unitId: application.jobOpening.unitId,
             jobRoleId: application.jobOpening.jobRoleId,
             employmentStatus: application.jobOpening.employmentType,
+            // What the applicant reported on the Careers form; HR confirms it.
+            priorExperienceYears: application.priorExperienceYears ?? '',
           },
           status: OnboardingDraftStatus.DRAFT,
           createdById: userId,

@@ -104,6 +104,8 @@ export default function EmployeeOnboardingPage() {
  separationReason: "",
  prcLicenseNumber: "",
  professionalRole: "",
+ // Years of experience before Hospicio (optional). From a hired applicant: what they reported.
+ priorExperienceYears: "",
  sssNumber: "",
  philhealthNumber: "",
  pagibigNumber: "",
@@ -949,6 +951,10 @@ export default function EmployeeOnboardingPage() {
  <input required type="date" name="hireDate" value={formData.hireDate} onChange={handleChange} className="hrisense-control w-full h-[42px] px-3" />
  </div>
  <div>
+ <label className="block text-sm font-medium text-foreground mb-1">Experience before Hospicio (years)</label>
+ <input type="number" min={0} max={60} step={0.5} name="priorExperienceYears" value={formData.priorExperienceYears ?? ''} onChange={handleChange} placeholder="Optional, e.g. 4.5" className="hrisense-control w-full h-[42px] px-3" />
+ </div>
+ <div>
  <label className="block text-sm font-medium text-foreground mb-1">Regularization Date</label>
  <input type="date" name="regularizationDate" value={formData.regularizationDate} onChange={handleChange} className="hrisense-control w-full h-[42px] px-3" />
  </div>
@@ -1234,6 +1240,10 @@ export default function EmployeeOnboardingPage() {
  <div>
  <span className="text-muted-foreground block mb-1">Start Date</span>
  <span className="font-medium">{formatEmploymentDate(formData.hireDate)}</span>
+ </div>
+ <div>
+ <span className="text-muted-foreground block mb-1">Experience before Hospicio</span>
+ <span className="font-medium">{formData.priorExperienceYears !== '' && formData.priorExperienceYears !== undefined && formData.priorExperienceYears !== null ? `${formData.priorExperienceYears} years` : 'Not recorded'}</span>
  </div>
  {hasEnded(formData.employmentState) && (
  <div>

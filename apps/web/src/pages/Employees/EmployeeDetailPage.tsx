@@ -2,7 +2,7 @@ import { confirmAction } from "@/components/shared/ConfirmProvider";
 import { useState, useEffect } from "react";
 import { BreakdownButton, MetricBreakdownDialog } from '@/components/shared/MetricBreakdown';
 import { profileCompletionSpec } from '@/components/shared/profileCompletionSpec';
-import { useParams, Link, useNavigate } from "@tanstack/react-router";
+import { useParams, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
   ArrowLeft, Edit2, Archive, UserCheck, Shield, UploadCloud, FileText, X,
@@ -34,7 +34,7 @@ import { LeaveBalancePanel } from "@/pages/Leave/components/LeaveBalancePanel";
 import { useAuth } from "@/providers/AuthProvider";
 import { formatAge } from "@/lib/age";
 import {
-  EMPLOYMENT_STATE_LABELS, employmentDuration, formatEmploymentDate, hasEnded, isProfessional,
+  EMPLOYMENT_STATE_LABELS, employmentDuration, formatEmploymentDate, hasEnded, isProfessional, priorExperienceText, totalExperienceText,
   type EmploymentState,
 } from "@/lib/employment";
 
@@ -194,13 +194,27 @@ function canPreviewInBrowser(mimeType?: string | null): boolean {
   return !!mimeType && PREVIEWABLE_MIME_TYPES.includes(mimeType);
 }
 
+/** URL slugs for the record's sections (?tab=leave-balances → "Leave Balances"). */
+const TAB_BY_SLUG: Record<string, string> = {
+  overview: "Overview", personal: "Personal", contact: "Contact", employment: "Employment", schedule: "Schedule",
+  attendance: "Attendance", education: "Education", government: "Government", emergency: "Emergency",
+  documents: "Documents", timeline: "Timeline", "leave-balances": "Leave Balances", compliance: "Compliance",
+  evaluations: "Evaluations", training: "Training",
+};
+
 export default function EmployeeDetailPage() {
   // @ts-ignore
   const { employeeId } = useParams({ strict: false }) as any;
   const navigate = useNavigate();
   const [employee, setEmployee] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("Overview");
+  // A link can open a section: /employees/<id>?tab=compliance (AI Assistance uses this).
+  const linkSearch = useSearch({ strict: false }) as { tab?: string };
+  const linkedTab = TAB_BY_SLUG[String(linkSearch.tab ?? '').toLowerCase()] ?? null;
+  const [activeTab, setActiveTab] = useState(linkedTab ?? "Overview");
+  useEffect(() => {
+    if (linkedTab) setActiveTab(linkedTab);
+  }, [linkedTab, employeeId]);
   const [timeline, setTimeline] = useState<any[]>([]);
   const [timelineError, setTimelineError] = useState<string | null>(null);
   const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
@@ -736,6 +750,8 @@ export default function EmployeeDetailPage() {
                     ? `${serviceLength.text}${serviceLength.ongoing ? ' (start date → present)' : ' (start date → end date)'}`
                     : endDateMissing ? "Cannot be calculated — no end date recorded" : undefined}
                 />
+                <InfoField label="Experience Before Hospicio" value={priorExperienceText(employee.priorExperienceYears)} />
+                <InfoField label="Total Experience" value={totalExperienceText(serviceLength, employee.priorExperienceYears)} />
                 <InfoField
                   label="Leave Eligibility (HR)"
                   value={[employee.paternityLeaveEligible && "Paternity Leave", employee.soloParentLeaveEligible && "Solo Parent Leave"].filter(Boolean).join(", ") || "Not marked for Paternity or Solo Parent Leave"}

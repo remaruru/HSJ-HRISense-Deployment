@@ -52,7 +52,7 @@ const envSchema = z
     ANTHROPIC_MODEL: z.string().default('claude-sonnet-5-5'),
     ANTHROPIC_BASE_URL: z.string().url().optional(),
     /** Longest answer the model may write, in tokens. */
-    AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(8000).default(1500),
+    AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(256).max(8000).default(3000),
     /** How many rounds of data lookups one question may take. */
     AI_MAX_TOOL_ROUNDS: z.coerce.number().int().min(1).max(10).default(6),
     /** Per provider call. */
