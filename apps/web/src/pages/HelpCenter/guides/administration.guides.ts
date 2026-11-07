@@ -138,7 +138,7 @@ export const ADMINISTRATION_GUIDES: HelpGuideDefinition[] = [
           stepNumber: 5,
           title: 'Export the answer (optional)',
           instruction: 'Under any answer, select **PDF** to save it for reading or printing, or **Excel** to work with its tables and chart figures.',
-          expectedResult: 'The file downloads with the question, the answer, its charts and their data, and an "AI-generated" note.',
+          expectedResult: 'The file downloads with the answer, its charts and their data, and an "AI-generated" note. The question you typed is not included.',
           uiPath: 'Answer -> Export: PDF / Excel',
         },
         {

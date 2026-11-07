@@ -19,6 +19,7 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'mysql://root@localh
 
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import ExcelJS from 'exceljs';
 import http from 'http';
 import fs from 'fs';
 import express from 'express';
@@ -1074,7 +1075,8 @@ describe('revision: people lookups, job openings, applicants and exports', () =>
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     const type = res.headers.get('content-type') ?? '';
-    return { status: res.status, type, raw: Buffer.from(await res.arrayBuffer()) };
+    const fileName = res.headers.get('content-disposition') ?? '';
+    return { status: res.status, type, fileName, raw: Buffer.from(await res.arrayBuffer()) };
   };
   const json = (r: { raw: Buffer }) => JSON.parse(r.raw.toString() || 'null');
   const roleOf = async (key: string) => (await prisma.employee.findUnique({ where: { id: ids[key] }, select: { jobRoleId: true, unitId: true } }))!;
@@ -1277,6 +1279,16 @@ describe('revision: people lookups, job openings, applicants and exports', () =>
     assert.equal(xlsx.raw.subarray(0, 2).toString(), 'PK');
     assert.equal((await request('GET', `${base}?format=pdf`, 'R1')).status, 404, "another user's conversation does not exist for them");
     assert.equal((await request('GET', `${base}?format=docx`, 'HR')).status, 400);
+
+    // The question that was typed ('Prepare a job opening for 2 nurses') stays out of the file and its name.
+    assert.match(pdf.fileName, /HRISense_AI_answer_/);
+    assert.match(xlsx.fileName, /HRISense_AI_answer_/);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(xlsx.raw as any);
+    const cells: string[] = [];
+    workbook.worksheets.forEach((ws) => ws.eachRow((row) => row.eachCell((cell) => cells.push(String(cell.value)))));
+    assert.ok(cells.includes('AI Assistance Answer'));
+    assert.ok(!cells.some((c) => /prepare a job opening/i.test(c)), 'the prompt is not in the workbook');
   });
 
   test('publish: only a recruitment manager can, from the stored draft, once', async (t) => {

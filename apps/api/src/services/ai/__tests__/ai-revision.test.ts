@@ -190,10 +190,10 @@ describe('exports', () => {
 
   test('PDF and Excel are real files carrying the answer and the chart data', async () => {
     const spec = {
-      title: 'Who are our most experienced caretakers?',
+      title: 'AI Assistance Answer',
       label: 'AI Assistance',
-      meta: ['Asked by Test Person (HR)'],
-      sections: [{ heading: 'Answer', blocks: answerToBlocks(answer), charts: [chart] }],
+      meta: ['Generated for Test Person (HR)'],
+      sections: [{ blocks: answerToBlocks(answer), charts: [chart] }],
       links: [{ label: "Open St. Mary Staff's profile", path: `/employees/${OTHER}` }],
     };
     const pdf = await exportToPdf(spec);

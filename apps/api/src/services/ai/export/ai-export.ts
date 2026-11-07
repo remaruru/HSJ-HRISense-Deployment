@@ -21,11 +21,11 @@ export type ExportBlock =
   | { kind: 'table'; header: string[]; rows: string[][] };
 
 export interface ExportDocument {
-  /** Big title on the first page, e.g. the question asked. */
+  /** Big title on the first page. Never the question the user typed. */
   title: string;
   /** Small label in the brand band, e.g. "AI Assistance". */
   label: string;
-  /** "Asked by … (HR) · Nov 5, 2026, 10:44 PM" etc. */
+  /** "Generated for … (HR) on Nov 5, 2026, 10:44 PM" etc. */
   meta: string[];
   sections: Array<{ heading?: string; blocks: ExportBlock[]; charts?: Array<ChartPayload & { caption?: string }> }>;
   links?: Array<{ label: string; path: string }>;

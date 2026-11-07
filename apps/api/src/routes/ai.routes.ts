@@ -269,7 +269,8 @@ async function sendExport(res: any, spec: ExportDocument, format: 'pdf' | 'excel
 /**
  * GET /ai/assistant/conversations/:id/messages/:messageId/export?format=pdf|excel
  * One of YOUR answers exactly as stored — its text, charts (with their data)
- * and links — as a PDF to read or an Excel workbook to work with.
+ * and links — as a PDF to read or an Excel workbook to work with. The question
+ * that was typed stays out of the file, its title and its name.
  */
 router.get(
   '/assistant/conversations/:id/messages/:messageId/export',
@@ -278,13 +279,11 @@ router.get(
     const format = exportFormat(req.query.format);
     const actor = await resolveAiActor(req.user!.userId);
     const conversation = await ConversationService.getOwned(actor, req.params.id);
-    const index = conversation.messages.findIndex((m) => m.id === req.params.messageId && m.role === 'assistant');
-    if (index < 0) throw new AppError('Message not found.', 404);
-    const message = conversation.messages[index];
-    const question = [...conversation.messages.slice(0, index)].reverse().find((m) => m.role === 'user')?.content ?? conversation.title;
+    const message = conversation.messages.find((m) => m.id === req.params.messageId && m.role === 'assistant');
+    if (!message) throw new AppError('Message not found.', 404);
 
     const blocks = answerToBlocks(message.content);
-    const sections: ExportDocument['sections'] = [{ heading: 'Answer', blocks, charts: message.charts ?? [] }];
+    const sections: ExportDocument['sections'] = [{ blocks, charts: message.charts ?? [] }];
     if (message.action?.kind === 'JOB_OPENING') {
       const d = message.action.draft;
       const lines = (t: string | null) => (t ?? '').split('\n').map((l) => l.replace(/^\s*[-*•]\s*/, '').trim()).filter(Boolean);
@@ -305,18 +304,18 @@ router.get(
     await sendExport(
       res,
       {
-        title: question,
+        title: 'AI Assistance Answer',
         label: 'AI Assistance',
         meta: [
-          `Asked by ${actor.displayName} (${TIER_LABEL[actor.tier]}) on ${phDateTime(new Date(message.createdAt))}`,
-          `Exported ${phDateTime()} · answers use the asker's own HRISense access`,
+          `Generated for ${actor.displayName} (${TIER_LABEL[actor.tier]}) on ${phDateTime(new Date(message.createdAt))}`,
+          `Exported ${phDateTime()} · based on this person's own HRISense access`,
         ],
         sections,
         links: message.links,
         notes: message.notices,
       },
       format,
-      question
+      'AI_answer'
     );
   })
 );
