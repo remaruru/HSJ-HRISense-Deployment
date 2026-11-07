@@ -1280,8 +1280,8 @@ describe('revision: people lookups, job openings, applicants and exports', () =>
     assert.equal((await request('GET', `${base}?format=pdf`, 'R1')).status, 404, "another user's conversation does not exist for them");
     assert.equal((await request('GET', `${base}?format=docx`, 'HR')).status, 400);
 
-    // Only the AI's output and the export time: not the question that was typed
-    // ('Prepare a job opening for 2 nurses'), a title, the asker or a note.
+    // The top is only the export time: not the question that was typed
+    // ('Prepare a job opening for 2 nurses'), a title or the asker. The AI note stays at the end.
     assert.match(pdf.fileName, /HRISense_AI_answer_/);
     assert.match(xlsx.fileName, /HRISense_AI_answer_/);
     const workbook = new ExcelJS.Workbook();
@@ -1289,7 +1289,8 @@ describe('revision: people lookups, job openings, applicants and exports', () =>
     const cells: string[] = [];
     workbook.worksheets.forEach((ws) => ws.eachRow((row) => row.eachCell((cell) => cells.push(String(cell.value)))));
     assert.match(cells[0], /^Exported /, 'the export time comes first');
-    assert.ok(!cells.some((c) => /prepare a job opening|AI Assistance Answer|Generated (for|by)|Asked by|AI can be wrong/i.test(c)), 'nothing but the output');
+    assert.ok(!cells.some((c) => /prepare a job opening|AI Assistance Answer|Generated for|Asked by/i.test(c)), 'no prompt, title or asker');
+    assert.ok(cells.some((c) => /AI can be wrong/.test(c)), 'the AI note is still there');
   });
 
   test('publish: only a recruitment manager can, from the stored draft, once', async (t) => {

@@ -269,8 +269,8 @@ async function sendExport(res: any, spec: ExportDocument, format: 'pdf' | 'excel
 /**
  * GET /ai/assistant/conversations/:id/messages/:messageId/export?format=pdf|excel
  * One of YOUR answers exactly as stored — its text, charts (with their data)
- * and links — as a PDF to read or an Excel workbook to work with. Only the AI's
- * output and the export time: no typed question, title or asker's name.
+ * and links — as a PDF to read or an Excel workbook to work with. The typed
+ * question, a title and the asker's name stay out of it.
  */
 router.get(
   '/assistant/conversations/:id/messages/:messageId/export',

@@ -138,7 +138,7 @@ export const ADMINISTRATION_GUIDES: HelpGuideDefinition[] = [
           stepNumber: 5,
           title: 'Export the answer (optional)',
           instruction: 'Under any answer, select **PDF** to save it for reading or printing, or **Excel** to work with its tables and chart figures.',
-          expectedResult: 'The file downloads with the date and time it was exported, then the answer, its charts and their data. The question you typed is not included.',
+          expectedResult: 'The file downloads with the date and time it was exported, then the answer, its charts and their data, and an "AI-generated" note. The question you typed is not included.',
           uiPath: 'Answer -> Export: PDF / Excel',
         },
         {
@@ -406,7 +406,7 @@ export const ADMINISTRATION_GUIDES: HelpGuideDefinition[] = [
         {
           stepNumber: 2,
           title: 'Open the file',
-          instruction: 'The **PDF** has the date and time it was exported, the answer, each chart with its data table, and the links. The **Excel** workbook has the answer on the first sheet and every table and chart\'s figures on their own sheets. The question you typed is not included.',
+          instruction: 'The **PDF** has the date and time it was exported, the answer, each chart with its data table, the links and an "AI-generated" note. The **Excel** workbook has the answer on the first sheet and every table and chart\'s figures on their own sheets. The question you typed is not included.',
           expectedResult: 'You have exactly what the assistant showed, with the numbers ready to work with.',
           uiPath: 'Downloads',
         },

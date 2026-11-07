@@ -3328,11 +3328,11 @@ Every answer (including Quick analytics) has **Export: PDF / Excel**:
 `GET /ai/assistant/conversations/:id/messages/:messageId/export?format=pdf|excel`
 — only the asker's own conversations. HR's **Workforce summary** has **Export PDF
 / Export Excel** (`POST /ai/summary/export`). The PDF carries the date and time it
-was exported, then only the AI's output: the answer, each chart with its data
-table, and the links. The Excel workbook has the same on its first sheet and every
-table and chart's figures on their own sheets, numbers kept as numbers. The
-question the user typed, the asker's name and any added note are left out, and the
-question is not in the file name either.
+was exported, the answer, each chart with its data table, the links, and an
+*AI-generated — check important figures* note; the Excel workbook has the answer
+on its first sheet and every table and chart's figures on their own sheets,
+numbers kept as numbers. The question the user typed and the asker's name are left
+out, and the question is not in the file name either.
 
 ### 20.6 Testing the assistant
 
