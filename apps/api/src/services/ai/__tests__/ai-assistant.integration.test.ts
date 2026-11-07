@@ -1117,6 +1117,41 @@ describe('revision: people lookups, job openings, applicants and exports', () =>
     await prisma.jobOpening.deleteMany({ where: { id: { in: made.openings } } });
   });
 
+  test('get_hr_contacts gives the office contact and names, never anyone\'s own details', async () => {
+    for (const who of ['R1', 'SUP']) {
+      const r = await run(who, 'get_hr_contacts');
+      assert.ok(r.ok);
+      assert.ok('office' in r.json.data && Array.isArray(r.json.data.hrStaff));
+      for (const person of r.json.data.hrStaff) assert.deepEqual(Object.keys(person).sort(), ['jobRole', 'name']);
+      for (const leaked of ['SECRET-ADDRESS-123', '34-1234567-8', '09170000000', '@example.test']) assert.ok(!r.content.includes(leaked), leaked);
+    }
+  });
+
+  test('role-scope questions are answered by the server, without any model or the asker\'s own records', async () => {
+    // A provider with no steps: if a model were called, the answer would be an error.
+    setAiProviderForTests(new ScriptedProvider([]));
+    const hr = await AssistantOrchestrator.handle({ userId: users.SUP, message: 'provide hr details' });
+    assert.equal(hr.message.status, 'ANSWERED');
+    assert.match(hr.message.content, /outside your access as a Supervisor/);
+    assert.ok(!/announcement|schedule|compliance|shift/i.test(hr.message.content), 'no records of the asker');
+
+    const profile = await AssistantOrchestrator.handle({ userId: users.SUP, message: 'what about hr profile' });
+    assert.ok(!/your hr profile|length of service/i.test(profile.message.content));
+
+    const connect = await AssistantOrchestrator.handle({ userId: users.R1, message: 'connect me to hr' });
+    assert.equal(connect.message.status, 'ANSWERED');
+    assert.match(connect.message.content, /can't call or connect you/);
+
+    const docs = await AssistantOrchestrator.handle({ userId: users.R1, message: "who's employee lack of documents" });
+    assert.equal(docs.message.status, 'NOT_AUTHORIZED');
+    assert.match(docs.message.content, /only see your own records/);
+
+    const boss = await AssistantOrchestrator.handle({ userId: users.R1, message: "provide the supervisor's details" });
+    assert.equal(boss.message.status, 'NOT_AUTHORIZED');
+    assert.match(boss.message.content, /outside your access/);
+    assert.ok(!/summary of your profile|length of service|experience/i.test(boss.message.content), 'no profile summary');
+  });
+
   test("find_employees stays inside each tier's access; birth dates only for HR and the person", async () => {
     const r1 = await run('R1', 'find_employees', {});
     assert.deepEqual(r1.json.data.matches.map((m: any) => m.id), [ids.R1], 'an employee finds only themselves');

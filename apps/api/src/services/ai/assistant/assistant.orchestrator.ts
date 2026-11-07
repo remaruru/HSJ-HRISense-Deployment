@@ -6,6 +6,8 @@ import { buildChart, ChartPayload, DatasetStore } from '../charts/chart-schema';
 import { getAiAvailability, getAiConfig } from '../config/ai-config';
 import { ConversationService, MessageStatus, newMessageId, StoredMessage } from '../conversation/conversation.service';
 import { classifyInput, GuardResult, normaliseMessage } from '../guard/input-guard';
+import { classifyScope } from '../guard/role-scope';
+import { answerScopedQuestion } from './scoped-answers';
 import { cleanAnswer, cleanFollowUps } from '../guard/output-guard';
 import { searchKnowledge } from '../knowledge/knowledge.service';
 import { validateLink, SafeLink } from '../links/app-links';
@@ -343,10 +345,14 @@ export class AssistantOrchestrator {
 
     const state: RunState = { toolAudit: [], rounds: 0, inputTokens: null, outputTokens: null };
     const guard = classifyInput(question, actor.tier);
+    // Questions with one right answer because of the asker's role never reach a model.
+    const scopeRoute = guard.verdict === 'ALLOW' ? classifyScope(question, actor.tier) : null;
     let outcome: Outcome;
 
     if (guard.verdict !== 'ALLOW') {
       outcome = guardOutcome(guard, actor);
+    } else if (scopeRoute) {
+      outcome = await answerScopedQuestion(scopeRoute, question, actor);
     } else if (!provider) {
       outcome = unavailableOutcome(question, actor, availability.reason ?? 'AI Assistance is not configured on this server.');
     } else {
@@ -405,7 +411,7 @@ export class AssistantOrchestrator {
       rounds: state.rounds,
       error: state.error,
       failed: outcome.status === 'ERROR',
-      guardRule: guard.rule,
+      guardRule: guard.rule ?? (scopeRoute ? `scope:${scopeRoute}` : undefined),
     });
 
     return { conversationId, aiAvailable: Boolean(provider), userMessage, message: assistantMessage };

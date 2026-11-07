@@ -302,7 +302,7 @@ export function monthStartKey(dayKey: string, offset: number): string {
 const profileTool = defineTool({
   name: 'get_employee_profile',
   description:
-    "Work profile of one employee: name, employee number, job role, unit, profession, employment status and state, hire / probation / regularization dates, length of service at Hospicio, experience before Hospicio and total experience, birth date and age (HR, or the person themselves only), immediate supervisor and reporting-line status. Never includes addresses, contacts or government IDs. Omit employeeId for the person asking. To compare or rank several people, use find_employees instead.",
+    "Work profile of one employee: name, employee number, job role, unit, profession, employment status and state, hire / probation / regularization dates, length of service at Hospicio, experience before Hospicio and total experience, birth date and age (HR, or the person themselves only), immediate supervisor and reporting-line status. Never includes addresses, contacts or government IDs. Omit employeeId ONLY when the question is about the person asking themselves; never use their own profile to answer a question about HR, their supervisor or anyone else. To compare or rank several people, use find_employees instead.",
   tiers: ALL_TIERS,
   args: z.object({ employeeId: employeeIdArg.optional() }).strict(),
   async run(ctx: ToolContext, args: { employeeId?: string }) {

@@ -3178,6 +3178,7 @@ Full technical design: [`docs/HRISENSE_AI_ARCHITECTURE.md`](HRISENSE_AI_ARCHITEC
 | People by role, kind of work, unit, experience, length of service, age or hire date — "nurses (Clinic Staff) with 10+ years of experience", "the 10 longest-serving caretakers", "the oldest employee" | own record | self + direct reports | ✅ everyone |
 | Birth date and age | own | own only (never a direct report's) | ✅ |
 | Prepare a job opening; compare an opening's applicants | — | — | ✅ |
+| How to reach HR: the HR office contact HR records in **Settings → HR Office Contact**, and HR staff names and job roles | ✅ | ✅ | ✅ |
 
 **Experience** has three parts and every answer gives all three: **length of
 service** at Hospicio (from the hire date), **experience before Hospicio** (the
@@ -3210,8 +3211,12 @@ written about another person. Payroll does not exist in HRISense (Appendix E.5).
 2. A **deterministic guard** refuses, without calling any AI, requests for
    credentials or secrets, SQL or code, attempts to override instructions or
    claim a role the person does not hold, payroll questions, and clearly
-   unrelated requests.
-3. The AI may only call **narrow lookup tools** offered to that tier (43 in all,
+   unrelated requests. For supervisors and employees, **role-scope routing**
+   then answers the questions that have one right answer because of their role,
+   also without calling any AI: how to reach HR (only the HR office contact and
+   HR staff names and job roles), HR staff's or their supervisor's details
+   (outside their access), and, for employees, other people's records.
+3. The AI may only call **narrow lookup tools** offered to that tier (44 in all,
    e.g. `get_attendance`, `get_team_overview`, `get_compliance_overview`,
    `find_employees`, `get_org_catalog`, `search_help_center`; HR also
    `prepare_job_opening` and `compare_applicants`). Each tool re-checks the

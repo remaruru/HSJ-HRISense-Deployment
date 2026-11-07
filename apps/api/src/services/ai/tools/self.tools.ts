@@ -131,7 +131,7 @@ const calendarTool = defineTool({
 const todayTool = defineTool({
   name: 'get_my_day',
   description:
-    "A snapshot for the person asking: today's schedule and attendance record, holidays, approved leave today, pending leave requests, unread notifications and announcements, compliance items needing attention, and upcoming training. Use it for 'what do I need to know today' or dashboard-style questions.",
+    "A snapshot for the person asking: today's schedule and attendance record, holidays, approved leave today, pending leave requests, unread notifications and announcements, compliance items needing attention, and upcoming training. Use it ONLY when the person asks about their own day, such as 'what do I need to know today'. Never use it to answer a question about HR or about anybody else.",
   tiers: ALL_TIERS,
   args: z.object({}).strict(),
   async run(ctx: ToolContext) {

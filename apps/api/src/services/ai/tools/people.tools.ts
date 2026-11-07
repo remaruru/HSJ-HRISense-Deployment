@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../../config/prisma';
 import { servicePeriod } from '../../../lib/service-period';
 import { finalResultOf } from '../../evaluation-workflow';
+import { HrContactService } from '../../hr-contact.service';
 import { isHr } from '../actor/ai-actor';
 import { describeDataset } from '../charts/chart-schema';
 import { profileLinkFor } from '../links/app-links';
@@ -468,4 +469,30 @@ async function complianceAttentionOf(employeeId: string): Promise<number> {
   return items.filter((i) => ['MISSING', 'EXPIRED', 'EXPIRING_SOON', 'NEEDS_REVIEW'].includes(i.status)).length;
 }
 
-export const PEOPLE_TOOLS: AiTool[] = [catalogTool, findTool];
+// ── How to reach HR ──────────────────────────────────────────────────────────
+
+const hrContactTool = defineTool({
+  name: 'get_hr_contacts',
+  description:
+    "How to reach HR: the HR office phone, email and location that HR recorded, and the names and job roles of the HR staff. Use it, and nothing else, for every 'HR details', 'HR info', 'HR profile', 'HR contact', 'HR number', 'connect me to HR', 'who is HR' or 'how do I reach HR' question. It is the only contact information you can give, and it never includes an HR person's own phone, personal email or records.",
+  tiers: ALL_TIERS,
+  args: z.object({}).strict(),
+  async run(ctx: ToolContext) {
+    const { office, staff } = await HrContactService.directory();
+    const recorded = Boolean(office.phone || office.email || office.location);
+    return {
+      data: {
+        office: recorded ? office : null,
+        hrStaff: staff,
+        note: recorded
+          ? 'Give only these details. Fields that are null have not been recorded, so do not mention them or guess them.'
+          : isHr(ctx.actor)
+            ? 'No HR office contact is recorded yet. Say so, and that HR can add it in Settings under HR Office Contact. Never invent a number or email.'
+            : 'No HR office contact is recorded yet. Say so plainly, name the HR staff and suggest going to the HR office in person. Never invent a number or email.',
+      },
+      rows: staff.length,
+    };
+  },
+});
+
+export const PEOPLE_TOOLS: AiTool[] = [catalogTool, findTool, hrContactTool];

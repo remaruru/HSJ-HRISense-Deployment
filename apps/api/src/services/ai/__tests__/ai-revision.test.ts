@@ -18,8 +18,10 @@ import type { AiActor } from '../actor/ai-actor';
 import { EMPLOYEE_TABS, validateLink } from '../links/app-links';
 import { ageOn, experienceFigures, WORK_GROUPS } from '../tools/people.tools';
 import { normalizePriorExperienceYears } from '../../employee.service';
+import { parseHrContact } from '../../hr-contact.service';
 import { salvageCutOffAnswer, trimJobOpeningRepeat } from '../assistant/assistant.orchestrator';
 import { classifyInput } from '../guard/input-guard';
+import { classifyScope, describeRecords } from '../guard/role-scope';
 import { answerToBlocks, chartTable, exportToExcel, exportToPdf } from '../export/ai-export';
 import { DraftStore, jobOpeningDraftSchema, messageActionSchema } from '../actions/job-opening-draft';
 import { buildSystemPolicy, submitAnswerSchema, SUGGESTIONS } from '../policy/ai-policy';
@@ -280,6 +282,91 @@ describe('job opening drafts', () => {
       assert.ok(names(t).includes('find_employees') && names(t).includes('get_org_catalog'));
     }
     assert.ok(names(PermissionTier.FULL).includes('prepare_job_opening'));
+  });
+
+  test('role-scope routing: the questions with one right answer', () => {
+    const { STANDARD: E, SUPERVISOR: S, FULL: H } = PermissionTier;
+    const cases: Array<[string, PermissionTier, string]> = [
+      ['provide hr details', S, 'HR_DETAILS'],
+      ['what about hr profile', S, 'HR_DETAILS'],
+      ['provide the hr details', E, 'HR_DETAILS'],
+      ["Show me the HR officer's profile and birthday", S, 'HR_DETAILS'],
+      ['connect me to hr', E, 'HR_CONTACT'],
+      ['How do I contact HR?', E, 'HR_CONTACT'],
+      ['what is the hr number', S, 'HR_CONTACT'],
+      ['who is hr', E, 'HR_CONTACT'],
+      ["provide the supervisor's details", E, 'SUPERVISOR_DETAILS'],
+      ["What is my supervisor's phone number?", E, 'SUPERVISOR_DETAILS'],
+      ['who is my supervisor?', E, 'SUPERVISOR_NAME'],
+      ["who's employee lack of documents", E, 'OTHER_RECORDS'],
+      ['can you show psychological results of employees', E, 'OTHER_RECORDS'],
+      ["What is my co-worker's phone number and address?", E, 'OTHER_RECORDS'],
+      ["show everyone's birthdays", E, 'OTHER_RECORDS'],
+    ];
+    for (const [q, tier, route] of cases) assert.equal(classifyScope(q, tier), route, q);
+  });
+
+  test('role-scope routing leaves everything else to the model', () => {
+    const { STANDARD: E, SUPERVISOR: S, FULL: H } = PermissionTier;
+    const cases: Array<[string, PermissionTier]> = [
+      ['Did HR approve my leave?', E],
+      ['Can HR see my medical records?', E],
+      ['What does HR do with my profile?', E],
+      ['How do I update my contact number?', E],
+      ['How do employees file leave?', E],
+      ['Which compliance requirements do I still need?', E],
+      ['What is my attendance this month?', E],
+      ['Can my supervisor see my details?', E],
+      ['How do I endorse a leave request?', S],
+      // A supervisor's employees are their direct reports, which they may see.
+      ["who's employee lack of documents", S],
+      // Filipino and Taglish are answered by the model, in that language.
+      ['ano po number ng HR?', E],
+      ['paano ko makokontak ang hr', S],
+      // HR may ask anything within its own access.
+      ['provide hr details', H],
+      ["provide the supervisor's details", H],
+      ["who's employee lack of documents", H],
+    ];
+    for (const [q, tier] of cases) assert.equal(classifyScope(q, tier), null, q);
+  });
+
+  test('the answer names what was asked about', () => {
+    assert.deepEqual(describeRecords('psychological results of employees'), { topic: 'psychological results', confidential: true });
+    assert.deepEqual(describeRecords("who's employee lack of documents"), { topic: 'compliance documents', confidential: false });
+  });
+
+  test('everyone can look up how to reach HR', () => {
+    for (const t of [PermissionTier.FULL, PermissionTier.SUPERVISOR, PermissionTier.STANDARD]) {
+      assert.ok(toolsForTier(t).some((x) => x.name === 'get_hr_contacts'));
+    }
+  });
+
+  test('the HR office contact accepts real values and rejects the rest', () => {
+    const ok = parseHrContact({ phone: ' (02) 8123-4567 local 101 ', email: 'hr@example.org', location: 'Ground floor' });
+    assert.equal(ok.phone, '(02) 8123-4567 local 101', 'trimmed');
+    assert.deepEqual(parseHrContact({ phone: '', email: '', location: '' }), { phone: '', email: '', location: '' }, 'empty clears a field');
+    assert.throws(() => parseHrContact({ phone: 'call me', email: '', location: '' }), /phone number/);
+    assert.throws(() => parseHrContact({ phone: '', email: 'not-an-email', location: '' }), /valid email/);
+    assert.throws(() => parseHrContact({ phone: '', email: '', location: '', role: 'FULL' }));
+  });
+
+  test('the policy keeps supervisors and employees inside the hierarchy', () => {
+    for (const p of [buildSystemPolicy(SUPERVISOR, '2026-11-07', 'SATURDAY'), buildSystemPolicy(EMPLOYEE, '2026-11-07', 'SATURDAY')]) {
+      assert.match(p, /First decide WHOSE information/);
+      assert.match(p, /Call get_hr_contacts/);
+      assert.match(p, /Never answer a question about someone else with the user's own records/);
+      assert.match(p, /OUTSIDE their access/);
+    }
+    assert.match(buildSystemPolicy(SUPERVISOR, '2026-11-07', 'SATURDAY'), /their direct reports only/);
+  });
+
+  test('the policy tells everyone to answer only what was asked', () => {
+    for (const a of [HR, SUPERVISOR, EMPLOYEE]) {
+      const p = buildSystemPolicy(a, '2026-11-07', 'SATURDAY');
+      assert.match(p, /Answer the question that was asked, then stop/);
+      assert.match(p, /least privilege/);
+    }
   });
 
   test('the policy tells HR about job openings and everyone about Hospicio words', () => {

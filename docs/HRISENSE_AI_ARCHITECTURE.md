@@ -13,7 +13,7 @@
 The HSJ HRISense assistant answers questions from **HR, supervisors and
 employees** about HRISense and about the records **each of them is allowed to
 see**. The AI model never touches the database. It can only ask the server to run
-one of **43 narrow, read-only lookup tools**; the server decides who is asking,
+one of **44 narrow, read-only lookup tools**; the server decides who is asking,
 checks every lookup against that person's access, computes every figure itself,
 and validates everything the model returns before the browser shows it. The one
 thing it prepares for HR is a **job opening draft**, which becomes a real opening
@@ -160,6 +160,7 @@ be UUIDs; date ranges are bounded; unit names are resolved server-side.
 | `get_audit_activity` | HR | days |
 | `get_workforce_fact_sheet` | HR | periodDays |
 | `get_org_catalog` | All (headcounts HR only) | — (units, roles and the fixed **work groups**) |
+| `get_hr_contacts` | All | — (the HR office phone, email and location HR recorded in Settings, plus HR staff names and job roles; never an HR person's own phone, personal email or records) |
 | `find_employees` | All (scoped; birth date and age: HR anyone, others only themselves) | workGroup, roleIds, roleText, unitIds, unitText, profession, employmentStatus, min/max service years, min prior/total experience, min/max age, hiredFrom/To, sortBy, order, limit, include latestEvaluation (HR) / trainingsCompleted / complianceAttention (HR) |
 | `prepare_job_opening` | HR | jobRoleId or jobRoleTitle, unitId (org-wide roles), title, employmentType, vacancies, description, responsibilities, qualifications, requiredDocuments, openingDate, closingDate |
 | `compare_applicants` | HR | openingId or openingText, status |
@@ -255,6 +256,15 @@ instruction overrides and role-play ("ignore your instructions", "pretend I am
 HR", "developer mode", "reveal your system prompt"), false role claims (an
 employee saying "I'm HR"), payroll questions, and clearly unrelated requests with
 no HRISense term. Invisible characters used to hide text are stripped first.
+
+**Role-scope routing (`guard/role-scope.ts`, `assistant/scoped-answers.ts`, also
+before any model call):** for supervisors and employees, the questions with one
+right answer because of their role are answered by the server: how to reach HR,
+HR staff's details, their supervisor's name or details, and (employees) other
+people's records. They use only the HR office contact, HR staff names and job
+roles, and the asker's own supervisor's name and job role, so no record can be
+added that nobody asked for. Own-record, how-to and Filipino or Taglish questions
+go to the model, whose policy has the same rules.
 
 **Output (`guard/output-guard.ts`):** removes code blocks, HTML, script tags and
 inline links; redacts API keys, JWTs, bcrypt hashes, `password: …` pairs and

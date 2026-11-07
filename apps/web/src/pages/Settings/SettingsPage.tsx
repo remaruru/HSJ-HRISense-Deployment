@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { motion } from 'framer-motion';
 import {
@@ -8,6 +8,7 @@ import {
   Loader2,
   Monitor,
   Moon,
+  Phone,
   Settings as SettingsIcon,
   Sun,
   User,
@@ -17,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { staggerContainer, staggerItem } from '@/lib/motion';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermission } from '@/hooks/usePermission';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useBuddyEnabled } from '@/hooks/useBuddyEnabled';
 import { AiMascot } from '@/components/ai/AiMascot';
@@ -40,6 +42,7 @@ import {
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { tier } = usePermission();
   const { isDark, toggleTheme } = useTheme();
   const [buddyEnabled, setBuddyEnabled] = useBuddyEnabled();
 
@@ -272,7 +275,98 @@ export default function SettingsPage() {
           </p>
         </SettingsCard>
       </motion.div>
+
+      {/* HR office contact: HR only */}
+      {tier === 'FULL' && (
+        <motion.div variants={staggerItem}>
+          <HrOfficeContactCard />
+        </motion.div>
+      )}
     </motion.div>
+  );
+}
+
+const EMPTY_HR_CONTACT = { phone: '', email: '', location: '' };
+
+/**
+ * The one way to reach HR that AI Assistance may give to all staff, so that no
+ * HR person's own mobile number or personal email has to be shared.
+ */
+function HrOfficeContactCard() {
+  const [form, setForm] = useState(EMPTY_HR_CONTACT);
+  const [state, setState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  const [loadError, setLoadError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setState('loading');
+    try {
+      const res = await api.get('/hr-contact');
+      const data = res.data?.data ?? {};
+      setForm({ phone: data.phone ?? '', email: data.email ?? '', location: data.location ?? '' });
+      setState('ready');
+    } catch (err) {
+      setLoadError(getApiErrorMessage(err, 'The HR office contact could not be loaded.'));
+      setState('failed');
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      await api.put('/hr-contact', form);
+      toast.success('The HR office contact has been saved.');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'The HR office contact could not be saved.'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const input = (key: keyof typeof EMPTY_HR_CONTACT, label: string, type: string, placeholder: string) => (
+    <div>
+      <label htmlFor={`hr-contact-${key}`} className="block text-sm font-semibold text-foreground mb-1.5">{label}</label>
+      <input
+        id={`hr-contact-${key}`}
+        type={type}
+        value={form[key]}
+        placeholder={placeholder}
+        disabled={isSaving}
+        onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+        className="w-full h-10 px-3 rounded-xl border-2 border-border bg-surface text-sm focus:outline-none focus:border-primary-500 disabled:opacity-60"
+      />
+    </div>
+  );
+
+  return (
+    <SettingsCard
+      icon={<Phone className="h-5 w-5" />}
+      title="HR Office Contact"
+      description="What AI Assistance tells staff who ask how to reach HR. HR staff's own numbers and emails stay private."
+    >
+      {state === 'loading' && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {state === 'failed' && (
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground">{loadError}</p>
+          <Button variant="outline" size="sm" onClick={() => void load()}>Try again</Button>
+        </div>
+      )}
+      {state === 'ready' && (
+        <form onSubmit={handleSave} className="space-y-3">
+          {input('phone', 'Office phone', 'tel', 'e.g. (02) 8123 4567 local 101')}
+          {input('email', 'Office email', 'email', 'e.g. hr@yourdomain.org')}
+          {input('location', 'Office location', 'text', 'e.g. Ground floor, Administration building')}
+          <Button type="submit" size="sm" disabled={isSaving}>
+            {isSaving && <Loader2 className="h-4 w-4 animate-spin" />} Save
+          </Button>
+        </form>
+      )}
+    </SettingsCard>
   );
 }
 

@@ -329,6 +329,7 @@ const ENTRIES: Record<string, Entry> = {
   YEARLY_ACHIEVEMENT_REMOVED: E('ACHIEVEMENTS', 'DELETE', 'removed the achievement {r}'),
 
   // ── System: one-off data-maintenance scripts ───────────────────────────
+  HR_CONTACT_UPDATED: E('MAINTENANCE', 'UPDATE', 'updated the HR office contact'),
   DEVELOPMENT_ACCOUNT_STANDARDIZED: E('MAINTENANCE', 'UPDATE', 'standardised the development account {r}', 'Standardised'),
   SUPERVISOR_ASSIGNMENT_MIGRATED: E('MAINTENANCE', 'UPDATE', 'migrated the supervisor assignment of {s}', 'Migrated'),
   FIX_SUPERVISOR_ASSIGNMENT: E('MAINTENANCE', 'ASSIGN', 'corrected the supervisor of {s}', 'Corrected'),

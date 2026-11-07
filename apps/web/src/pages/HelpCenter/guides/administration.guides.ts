@@ -175,6 +175,8 @@ export const ADMINISTRATION_GUIDES: HelpGuideDefinition[] = [
         'Attendance rate counts only days that have a record: Present, Late and Half day are presence; only an Absent record is an absence. Days with no imported record are never counted as absent — record coverage shows how complete the data is.',
         'The assistant never sees passwords, government ID numbers, addresses, phone numbers, salaries, résumé contents, medical HR notes or confidential psychological notes.',
         "Birth dates and ages are private: HR can see anyone's, and everyone else only their own. Supervisors see their team's work details, never their personal details.",
+        'Ask how to reach HR ("How do I contact HR?") and the assistant gives the HR office contact and the names of the HR staff. HR records that contact in **Settings**, under **HR Office Contact**.',
+        'The assistant answers within your role. If you ask about someone outside your access, it says so and tells you who can help, and it does not add details you did not ask for.',
         'When it lists people by experience, age or trainings, the assistant only states the facts — it never calls anyone "the best" or recommends a person. The choice stays with you.',
       ],
       relatedGuideIds: ['AI_ASSISTANCE_ASK', 'AI_ASSISTANCE_EXPORT', 'AI_ASSISTANCE_JOB_OPENING'],
@@ -561,7 +563,7 @@ export const ADMINISTRATION_GUIDES: HelpGuideDefinition[] = [
           stepNumber: 1,
           title: 'Open Settings',
           instruction: 'Select **Settings** in the menu, or in the profile menu at the top right.',
-          expectedResult: 'Five cards appear: My Profile, Security, Appearance, HRISense buddy and Notifications.',
+          expectedResult: 'Five cards appear: My Profile, Security, Appearance, HRISense buddy and Notifications. HR also sees HR Office Contact.',
           uiPath: 'Left menu -> Settings',
         },
         {
@@ -589,6 +591,10 @@ export const ADMINISTRATION_GUIDES: HelpGuideDefinition[] = [
       ],
       whatHappensNext: 'Your choices stay on this device the next time you sign in here.',
       troubleshooting: [
+        {
+          problem: 'Staff need a way to reach HR.',
+          solution: 'HR fills in **HR Office Contact** in Settings with the office phone, email and location. AI Assistance gives staff only these details, so HR staff\'s own numbers and emails stay private.',
+        },
         {
           problem: 'I want to change my name or contact details here.',
           solution: 'Use **My Profile** → **Edit My Profile** for your phone numbers, addresses and emergency contacts. Everything else is kept by HR.',
