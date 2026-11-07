@@ -190,9 +190,8 @@ describe('exports', () => {
 
   test('PDF and Excel are real files carrying the answer and the chart data', async () => {
     const spec = {
-      title: 'AI Assistance Answer',
       label: 'AI Assistance',
-      meta: ['Generated for Test Person (HR)'],
+      meta: ['Exported Nov 7, 2026, 4:00 PM'],
       sections: [{ blocks: answerToBlocks(answer), charts: [chart] }],
       links: [{ label: "Open St. Mary Staff's profile", path: `/employees/${OTHER}` }],
     };

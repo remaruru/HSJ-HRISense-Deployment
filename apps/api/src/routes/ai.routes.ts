@@ -269,8 +269,8 @@ async function sendExport(res: any, spec: ExportDocument, format: 'pdf' | 'excel
 /**
  * GET /ai/assistant/conversations/:id/messages/:messageId/export?format=pdf|excel
  * One of YOUR answers exactly as stored — its text, charts (with their data)
- * and links — as a PDF to read or an Excel workbook to work with. The question
- * that was typed stays out of the file, its title and its name.
+ * and links — as a PDF to read or an Excel workbook to work with. Only the AI's
+ * output and the export time: no typed question, title or asker's name.
  */
 router.get(
   '/assistant/conversations/:id/messages/:messageId/export',
@@ -304,12 +304,8 @@ router.get(
     await sendExport(
       res,
       {
-        title: 'AI Assistance Answer',
         label: 'AI Assistance',
-        meta: [
-          `Generated for ${actor.displayName} (${TIER_LABEL[actor.tier]}) on ${phDateTime(new Date(message.createdAt))}`,
-          `Exported ${phDateTime()} · based on this person's own HRISense access`,
-        ],
+        meta: [`Exported ${phDateTime()}`],
         sections,
         links: message.links,
         notes: message.notices,
@@ -349,7 +345,6 @@ router.post(
     const parsed = summaryExportBody.safeParse(req.body ?? {});
     if (!parsed.success) throw new AppError('This workforce summary could not be exported. Generate it again and retry.', 400);
     const { format, periodDays, analysis } = parsed.data;
-    const actor = await resolveAiActor(req.user!.userId);
     const itemSection = (heading: string, items: typeof analysis.observations): ExportDocument['sections'][number] => ({
       heading,
       blocks: items.flatMap((it) => [
@@ -364,7 +359,7 @@ router.post(
       {
         title: `Workforce summary — last ${periodDays} days`,
         label: 'AI Workforce Summary',
-        meta: [`Generated for ${actor.displayName} (${TIER_LABEL[actor.tier]})`, `Exported ${phDateTime()}`],
+        meta: [`Exported ${phDateTime()}`],
         sections: [
           { heading: 'Summary', blocks: answerToBlocks(analysis.summary) },
           ...(analysis.observations.length ? [itemSection('Observations', analysis.observations)] : []),
